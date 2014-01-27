@@ -1444,16 +1444,27 @@ let unification_error unif ?(swap=false) tr txt1 ppf txt2 =
       let (t1,t1',t2,t2') = if swap then (t2,t2',t1,t1') else (t1,t1',t2,t2') in
       print_labels := not !Clflags.classic;
       let tr = List.map prepare_expansion tr in
-      fprintf ppf
-        "@[<v>\
-          @[%t@;<1 2>%a@ \
-            %t@;<1 2>%a\
-          @]%a%t\
-         @]"
-        txt1 (type_expansion t1) t1'
-        txt2 (type_expansion t2) t2'
-        (trace false "is not compatible with type") tr
-        (explanation unif mis);
+      if not swap then 
+        fprintf ppf
+          "@[<v>\
+            @[%t@;<1 2>%a@ \
+              %t@;<1 2>%a\
+            @]%a%t\
+           @]"
+          txt1 (type_expansion t1) t1'
+          txt2 (type_expansion t2) t2'
+          (trace false "is not compatible with type") tr
+          (explanation unif mis)
+      else 
+        fprintf ppf
+          "@[<v>\
+            @[%t %a %t %a\
+            @]%a%t\
+           @]"
+          txt1 (type_expansion t1) t1'
+          txt2 (type_expansion t2) t2'
+          (trace false "is not compatible with type") tr
+          (explanation unif mis);
       print_labels := true
     with exn ->
       print_labels := true;
