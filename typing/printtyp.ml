@@ -1429,7 +1429,43 @@ let rec trace_same_names = function
       type_same_name t1 t2; type_same_name t1' t2'; trace_same_names rem
   | _ -> ()
 
-let unification_error unif ?(swap=false) tr txt1 ppf txt2 =
+let unification_error unif tr txt1 ppf txt2 =
+  reset ();
+  trace_same_names tr;
+  let tr = List.map (fun (t, t') -> (t, hide_variant_name t')) tr in
+  let mis = mismatch unif tr in
+  match tr with
+  | [] | _ :: [] -> assert false
+  | t1 :: t2 :: tr ->
+    try
+      let tr = filter_trace (mis = None) tr in
+      let t1, t1' = may_prepare_expansion (tr = []) t1
+      and t2, t2' = may_prepare_expansion (tr = []) t2 in
+      print_labels := not !Clflags.classic;
+      let tr = List.map prepare_expansion tr in
+      fprintf ppf
+        "@[<v>\
+          @[%t@;<1 2>%a@ \
+            %t@;<1 2>%a\
+          @]%a%t\
+         @]"
+        txt1 (type_expansion t1) t1'
+        txt2 (type_expansion t2) t2'
+        (trace false "is not compatible with type") tr
+        (explanation unif mis);
+      print_labels := true
+    with exn ->
+      print_labels := true;
+      raise exn
+
+let report_unification_error ppf env ?(unif=true) 
+    tr txt1 txt2 =
+  wrap_printing_env env (fun () -> unification_error unif tr txt1 ppf txt2)
+;;
+
+
+(* note: quite a bit of code copy-pasted from above *)
+let unification_error_easy unif swap tr txt1 ppf txt2 txt3 =
   reset ();
   trace_same_names tr;
   let tr = List.map (fun (t, t') -> (t, hide_variant_name t')) tr in
@@ -1444,36 +1480,27 @@ let unification_error unif ?(swap=false) tr txt1 ppf txt2 =
       let (t1,t1',t2,t2') = if swap then (t2,t2',t1,t1') else (t1,t1',t2,t2') in
       print_labels := not !Clflags.classic;
       let tr = List.map prepare_expansion tr in
-      if not swap then 
-        fprintf ppf
-          "@[<v>\
-            @[%t@;<1 2>%a@ \
-              %t@;<1 2>%a\
-            @]%a%t\
-           @]"
-          txt1 (type_expansion t1) t1'
-          txt2 (type_expansion t2) t2'
-          (trace false "is not compatible with type") tr
-          (explanation unif mis)
-      else 
-        fprintf ppf
-          "@[<v>\
-            @[%t %a %t %a\
-            @]%a%t\
-           @]"
-          txt1 (type_expansion t1) t1'
-          txt2 (type_expansion t2) t2'
-          (trace false "is not compatible with type") tr
-          (explanation unif mis);
+      fprintf ppf
+        "@[<v>\
+          @[%t@;<1 2>%a@ \
+            %t@;<1 2>%a\
+          @]%a%t\
+          %t
+         @]"
+        txt1 (type_expansion t1) t1'
+        txt2 (type_expansion t2) t2'
+        (trace false "is not compatible with type") tr
+        (explanation unif mis)
+        txt3;
       print_labels := true
     with exn ->
       print_labels := true;
       raise exn
 
-let report_unification_error ppf env ?(unif=true) ?(swap=false)
-    tr txt1 txt2 =
-  wrap_printing_env env (fun () -> unification_error unif tr txt1 ppf txt2 ~swap:swap)
-;;
+let report_unification_error_easy ppf env ?(unif=true) ?(swap=true)
+    tr txt1 txt2 txt3 =
+  wrap_printing_env env (fun () -> unification_error_easy unif swap tr txt1 ppf txt2 txt3)
+
 
 
 let trace fst keep_last txt ppf tr =

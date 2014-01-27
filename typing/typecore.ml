@@ -29,7 +29,7 @@ type error =
   | Multiply_bound_variable of string
   | Orpat_vars of Ident.t
   | Expr_type_clash of (type_expr * type_expr) list
-  | Expr_type_clash_easy of string * (type_expr * type_expr) list
+  | Expr_type_clash_easy of string * string * (type_expr * type_expr) list
   | Apply_non_function of type_expr
   | Apply_wrong_label of label * type_expr
   | Label_multiply_defined of string
@@ -1888,6 +1888,39 @@ and type_expect_ ?in_function env sexp ty_expected =
   | Pexp_function caselist ->
       type_function ?in_function
         loc sexp.pexp_attributes env ty_expected "" caselist
+  | Pexp_apply(sfunct, sargs) when !Clflags.easytype ->
+      begin_def ();
+      begin_def ();
+      let funct = type_exp env sfunct in
+      end_def ();
+      generalize_structure funct.exp_type;
+      let rec lower_args seen ty_fun =
+        let ty = expand_head env ty_fun in
+        if List.memq ty seen then () else
+        match ty.desc with
+          Tarrow (l, ty_arg, ty_fun, com) ->
+            (try unify_var env (newvar()) ty_arg with Unify _ -> assert false);
+            lower_args (ty::seen) ty_fun
+        | _ -> ()
+      in
+      let ty = instance env funct.exp_type in
+      end_def ();
+      wrap_trace_gadt_instances env (lower_args []) ty;
+      begin_def ();
+  (* --AC: TODO *)
+      let (args, ty_res) = type_application env funct sargs in
+      end_def ();
+      unify_var env (newvar()) funct.exp_type;
+      let exp = {
+        exp_desc = Texp_apply(funct, args);
+        exp_loc = loc; exp_extra = [];
+        exp_type = ty_res;
+        exp_attributes = sexp.pexp_attributes;
+        exp_env = env } in
+      unify_exp_easy env (re exp) (instance env ty_expected) 
+        "the result of the function application is required by the context to have type"
+        (*--AC: msgbonus as hint on how to get details for the application *)
+
   | Pexp_apply(sfunct, sargs) ->
       if sargs = [] then
         Syntaxerr.ill_formed_ast loc "Function application with no argument.";
@@ -2166,8 +2199,23 @@ and type_expect_ ?in_function env sexp ty_expected =
             exp_type = ifso.exp_type;
             exp_attributes = sexp.pexp_attributes;
             exp_env = env }
-      | Some sifnot ->
-         (* AC:.... TODO *)
+      | Some sifnot when !Clflags.easytype ->
+          let ifso = type_exp env sifso in
+          let ifso = unify_exp_easy env ifso ty_expected  
+            "the then-branch of the conditional is required by the context to have type" in
+          let ifnot = type_exp env sifnot in
+          let ifnot = unify_exp_easy env ifnot ty_expected
+            "the else-branch of the conditional is required to have\nthe same type as the first branch, that is, the type" in
+          (*--AC: not sure i understand why it's needed *)
+          let _ = unify_exp_easy env ifnot ifso.exp_type
+            "the else-branch of the conditional is required to have\nthe same type as the first branch, that is, the type" in
+          re {
+            exp_desc = Texp_ifthenelse(cond, ifso, Some ifnot);
+            exp_loc = loc; exp_extra = [];
+            exp_type = ifso.exp_type;
+            exp_attributes = sexp.pexp_attributes;
+            exp_env = env }
+      | Some sifnot (* when not !Clflags.easytype*) ->
           let ifso = type_expect env sifso ty_expected in
           let ifnot = type_expect env sifnot ty_expected in
           (* Keep sharing *)
@@ -3425,39 +3473,52 @@ and type_statement env sexp =
 and msg_so msg =
   msg ^ ",\nso it should have type"
 
-and type_statement_easify env sexp msg =
+(* --AC: is msgplus needed? *)
+and type_statement_easify env sexp ?(msgplus="") msg =
   if !Clflags.easytype
-    then type_statement_easy env sexp msg
+    then type_statement_easy env sexp msg msgplus
     else type_statement env sexp
 
-and type_statement_easy env sexp msg =
+and type_statement_easy env sexp msg msgbonus =
   (* --AC: would this be equivalent to 
       "type_expect_predef_easy env sexp Predef.type_unit msg" ? *)
   begin_def(); (*--AC: we don't need this, do we?*)
   let exp = type_exp env sexp in
   end_def();
+  let msgadd =  
+    match (expand_head env exp.exp_type).desc with
+    | Tarrow (_,tleft,_,_) ->
+       "\n" ^ 
+       begin match (expand_head env tleft).desc with
+       | Tconstr (p, _, _) when Path.same p Predef.path_unit ->
+          "You probably forgot to provide \"()\" as argument."
+       | Tarrow _ -> "You probably forgot several arguments."
+       | _ -> "You probably forgot an argument."
+       end 
+    | _ -> ""
+    in
   let expected_ty = instance_def Predef.type_unit in
-  try 
-    unify_exp env exp expected_ty; exp
-  with Error (loc', env', Expr_type_clash(trace')) ->
-       raise (Error (loc', env', Expr_type_clash_easy(msg,trace')))
+  unify_exp_easy env exp expected_ty ~msgbonus:(msgbonus ^ msgadd) msg
 
 (* note: should call type_expect_easify with a ty_expected
    that is a predefined type only if it is not polymorphic *)
 
-and type_expect_easify ?in_function env sexp ty_expected msg =
+and type_expect_easify ?in_function env sexp ty_expected ?msgbonus msg =
   if !Clflags.easytype
-    then type_expect_predef_easy env sexp ty_expected msg
+    then type_expect_predef_easy env sexp ty_expected ?msgbonus msg
     else type_expect ?in_function env sexp ty_expected 
 
-and type_expect_predef_easy env sexp predef_expected msg =
+and type_expect_predef_easy env sexp predef_expected ?msgbonus msg =
   let exp = type_exp env sexp in
   let expected_ty = instance_def predef_expected in
-  try 
-    unify_exp env exp expected_ty; exp
-  with Error (loc', env', Expr_type_clash(trace')) ->
-       raise (Error (loc', env', Expr_type_clash_easy(msg,trace')))
+  unify_exp_easy env exp expected_ty ?msgbonus msg
 
+and unify_exp_easy env exp expected_ty ?(msgbonus="") msg =
+  try 
+    unify_exp env exp expected_ty; 
+    exp
+  with Error (loc', env', Expr_type_clash(trace')) ->
+       raise (Error (loc', env', Expr_type_clash_easy(msg,msgbonus,trace')))
 
 (* Typing of match cases *)
 
@@ -3856,12 +3917,14 @@ let report_error env ppf = function
            fprintf ppf "This expression has type")
         (function ppf ->
            fprintf ppf "but an expression was expected of type")
-  | Expr_type_clash_easy (msg, trace) ->
-      report_unification_error ppf env trace ~swap:true
+  | Expr_type_clash_easy (msg1, msg3, trace) ->
+      report_unification_error_easy ppf env trace ~swap:true
         (function ppf ->
-           fprintf ppf "%s" msg)
+           fprintf ppf "%s" msg1)
         (function ppf ->
            fprintf ppf "but it has type")
+        (function ppf ->
+           fprintf ppf "%s" msg3)
   | Apply_non_function typ ->
       reset_and_mark_loops typ;
       begin match (repr typ).desc with
