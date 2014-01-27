@@ -15,6 +15,7 @@
 
 module type Common_options = sig
   val _absname : unit -> unit
+  val _easytype : unit -> unit
   val _I : string -> unit
   val _labels : unit -> unit
   val _no_alias_deps : unit -> unit
@@ -56,6 +57,7 @@ module type Compiler_options =  sig
   val _cclib : string -> unit
   val _ccopt : string -> unit
   val _config : unit -> unit
+  val _easytype : unit -> unit
   val _for_pack : string -> unit
   val _g : unit -> unit
   val _i : unit -> unit

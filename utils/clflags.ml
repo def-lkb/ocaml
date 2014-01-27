@@ -112,4 +112,5 @@ let runtime_variant = ref "";;      (* -runtime-variant *)
 
 let keep_docs = ref false              (* -keep-docs *)
 let keep_locs = ref false              (* -keep-locs *)
+let easytype = ref false               (* -easytype *)
 let unsafe_string = ref true;;         (* -safe-string / -unsafe-string *)

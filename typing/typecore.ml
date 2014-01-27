@@ -29,6 +29,7 @@ type error =
   | Multiply_bound_variable of string
   | Orpat_vars of Ident.t
   | Expr_type_clash of (type_expr * type_expr) list
+  | Expr_type_clash_easy of string * (type_expr * type_expr) list
   | Apply_non_function of type_expr
   | Apply_wrong_label of label * type_expr
   | Label_multiply_defined of string
@@ -2173,6 +2174,18 @@ and type_expect_ ?in_function env sexp ty_expected =
             exp_attributes = sexp.pexp_attributes;
             exp_env = env }
       end
+
+  | Pexp_sequence(sexp1, sexp2) when !Clflags.easytype ->
+      let exp1 = type_statement_easy env sexp1 "the expression is followed by a semi-column" in
+      (* the rest is copied from original code *)
+      let exp2 = type_expect env sexp2 ty_expected in
+      re {
+        exp_desc = Texp_sequence(exp1, exp2);
+        exp_loc = loc; exp_extra = [];
+        exp_type = exp2.exp_type;
+        exp_attributes = sexp.pexp_attributes;
+        exp_env = env }      
+
   | Pexp_sequence(sexp1, sexp2) ->
       let exp1 = type_statement env sexp1 in
       let exp2 = type_expect env sexp2 ty_expected in
@@ -3408,6 +3421,16 @@ and type_statement env sexp =
   unify_var env tv ty;
   exp
 
+and type_statement_easy env sexp msg =
+  begin_def(); (*--AC:not needed, is it?*)
+  let exp = type_exp env sexp in
+  end_def();
+  let expected_ty = instance_def Predef.type_unit in
+  try 
+    unify_exp env exp expected_ty; exp
+  with Error (loc', env', Expr_type_clash(trace')) ->
+       raise (Error (loc', env', Expr_type_clash_easy(msg,trace')))
+
 (* Typing of match cases *)
 
 and type_cases ?in_function env ty_arg ty_res partial_flag loc caselist =
@@ -3805,6 +3828,12 @@ let report_error env ppf = function
            fprintf ppf "This expression has type")
         (function ppf ->
            fprintf ppf "but an expression was expected of type")
+  | Expr_type_clash_easy (msg, trace) ->
+      report_unification_error ppf env trace ~swap:true
+        (function ppf ->
+           fprintf ppf "%s,\n so it should have type" msg)
+        (function ppf ->
+           fprintf ppf "but it has type")
   | Apply_non_function typ ->
       reset_and_mark_loops typ;
       begin match (repr typ).desc with

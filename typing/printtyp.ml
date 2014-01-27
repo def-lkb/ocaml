@@ -1429,7 +1429,7 @@ let rec trace_same_names = function
       type_same_name t1 t2; type_same_name t1' t2'; trace_same_names rem
   | _ -> ()
 
-let unification_error unif tr txt1 ppf txt2 =
+let unification_error unif ?(swap=false) tr txt1 ppf txt2 =
   reset ();
   trace_same_names tr;
   let tr = List.map (fun (t, t') -> (t, hide_variant_name t')) tr in
@@ -1441,6 +1441,7 @@ let unification_error unif tr txt1 ppf txt2 =
       let tr = filter_trace (mis = None) tr in
       let t1, t1' = may_prepare_expansion (tr = []) t1
       and t2, t2' = may_prepare_expansion (tr = []) t2 in
+      let (t1,t1',t2,t2') = if swap then (t2,t2',t1,t1') else (t1,t1',t2,t2') in
       print_labels := not !Clflags.classic;
       let tr = List.map prepare_expansion tr in
       fprintf ppf
@@ -1458,10 +1459,11 @@ let unification_error unif tr txt1 ppf txt2 =
       print_labels := true;
       raise exn
 
-let report_unification_error ppf env ?(unif=true)
+let report_unification_error ppf env ?(unif=true) ?(swap=false)
     tr txt1 txt2 =
-  wrap_printing_env env (fun () -> unification_error unif tr txt1 ppf txt2)
+  wrap_printing_env env (fun () -> unification_error unif tr txt1 ppf txt2 ~swap:swap)
 ;;
+
 
 let trace fst keep_last txt ppf tr =
   print_labels := not !Clflags.classic;
