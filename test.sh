@@ -1,0 +1,1 @@
+boot/ocamlrun ./ocamlc -I stdlib -easytype test.ml

@@ -1321,7 +1321,12 @@ let print_tags ppf fields =
 
 let has_explanation unif t3 t4 =
   match t3.desc, t4.desc with
-    Tfield _, (Tnil|Tconstr _) | (Tnil|Tconstr _), Tfield _
+  (* case added for easytype *)
+  | (Tconstr (p, [ty1], _), ty2 | ty2, Tconstr (p, [ty1], _)) 
+     when (match p with Pdot(Pident id, "ref", pos) 
+           when Ident.same id ident_pervasive -> true | _ -> false) 
+     -> true
+  | Tfield _, (Tnil|Tconstr _) | (Tnil|Tconstr _), Tfield _
   | Tnil, Tconstr _ | Tconstr _, Tnil
   | _, Tvar _ | Tvar _, _
   | Tvariant _, Tvariant _ -> true
@@ -1340,6 +1345,14 @@ let rec mismatch unif = function
 
 let explanation unif t3 t4 ppf =
   match t3.desc, t4.desc with
+  (* next case added for easytype;
+     AC--TODO: apply the case only when ty1 is unifiable with ty2,
+     however do so without performing any side-effects on them. *)
+  | (Tconstr (p, [ty1], _), ty2 | ty2, Tconstr (p, [ty1], _)) 
+     when (match p with Pdot(Pident id, "ref", pos) 
+           when Ident.same id ident_pervasive -> true | _ -> false) ->
+      fprintf ppf
+        "@,@[You are probably missing a \"!\" operator somewhere.@]"
   | Ttuple [], Tvar _ | Tvar _, Ttuple [] ->
       fprintf ppf "@,Self type cannot escape its class"
   | Tconstr (p, tl, _), Tvar _
@@ -1443,10 +1456,11 @@ let unification_error unif tr txt1 ppf txt2 =
       and t2, t2' = may_prepare_expansion (tr = []) t2 in
       print_labels := not !Clflags.classic;
       let tr = List.map prepare_expansion tr in
+      (* AC: added a dot at the end of the sentence. *)
       fprintf ppf
         "@[<v>\
           @[%t@;<1 2>%a@ \
-            %t@;<1 2>%a\
+            %t@;<1 2>%a.\ 
           @]%a%t\
          @]"
         txt1 (type_expansion t1) t1'

@@ -1848,7 +1848,7 @@ and type_expect_ ?in_function env sexp ty_expected =
         type_let env rec_flag spat_sexp_list scp true in
       let body =
         type_expect_easify new_env (wrap_unpacks sbody unpacks) ty_expected
-          (easy_report_std "the body of this let-expression is required by the context to have type") in
+          (easy_report_but "the body of this let-expression is required by the context to have type") in
       re {
         exp_desc = Texp_let(rec_flag, pat_exp_list, body);
         exp_loc = loc; exp_extra = [];
@@ -1885,7 +1885,8 @@ and type_expect_ ?in_function env sexp ty_expected =
              [Vb.mk spat smatch] sexp)
       in
       type_expect_easify ?in_function env sfun ty_expected
-        (easy_report_std "the body of this function is required by the context to have type")
+        (easy_report_but "the body of this function is required by the context to have type")
+
         (* TODO: keep attributes, call type_function directly *)
   | Pexp_fun (l, None, spat, sexp) ->
       type_function ?in_function loc sexp.pexp_attributes env ty_expected
@@ -1923,8 +1924,7 @@ and type_expect_ ?in_function env sexp ty_expected =
         exp_attributes = sexp.pexp_attributes;
         exp_env = env } in
       unify_exp_easy env (re exp) (instance env ty_expected) 
-        (easy_report_std "the result of the function application is required by the context to have type")
-        (*--AC: msgbonus as hint on how to get details for the application *)
+        (easy_report_but "the result of the function application is required by the context to have type")
 
   | Pexp_apply(sfunct, sargs) ->
       if sargs = [] then
@@ -2193,11 +2193,11 @@ and type_expect_ ?in_function env sexp ty_expected =
         exp_env = env }
   | Pexp_ifthenelse(scond, sifso, sifnot) ->
       let cond = type_expect_easify env scond Predef.type_bool 
-         (easy_report_std "this expression is the condition of a if-statement") in
+         (easy_report_so_but "this expression is the condition of a if-statement") in
       begin match sifnot with
         None ->
           let ifso = type_expect_easify env sifso Predef.type_unit 
-            (easy_report_std "this expression is the result of a conditional with no else branch") in
+            (easy_report_so_but "this expression is the result of a conditional with no else branch") in
           rue {
             exp_desc = Texp_ifthenelse(cond, ifso, None);
             exp_loc = loc; exp_extra = [];
@@ -2221,7 +2221,7 @@ and type_expect_ ?in_function env sexp ty_expected =
              (fun ppf (m1,m2,m3,m4) ->
                 Format.fprintf ppf
                   "@[<v>The then-branch has type %a whereas the else-branch has type %a.@  \
-                    @[%s@ %a@ %s@ %a@;\
+                    @[%s@ [%a]@ %s@ [%a].@;\
                     @]%a\
                     %a
                    @]"
@@ -2251,7 +2251,7 @@ and type_expect_ ?in_function env sexp ty_expected =
       end
   | Pexp_sequence(sexp1, sexp2) ->
       let exp1 = type_statement_easify env sexp1 
-        (easy_report_std "this expression is followed by a semi-column") in
+        (easy_report_so_but "this expression is followed by a semi-column") in
       let exp2 = type_expect env sexp2 ty_expected in
       re {
         exp_desc = Texp_sequence(exp1, exp2);
@@ -2261,9 +2261,9 @@ and type_expect_ ?in_function env sexp ty_expected =
         exp_env = env }
   | Pexp_while(scond, sbody) ->
       let cond = type_expect_easify env scond Predef.type_bool 
-        (easy_report_std "this expression is the condition of a while loop") in
+        (easy_report_so_but "this expression is the condition of a while loop") in
       let body = type_statement_easify env sbody 
-        (easy_report_std "this expression is the body of a while loop") in
+        (easy_report_so_but "this expression is the body of a while loop") in
       rue {
         exp_desc = Texp_while(cond, body);
         exp_loc = loc; exp_extra = [];
@@ -2272,9 +2272,9 @@ and type_expect_ ?in_function env sexp ty_expected =
         exp_env = env }
   | Pexp_for(param, slow, shigh, dir, sbody) ->
       let low = type_expect_easify env slow Predef.type_int 
-        (easy_report_std "this expression is a for-loop start index") in
+        (easy_report_so_but "this expression is a for-loop start index") in
       let high = type_expect_easify env shigh Predef.type_int
-        (easy_report_std "this expression is a for-loop stop index") in
+        (easy_report_so_but "this expression is a for-loop stop index") in
       let id, new_env =
         match param.ppat_desc with
         | Ppat_any -> Ident.create "_for", env
@@ -2287,7 +2287,7 @@ and type_expect_ ?in_function env sexp ty_expected =
             raise (Error (param.ppat_loc, env, Invalid_for_loop_index))
       in
       let body = type_statement_easify new_env sbody 
-        (easy_report_std "this expression is the body of a while loop") in
+        (easy_report_so_but "this expression is the body of a while loop") in
       rue {
         exp_desc = Texp_for(id, param, low, high, dir, body);
         exp_loc = loc; exp_extra = [];
@@ -2605,7 +2605,7 @@ and type_expect_ ?in_function env sexp ty_expected =
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_assert (e) ->
-      let cond = type_expect_easify env e Predef.type_bool (easy_report_std "this expression is the condition of an assertion") in
+      let cond = type_expect_easify env e Predef.type_bool (easy_report_so_but "this expression is the condition of an assertion") in
       let exp_type =
         match cond.exp_desc with
         | Texp_construct(_, {cstr_name="false"}, _) ->
@@ -3497,15 +3497,18 @@ and easy_report ?(swap=false) (msg1:string) (msg2:string) : easy_reporter =
     let (m1,m2) = if swap then (m2,m1) else (m1,m2) in
     Format.fprintf ppf
       "@[<v>\
-        @[%s@;%a@ \
-          %s@;<1 2>%a\
+        @[%s@;<1 2>[%a]@ \
+          %s@;<1 2>[%a].\
         @]%a\
         %a
        @]"
      msg1 m1 () msg2 m2 () m3 () m4 ()
 
-and easy_report_std (msg:string) : easy_reporter = 
-   easy_report ~swap:true (msg ^ ",\nso it should have type") "but it has type"
+and easy_report_but (msg:string) : easy_reporter = 
+   easy_report ~swap:true msg " but it has type"
+
+and easy_report_so_but (msg:string) : easy_reporter = 
+   easy_report_but (msg ^ ",\nso it should have type") 
 
 and type_statement_easify env sexp report =
   if !Clflags.easytype
@@ -3550,19 +3553,39 @@ and type_expect_predef_easy env sexp predef_expected report =
   let expected_ty = instance_def predef_expected in
   unify_exp_easy env exp expected_ty report
 
+(*--AC: probably need polymorphic recursion to typecheck 
+and unify_wrapper_easy report fct =
+  try 
+    fct()
+  with 
+  | Error (loc', env', Expr_type_clash(trace')) ->
+      raise (Error (loc', env', Expr_type_clash_easy(report,trace')))
+*)
 and unify_exp_types_easy loc env exp expected_ty report =
+(*
+  unify_wrapper_easy report (fun () ->
+    unify_exp_types loc env exp expected_ty)
+*)
   try 
     unify_exp_types loc env exp expected_ty
-  with Error (loc', env', Expr_type_clash(trace')) ->
-       raise (Error (loc', env', Expr_type_clash_easy(report,trace')))
-       (* AC--todo: factorize with code below *)
+  with 
+  | Error (loc', env', Expr_type_clash(trace')) ->
+      raise (Error (loc', env', Expr_type_clash_easy(report,trace')))
 
 and unify_exp_easy env exp expected_ty report =
+(*
+  unify_wrapper_easy report (fun () ->
+    unify_exp env exp expected_ty; 
+    exp)
+*)
   try 
     unify_exp env exp expected_ty; 
     exp
-  with Error (loc', env', Expr_type_clash(trace')) ->
-       raise (Error (loc', env', Expr_type_clash_easy(report,trace')))
+  with 
+  | Error (loc', env', Expr_type_clash(trace')) ->
+      raise (Error (loc', env', Expr_type_clash_easy(report,trace')))
+
+
 
 (* Typing of match cases *)
 
