@@ -1464,44 +1464,34 @@ let report_unification_error ppf env ?(unif=true)
 ;;
 
 
+type easy_error_piece = formatter -> unit -> unit
+
 (* note: quite a bit of code copy-pasted from above *)
-let unification_error_easy unif swap tr txt1 ppf txt2 txt3 =
-  reset ();
-  trace_same_names tr;
-  let tr = List.map (fun (t, t') -> (t, hide_variant_name t')) tr in
-  let mis = mismatch unif tr in
-  match tr with
-  | [] | _ :: [] -> assert false
-  | t1 :: t2 :: tr ->
-    try
-      let tr = filter_trace (mis = None) tr in
-      let t1, t1' = may_prepare_expansion (tr = []) t1
-      and t2, t2' = may_prepare_expansion (tr = []) t2 in
-      let (t1,t1',t2,t2') = if swap then (t2,t2',t1,t1') else (t1,t1',t2,t2') in
-      print_labels := not !Clflags.classic;
-      let tr = List.map prepare_expansion tr in
-      fprintf ppf
-        "@[<v>\
-          @[%t@;<1 2>%a@ \
-            %t@;<1 2>%a\
-          @]%a%t\
-          %t
-         @]"
-        txt1 (type_expansion t1) t1'
-        txt2 (type_expansion t2) t2'
-        (trace false "is not compatible with type") tr
-        (explanation unif mis)
-        txt3;
-      print_labels := true
-    with exn ->
-      print_labels := true;
-      raise exn
-
-let report_unification_error_easy ppf env ?(unif=true) ?(swap=true)
-    tr txt1 txt2 txt3 =
-  wrap_printing_env env (fun () -> unification_error_easy unif swap tr txt1 ppf txt2 txt3)
-
-
+let get_unification_error_easy env ?(unif=true) tr =
+  wrap_printing_env env (fun () ->
+    reset ();
+    trace_same_names tr;
+    let tr = List.map (fun (t, t') -> (t, hide_variant_name t')) tr in
+    let mis = mismatch unif tr in
+    match tr with
+    | [] | _ :: [] -> assert false
+    | t1 :: t2 :: tr ->
+      try
+        let tr = filter_trace (mis = None) tr in
+        let t1, t1' = may_prepare_expansion (tr = []) t1
+        and t2, t2' = may_prepare_expansion (tr = []) t2 in
+        print_labels := not !Clflags.classic;
+        let tr = List.map prepare_expansion tr in
+        let m1 = fun ppf () -> ((type_expansion t1) ppf t1') in
+        let m2 = fun ppf () -> ((type_expansion t2) ppf t2') in
+        let m3 = fun ppf () -> ((trace false "is not compatible with type") ppf tr) in
+        let m4 = fun ppf () -> fprintf ppf "%t" ((explanation unif mis)) in
+        print_labels := true;
+        (m1,m2,m3,m4)
+      with exn ->
+        print_labels := true;
+        raise exn
+  )
 
 let trace fst keep_last txt ppf tr =
   print_labels := not !Clflags.classic;

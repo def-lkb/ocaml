@@ -72,10 +72,10 @@ val report_unification_error:
     formatter -> Env.t -> ?unif:bool -> (type_expr * type_expr) list ->
     (formatter -> unit) -> (formatter -> unit) -> 
     unit
-val report_unification_error_easy:
-    formatter -> Env.t -> ?unif:bool -> ?swap:bool -> (type_expr * type_expr) list ->
-    (formatter -> unit) -> (formatter -> unit) -> (formatter -> unit) -> 
-    unit
+type easy_error_piece = formatter -> unit -> unit
+val get_unification_error_easy:
+    Env.t -> ?unif:bool -> (type_expr * type_expr) list ->
+    (easy_error_piece * easy_error_piece * easy_error_piece * easy_error_piece)
 val report_subtyping_error:
     formatter -> Env.t -> (type_expr * type_expr) list ->
     string -> (type_expr * type_expr) list -> unit
