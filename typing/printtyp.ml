@@ -1480,7 +1480,7 @@ let report_unification_error ppf env ?(unif=true)
 
 type easy_error_piece = formatter -> unit -> unit
 
-(* note: quite a bit of code copy-pasted from above *)
+(* Note: some code copy-pasted from original function *)
 let get_unification_error_easy env ?(unif=true) tr =
   wrap_printing_env env (fun () ->
     reset ();

@@ -78,6 +78,7 @@ type error =
   | Orpat_vars of Ident.t
   | Expr_type_clash of (type_expr * type_expr) list
   | Expr_type_clash_easy of easy_reporter * (type_expr * type_expr) list
+  | Apply_error_easy of (Format.formatter -> unit) * error
   | Apply_non_function of type_expr
   | Apply_wrong_label of label * type_expr
   | Label_multiply_defined of string

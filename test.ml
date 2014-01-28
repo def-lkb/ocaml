@@ -1,6 +1,16 @@
+
+
+
+let f x y =  
+  [x]
+
+let _ = 
+  f [] (ref [])
+
+(*
 let r = ref 1 in
 r := r + 1    
-
+*)
 (*
 let x = 2  
 let y = []
