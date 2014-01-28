@@ -1,19 +1,9 @@
 
-
-
-let f x y =  
-  [x]
+let f x y z =  
+  fst x @ fst y @ snd x @ snd y
 
 let _ = 
-  f [] (ref [])
-
+  f ([],[3.]) ([0],[])  (*meant 0.*)
 (*
-let r = ref 1 in
-r := r + 1    
-*)
-(*
-let x = 2  
-let y = []
-let _ = print_int x
-let _ = print_int (List.length y)
+let _ = f = true
 *)
