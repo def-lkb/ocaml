@@ -117,6 +117,13 @@ let rp node =
   node
 ;;
 
+(* Add a dummy prefix to a name in order to help track missing "rec" keywords *)
+let ghost_name_easy s =
+  "***" ^ s
+
+(* Add a dummy prefix to an ident in order to help track missing "rec" keywords *)
+let ghost_ident_easy id =
+  { id with Ident.name = ghost_name_easy (Ident.name id) }
 
 let fst3 (x, _, _) = x
 let snd3 (_,x,_) = x
@@ -1262,12 +1269,30 @@ let rec iter3 f lst1 lst2 lst3 =
   | _ ->
       assert false
 
-let add_pattern_variables ?check ?check_as env =
+(* Note: modified to also return "pv" *)
+let add_pattern_variables_general ?check ?check_as env =
   let pv = get_ref pattern_variables in
   (List.fold_right
      (fun (id, ty, name, loc, as_var) env ->
        let check = if as_var then check_as else check in
        Env.add_value ?check id
+         {val_type = ty; val_kind = Val_reg; Types.val_loc = loc;
+          val_attributes = [];
+         } env
+     )
+     pv env,
+   get_ref module_variables, pv)
+
+let add_pattern_variables ?check ?check_as env =
+  let (x,y,_) = add_pattern_variables_general ?check ?check_as env in
+  (x,y)
+
+(* Note: similar to the above, except using ghost names *)
+let add_pattern_variables_ghost_easy ?check ?check_as env pv =
+  (List.fold_right
+     (fun (id, ty, name, loc, as_var) env ->
+       let check = if as_var then check_as else check in
+       Env.add_value ?check (ghost_ident_easy id)
          {val_type = ty; val_kind = Val_reg; Types.val_loc = loc;
           val_attributes = [];
          } env
@@ -1285,12 +1310,13 @@ let type_pattern ~lev env spat scope expected_ty =
       ~check_as:(fun s -> Warnings.Unused_var s) in
   (pat, new_env, get_ref pattern_force, unpacks)
 
+(* Note: modified to also return pv *)
 let type_pattern_list env spatl scope expected_tys allow =
   reset_pattern scope allow;
   let new_env = ref env in
   let patl = List.map2 (type_pat new_env) spatl expected_tys in
-  let new_env, unpacks = add_pattern_variables !new_env in
-  (patl, new_env, get_ref pattern_force, unpacks)
+  let new_env, unpacks, pv = add_pattern_variables_general !new_env in
+  (patl, new_env, get_ref pattern_force, unpacks, pv)
 
 let type_class_arg_pattern cl_num val_env met_env l spat =
   reset_pattern None false;
@@ -1757,7 +1783,32 @@ and type_expect_ ?in_function env sexp ty_expected =
   match sexp.pexp_desc with
   | Pexp_ident lid ->
       begin
-        let (path, desc) = Typetexp.find_value env loc lid.txt in
+        let (path, desc) = 
+          if not !Clflags.easytype then 
+            Typetexp.find_value env loc lid.txt
+          else
+            begin
+            try Typetexp.find_value env loc lid.txt
+            with | (Typetexp.Error (loc', env', Typetexp.Unbound_value lid')) as error ->
+              (* try to see if "rec" keyword has been forgotten *)
+              begin
+                let ghost_lidtxt =
+                  match lid.txt with
+                  | Longident.Lident s -> Longident.Lident (ghost_name_easy s)
+                  | _ -> raise error
+                  in
+             let (path, desc) = 
+                begin 
+                try Typetexp.find_value env loc ghost_lidtxt
+                with Typetexp.Error (_, _, Typetexp.Unbound_value _) -> raise error 
+                end
+                in
+              let loc = desc.val_loc in
+              raise (Typetexp.Error (loc', env', Typetexp.Unbound_value_missing_rec_easy (lid', loc)))
+              end
+            end
+          in
+
         if !Clflags.annotations then begin
           let dloc = desc.Types.val_loc in
           let annot =
@@ -1946,7 +1997,7 @@ and type_expect_ ?in_function env sexp ty_expected =
             List.iter (fun ty -> Format.fprintf ppf "[%a] and " Printtyp.type_expr ty) tys;
             Format.fprintf ppf "\nso there is a problem.\n\n" 
             in
-          raise (Error (loc, env, Apply_error_easy (explain, loc', err')))
+          raise (Error ((*loc*) funct.exp_loc, env, Apply_error_easy (explain, loc', err')))
         end in
       end_def ();
       unify_var env (newvar()) funct.exp_type;
@@ -3778,17 +3829,19 @@ and type_statement_easy env sexp report =
   let msg_add =  
     match (expand_head env exp.exp_type).desc with
     | Tarrow (_,tleft,_,_) ->
-       "\n" ^ 
        begin match (expand_head env tleft).desc with
        | Tconstr (p, _, _) when Path.same p Predef.path_unit ->
-          "You probably forgot to provide \"()\" as argument."
-       | Tarrow _ -> "You probably forgot several arguments."
-       | _ -> "You probably forgot an argument."
+          Some "You probably forgot to provide \"()\" as argument."
+       | Tarrow _ -> Some "You probably forgot several arguments." 
+       | _ -> Some "You probably forgot an argument."
        end 
-    | _ -> ""
+    | _ -> None
     in
   let expected_ty = instance_def Predef.type_unit in
-  unify_exp_easy env exp expected_ty (report_adding report msg_add)
+  unify_exp_easy env exp expected_ty 
+    (fun ppf (m1,m2,m3,m4) -> report ppf (m1,m2,m3,
+      fun ppf () -> match msg_add with Some m -> Format.fprintf ppf "\n%s" m | None -> m4 ppf ()))
+    (*deprecated: (report_adding report msg_add)*)
 
 (* note: should call type_expect_easify with a ty_expected
    that is a predefined type only if it is not polymorphic *)
@@ -4007,9 +4060,16 @@ and type_let ?(check = fun s -> Warnings.Unused_var s)
         | _ -> spat)
       spat_sexp_list in
   let nvs = List.map (fun _ -> newvar ()) spatl in
-  let (pat_list, new_env, force, unpacks) =
+  let (pat_list, new_env, force, unpacks, pv) =
     type_pattern_list env spatl scope nvs allow in
   let is_recursive = (rec_flag = Recursive) in
+
+  (* Prepare a ghost environment for finding missing "rec" keywords *)
+  let ghost_env = 
+    if !Clflags.easytype && not is_recursive 
+      then Some (fst (add_pattern_variables_ghost_easy env pv))
+      else None in
+
   (* If recursive, first unify with an approximation of this expression *)
   if is_recursive then
     List.iter2
@@ -4043,7 +4103,10 @@ and type_let ?(check = fun s -> Warnings.Unused_var s)
   (* Only bind pattern variables after generalizing *)
   List.iter (fun f -> f()) force;
   let exp_env =
-    if is_recursive then new_env else env in
+    if is_recursive then new_env
+    else if !Clflags.easytype && not is_recursive then 
+      (match ghost_env with Some env' -> env' | _ -> assert false)
+    else env in
 
   let current_slot = ref None in
   let rec_needed = ref false in
@@ -4428,3 +4491,14 @@ let () =
 
 let () =
   Env.add_delayed_check_forward := add_delayed_check
+
+
+(* TODO:
+
+missing let rec => ghost context
+arguments have type => dig them; 
+display "and" only for good arguments
+si la fonction est simplement un nom, l'afficher entre quote
+pattern compatibility / match branches compatibility
+
+*)
