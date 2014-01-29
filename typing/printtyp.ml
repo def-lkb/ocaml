@@ -1358,13 +1358,13 @@ let explanation unif t3 t4 ppf =
      when (match p with Pdot(Pident id, "ref", pos) 
            when Ident.same id ident_pervasive -> true | _ -> false) ->
       fprintf ppf
-        "@,@[You are probably missing a \"!\" operator somewhere.@]"
+        "@,@[You are probably missing a `!' operator somewhere.@]"
   (* case added for easytype *)
   | (Tarrow (_, ty1, _, _), ty2 | ty2, Tarrow (_, ty1, _, _)) 
      when (*AC: could also generalize to: (expand_head env ty1).desc *) 
        (match ty1.desc with Tconstr (p,_,_) when Path.same p Predef.path_unit -> true | _ -> false) ->
       fprintf ppf
-        "@,@[You are probably missing a \"()\" argument somewhere.@]"
+        "@,@[You are probably missing a `()' argument somewhere.@]"
   | Ttuple [], Tvar _ | Tvar _, Ttuple [] ->
       fprintf ppf "@,Self type cannot escape its class"
   | Tconstr (p, tl, _), Tvar _

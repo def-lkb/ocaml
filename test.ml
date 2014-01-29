@@ -1,13 +1,2 @@
-
-
-
-
-
-
-(*
-*)
-
-(*
-let x : (int * int) = 
-  let y = (4,[]) in y
-*)
+let x =
+  if true then ([], [true]) else ([3], [4])
