@@ -1,4 +1,13 @@
-module Foo = struct let g x = x+1
-end
 
-let _ = print_int (Foo.g 3.)
+
+
+
+
+
+(*
+*)
+
+(*
+let x : (int * int) = 
+  let y = (4,[]) in y
+*)

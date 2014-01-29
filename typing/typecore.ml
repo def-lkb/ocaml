@@ -3888,6 +3888,7 @@ and type_expect_easify ?in_function env sexp ty_expected (report:easy_reporter) 
     else type_expect ?in_function env sexp ty_expected 
 
 and type_expect_predef_easy env sexp predef_expected report =
+  (* AC: not sure the following code is really making generalization/instances as it should *)
   let exp = type_exp env sexp in
   let expected_ty = instance_def predef_expected in
   unify_exp_easy env exp expected_ty report
@@ -4008,40 +4009,76 @@ and type_cases ?in_function env ty_arg ty_res partial_flag loc caselist =
   (* type bodies *)
   let in_function = if List.length caselist = 1 then in_function else None in
   let cases =
-    List.map2
-      (fun (pat, (ext_env, unpacks)) {pc_lhs; pc_guard; pc_rhs} ->
-        let sexp = wrap_unpacks pc_rhs unpacks in
-        let ty_res' =
-          if !Clflags.principal then begin
-            begin_def ();
-            let ty = instance ~partial:true env ty_res in
-            end_def ();
-            generalize_structure ty; ty
-          end
-          else if contains_gadt env pc_lhs then correct_levels ty_res
-          else ty_res in
-(*        Format.printf "@[%i %i, ty_res' =@ %a@]@." lev (get_current_level())
-          Printtyp.raw_type_expr ty_res'; *)
-        let guard =
-          match pc_guard with
-          | None -> None
-          | Some scond ->
-              Some
-                (type_expect ext_env (wrap_unpacks scond unpacks)
-                   Predef.type_bool)
-        in
-        let exp = type_expect ?in_function ext_env sexp ty_res' in
-        {
-         c_lhs = pat;
-         c_guard = guard;
-         c_rhs = {exp with exp_type = instance env ty_res'}
-        }
-      )
-      pat_env_list caselist
+    if not !Clflags.easytype then begin
+      List.map2
+        (fun (pat, (ext_env, unpacks)) {pc_lhs; pc_guard; pc_rhs} ->
+          let sexp = wrap_unpacks pc_rhs unpacks in
+          let ty_res' =
+            if !Clflags.principal then begin
+              begin_def ();
+              let ty = instance ~partial:true env ty_res in
+              end_def ();
+              generalize_structure ty; ty
+            end
+            else if contains_gadt env pc_lhs then correct_levels ty_res
+            else ty_res in
+  (*        Format.printf "@[%i %i, ty_res' =@ %a@]@." lev (get_current_level())
+            Printtyp.raw_type_expr ty_res'; *)
+          let guard =
+            match pc_guard with
+            | None -> None
+            | Some scond ->
+                Some
+                  (type_expect ext_env (wrap_unpacks scond unpacks)
+                     Predef.type_bool)
+          in
+          let exp = type_expect ?in_function ext_env sexp ty_res' in
+          {
+           c_lhs = pat;
+           c_guard = guard;
+           c_rhs = {exp with exp_type = instance env ty_res'}
+          }
+        )
+        pat_env_list caselist
+     end else begin
+        (* Note: some copy-paste from above;
+           Disclaimer: behavior with GADTs might be broken *)
+        let cases = List.map2
+          (fun (pat, (ext_env, unpacks)) {pc_lhs; pc_guard; pc_rhs} ->
+            let sexp = wrap_unpacks pc_rhs unpacks in
+            let guard =
+              match pc_guard with
+              | None -> None
+              | Some scond ->
+                  Some
+                    (type_expect_easify ext_env (wrap_unpacks scond unpacks)
+                       Predef.type_bool
+                      (easy_report_so_but "this expression is a when-clause condition"))
+            in
+            let exp = type_exp ext_env sexp in
+            {
+             c_lhs = pat;
+             c_guard = guard;
+             c_rhs = exp;
+            }
+          )
+          pat_env_list caselist
+          in
+        if cases <> [] then begin
+          let first_branch = (List.hd cases).c_rhs in
+          List.iter (fun c ->
+            ignore (unify_exp_easy env c.c_rhs first_branch.exp_type  
+              (easy_report ~swap:true "the previous branches of the matching have type" "but this branch has type"))
+            ) cases;
+          ignore (unify_exp_easy env first_branch ty_res  
+            (easy_report ~swap:true "the branches of the matching are required by the context to have type" "but they have type"))
+        end;
+        cases
+     end
   in
   if !Clflags.principal || has_gadts then begin
     let ty_res' = instance env ty_res in
-    List.iter (fun c -> unify_exp env c.c_rhs ty_res') cases
+    List.iter (fun c -> unify_exp env c.c_rhs ty_res') cases 
   end;
   let partial =
     if partial_flag then
