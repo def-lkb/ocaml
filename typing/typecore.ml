@@ -125,6 +125,29 @@ let ghost_name_easy s =
 let ghost_ident_easy id =
   { id with Ident.name = ghost_name_easy (Ident.name id) }
 
+(* Helper for printing function *)
+let format_fprintf_list ppf sep print_item items =
+  let rec aux = function
+    | [] -> ()
+    | [x] -> print_item ppf x
+    | x::ls -> print_item ppf x; Format.fprintf ppf "%s" sep; aux ls
+    in
+  aux items
+
+(* Helper for printing type *)
+let format_type ppf ty =
+  Format.fprintf ppf "[%a]" Printtyp.type_expr ty
+
+(* Helper for decomposing an arrow type; returns list of argument types, and return type *)
+
+let decompose_function_type env ty =
+  let rec aux acc ty =
+    match (expand_head env ty).desc with
+    | Tarrow (l, ty_arg, ty_fun, com) -> aux (ty_arg::acc) ty_fun
+    | _ -> (acc, ty)
+    in
+  aux [] ty
+
 let fst3 (x, _, _) = x
 let snd3 (_,x,_) = x
 
@@ -1991,11 +2014,12 @@ and type_expect_ ?in_function env sexp ty_expected =
           type_application_easy env funct sargs targs
         with (Error(loc', env', err')) ->
           let explain ppf = 
-            Format.fprintf ppf "The function has type [%a].\nHowever, the arguments provided have type \n" 
-              Printtyp.type_expr funct_sch;
-              (* AC: todo: the function expects arguments of types, for max (length sarg) (nb visible arrows) arguments ... *)
-            List.iter (fun ty -> Format.fprintf ppf "[%a] and " Printtyp.type_expr ty) tys;
-            Format.fprintf ppf "\nso there is a problem.\n\n" 
+            let expected_tys, return_ty = decompose_function_type env funct_sch in
+            Format.fprintf ppf "The function expects %d arguments of types\n" (List.length expected_tys);
+            format_fprintf_list ppf " and " format_type expected_tys;
+            Format.fprintf ppf ",\nbut it was provided %d arguments of types\n" (List.length tys);
+            format_fprintf_list ppf " and " format_type tys;
+            Format.fprintf ppf ".\n\n" 
             in
           raise (Error ((*loc*) funct.exp_loc, env, Apply_error_easy (explain, loc', err')))
         end in
@@ -2303,13 +2327,13 @@ and type_expect_ ?in_function env sexp ty_expected =
           let _ = unify_exp_types_easy loc env ifso.exp_type ifnot.exp_type
              (fun ppf (m1,m2,m3,m4) ->
                 Format.fprintf ppf
-                  "@[<v>The then-branch has type %a whereas the else-branch has type %a.@  \
+                  "@[<v>The then-branch has type [%a] whereas the else-branch has type [%a].@  \
                     @[%s@ [%a]@ %s@ [%a].@;\
                     @]%a\
                     %a
                    @]"
-                 Printtyp.type_sch schso 
-                 Printtyp.type_sch schnot
+                 format_type schso 
+                 format_type schnot
                  "Cannot unify type" m1 () "with type" m2 () m3 () m4 ())
             in
           let _ = unify_exp_easy env ifso ty_expected  
@@ -4300,8 +4324,23 @@ let rec report_error env ppf = function
   | Expr_type_clash_easy (report, trace) ->
       let ms = get_unification_error_easy env trace in
       report ppf ms
+  | Apply_error_easy (explain, loc, Expr_type_clash trace) ->
+      let (m1,m2,m3,m4) = get_unification_error_easy env trace in
+      explain ppf;
+      fprintf ppf "%a\n---\n" m4 ();
+      Location.print_error ppf loc;
+      let msg1 = "This expression has type" in
+      let msg2 = "but an expression was expected of type" in
+      Format.fprintf ppf
+        "@[<v>\
+          @[%s@;<1 2>[%a]@ \
+            %s@;<1 2>[%a].\
+          @]%a
+         @]"
+       msg1 m1 () msg2 m2 () m3 () 
   | Apply_error_easy (explain, loc, original_error) ->
       explain ppf;
+      fprintf ppf "---\n";
       Location.print_error ppf loc;
       report_error env ppf original_error
   | Apply_non_function typ ->
@@ -4495,9 +4534,7 @@ let () =
 
 (* TODO:
 
-missing let rec => ghost context
 arguments have type => dig them; 
-display "and" only for good arguments
 si la fonction est simplement un nom, l'afficher entre quote
 pattern compatibility / match branches compatibility
 
