@@ -1,2 +1,2 @@
-let x =
-  if true then ([], [true]) else ([3], [4])
+let x = read_int in   (* missing unit argument *)
+(fun f -> print_int f) x

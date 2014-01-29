@@ -3347,6 +3347,7 @@ and type_argument env sarg ty_expected' ty_expected =
       texp
 
 and type_argument_easy env sarg targ ty_expected' ty_expected =
+  (* Note: made some simplifications by dropping the complicated labelled case *)
   let rec is_inferred sexp =
     match sexp.pexp_desc with
       Pexp_ident _ | Pexp_apply _ | Pexp_send _ | Pexp_field _ -> true
@@ -3886,15 +3887,23 @@ and type_statement_easy env sexp report =
   let exp = type_exp env sexp in
   end_def();
   let msg_add =  
-    match (expand_head env exp.exp_type).desc with
-    | Tarrow (_,tleft,_,_) ->
-       begin match (expand_head env tleft).desc with
-       | Tconstr (p, _, _) when Path.same p Predef.path_unit ->
+    let is_type_unit ty =
+      match (expand_head env ty).desc with
+      | Tconstr (p, _, _) when Path.same p Predef.path_unit -> true
+      | _ -> false
+      in
+    let exp_ty = expand_head env exp.exp_type in
+    let (tys,ret_ty) = decompose_function_type env exp_ty in 
+    if not (is_type_unit ret_ty) then None else begin
+      match tys with
+      | [] -> None (* was not a function *)
+      | [ty] when is_type_unit ty -> 
           Some "You probably forgot to provide `()' as argument."
-       | Tarrow _ -> Some "You probably forgot several arguments." 
-       | _ -> Some "You probably forgot an argument."
-       end 
-    | _ -> None
+      | [ty] -> 
+          Some "You probably forgot to provide an argument." 
+      | _ -> 
+          Some "You probably forgot to provide several arguments." 
+    end
     in
   let expected_ty = instance_def Predef.type_unit in
   unify_exp_easy env exp expected_ty 
@@ -4423,7 +4432,7 @@ let rec report_error env ppf = function
       end
   | Apply_error_easy (explain, loc, original_error) ->
       explain ppf;
-      fprintf ppf "---\n";
+      fprintf ppf "@\n";
       Location.print_error ppf loc;
       report_error env ppf original_error
   | Apply_non_function typ ->

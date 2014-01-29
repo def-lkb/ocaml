@@ -1364,7 +1364,7 @@ let explanation unif t3 t4 ppf =
      when (*AC: could also generalize to: (expand_head env ty1).desc *) 
        (match ty1.desc with Tconstr (p,_,_) when Path.same p Predef.path_unit -> true | _ -> false) ->
       fprintf ppf
-        "@,@[You are probably missing a `()' argument somewhere.@]"
+        "@,@[You probably forgot to provide `()' as argument somewhere.@]"
   | Ttuple [], Tvar _ | Tvar _, Ttuple [] ->
       fprintf ppf "@,Self type cannot escape its class"
   | Tconstr (p, tl, _), Tvar _
