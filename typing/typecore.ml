@@ -134,6 +134,11 @@ let format_fprintf_list ppf sep print_item items =
     in
   aux items
 
+(* Helper for printing plural forms *)
+
+let plural ls =
+  if List.length ls > 1 then "s" else ""
+
 (* Helper for printing type *)
 let format_type ppf ty =
   Format.fprintf ppf "[%a]" Printtyp.type_expr ty
@@ -2015,9 +2020,16 @@ and type_expect_ ?in_function env sexp ty_expected =
         with (Error(loc', env', err')) ->
           let explain ppf = 
             let expected_tys, return_ty = decompose_function_type env funct_sch in
-            Format.fprintf ppf "The function expects %d arguments of types\n" (List.length expected_tys);
+            let show_func_name ppf () = 
+              match sfunct.pexp_desc with
+              | Pexp_ident lid -> 
+                  Format.fprintf ppf " ";
+                  format_fprintf_list ppf "." (fun pff s -> Format.fprintf ppf "%s" s) (Longident.flatten lid.txt)
+              | _ -> ()
+              in
+            Format.fprintf ppf "The function\"%a\" expects %d argument%s of type%s\n" show_func_name ()  (List.length expected_tys) (plural expected_tys) (plural expected_tys);
             format_fprintf_list ppf " and " format_type expected_tys;
-            Format.fprintf ppf ",\nbut it was provided %d arguments of types\n" (List.length tys);
+            Format.fprintf ppf ",\nbut it was provided %d argument%s of type%s\n" (List.length tys) (plural tys) (plural tys);
             format_fprintf_list ppf " and " format_type tys;
             Format.fprintf ppf ".\n\n" 
             in
@@ -2327,7 +2339,7 @@ and type_expect_ ?in_function env sexp ty_expected =
           let _ = unify_exp_types_easy loc env ifso.exp_type ifnot.exp_type
              (fun ppf (m1,m2,m3,m4) ->
                 Format.fprintf ppf
-                  "@[<v>The then-branch has type [%a] whereas the else-branch has type [%a].@  \
+                  "@[<v>The then-branch has type %a whereas the else-branch has type %a.@  \
                     @[%s@ [%a]@ %s@ [%a].@;\
                     @]%a\
                     %a
@@ -4324,6 +4336,7 @@ let rec report_error env ppf = function
   | Expr_type_clash_easy (report, trace) ->
       let ms = get_unification_error_easy env trace in
       report ppf ms
+  (* --AC: problem with the order
   | Apply_error_easy (explain, loc, Expr_type_clash trace) ->
       let (m1,m2,m3,m4) = get_unification_error_easy env trace in
       explain ppf;
@@ -4338,6 +4351,7 @@ let rec report_error env ppf = function
           @]%a
          @]"
        msg1 m1 () msg2 m2 () m3 () 
+   *)
   | Apply_error_easy (explain, loc, original_error) ->
       explain ppf;
       fprintf ppf "---\n";
@@ -4534,8 +4548,6 @@ let () =
 
 (* TODO:
 
-arguments have type => dig them; 
-si la fonction est simplement un nom, l'afficher entre quote
 pattern compatibility / match branches compatibility
 
 *)
