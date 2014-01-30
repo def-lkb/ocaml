@@ -44,12 +44,12 @@ type error =
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
 
-(* Wrapper for making a new call with Typecore.activate_easytype := false
-   in case the first call ends on a typing error *)
+(* Wrapper for making a new call with Ctype.activate_easytype := true
+  in case the first call ends on a typing error *)
 let wrap_typing_easy fct =
   try fct()
   with Typecore.Error _ | Typetexp.Error _ ->
-    Typecore.activate_easytype := true;
+    Ctype.activate_easytype := true;
     fct()
 
 open Typedtree

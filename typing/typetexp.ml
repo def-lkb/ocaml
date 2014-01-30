@@ -983,7 +983,7 @@ let report_error env ppf = function
   | Unbound_value_missing_rec_easy (lid, loc) ->
       fprintf ppf "Unbound value %a.\n" longident lid;
       let (_, line, _) = Location.get_pos_info loc.Location.loc_start in
-      fprintf ppf "You are probably missing the \"rec\" keyword on line %i." line;
+      fprintf ppf "@.You are probably missing the `rec' keyword on line %i." line;
   | Unbound_module lid ->
       fprintf ppf "Unbound module %a" longident lid;
       spellcheck ppf Env.fold_modules env lid;

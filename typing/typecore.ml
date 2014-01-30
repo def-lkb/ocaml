@@ -20,11 +20,13 @@ open Typedtree
 open Btype
 open Ctype
 
-(* Global flag to activate easytype typing mode *)
-let activate_easytype = ref false
+(* AC: TODO: type trace = (type_expr * type_expr) list *)
 
+(* Flag to control the behavior of error reporting 
+   on application, whether or not to show the original
+   ocaml error message *)
+let show_original_error_after_easy = false
 
-(* TODO: type trace = (type_expr * type_expr) list *)
 
 type easy_error_piece = Printtyp.easy_error_piece
 type easy_reporter = Format.formatter -> (easy_error_piece * easy_error_piece * easy_error_piece * easy_error_piece) -> unit
@@ -2393,7 +2395,7 @@ and type_expect_ ?in_function env sexp ty_expected =
             exp_env = env }
       end
   | Pexp_sequence(sexp1, sexp2) ->
-      let exp1 = type_statement_easify env sexp1 
+      let exp1 = type_statement_easify ~force_easy:true env sexp1 
         (easy_report_so_but_string "This expression is followed by a semi-column") in
       let exp2 = type_expect env sexp2 ty_expected in
       re {
@@ -3956,8 +3958,8 @@ and easy_report_so_but_string s : easy_reporter =
 and easy_report_but_string s : easy_reporter = 
   easy_report_but (format_string s)
 
-and type_statement_easify env sexp report =
-  if !activate_easytype
+and type_statement_easify ?(force_easy=false) env sexp report =
+  if !activate_easytype || force_easy
     then type_statement_easy env sexp report
     else type_statement env sexp
 
@@ -3993,7 +3995,9 @@ and type_statement_easy env sexp report =
   let expected_ty = instance_def Predef.type_unit in
   unify_exp_easy env exp expected_ty 
     (fun ppf (m1,m2,m3,m4) -> report ppf (m1,m2,m3,
-      fun ppf () -> match msg_add with Some m -> Format.fprintf ppf "\n%s" m | None -> m4 ppf ()))
+      fun ppf () -> match msg_add with 
+        | Some m -> Format.fprintf ppf "@.%s" m; Printtyp.hack_to_display_message_at_the_right_place_easy := true
+        | None -> m4 ppf ()))
     (*deprecated: (report_adding report msg_add)*)
 
 (* note: should call type_expect_easify with a ty_expected
@@ -4490,22 +4494,29 @@ let rec report_error env ppf = function
   | Expr_type_clash_easy (report, trace) ->
       let ms = get_unification_error_easy env trace in
       report ppf ms
-  (* --AC: problem with the order
   | Apply_error_easy (explain, loc, Expr_type_clash trace) ->
       let (m1,m2,m3,m4) = get_unification_error_easy env trace in
       explain ppf;
-      fprintf ppf "%a\n---\n" m4 ();
-      Location.print_error ppf loc;
-      let msg1 = "This expression has type" in
-      let msg2 = "but an expression was expected of type" in
-      Format.fprintf ppf
-        "@[<v>\
-          @[%s@;<1 2>[%a]@ \
-            %s@;<1 2>[%a].\
-          @]%a
-         @]"
-       msg1 m1 () msg2 m2 () m3 () 
-   *)
+      let (m4a_call,m4b) = 
+        if !Printtyp.hack_to_display_message_at_the_right_place_easy 
+          then ((fun () -> fprintf ppf "%a@." m4 ()), format_string "")
+          else ((fun () -> ()), m4)
+        in
+      m4a_call();
+      if show_original_error_after_easy then begin
+        Format.fprintf ppf "----@.";
+        Location.print_error ppf loc;
+        let msg1 = "This expression has type" in
+        let msg2 = "but an expression was expected of type" in
+        Format.fprintf ppf
+          "@[<v>\
+            @[%s@;<1 2>[%a]@ \
+              %s@;<1 2>[%a].\
+            @]%a \
+            %a \
+           @]"
+         msg1 m1 () msg2 m2 () m3 () m4b ()
+      end
   | Apply_error_easy (explain, loc, Apply_non_function typ) ->
       explain ppf;
       (* Note: some copy-paste from code further below *)
@@ -4517,9 +4528,11 @@ let rec report_error env ppf = function
       end
   | Apply_error_easy (explain, loc, original_error) ->
       explain ppf;
-      fprintf ppf "@\n";
-      Location.print_error ppf loc;
-      report_error env ppf original_error
+      if show_original_error_after_easy then begin
+        fprintf ppf "@\n";
+        Location.print_error ppf loc;
+        report_error env ppf original_error
+      end
   | Apply_non_function typ ->
       reset_and_mark_loops typ;
       begin match (repr typ).desc with

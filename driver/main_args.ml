@@ -73,8 +73,13 @@ let mk_dtypes f =
   "-dtypes", Arg.Unit f, " (deprecated) same as -annot"
 ;;
 
+let mk_easy f =
+  "-easy", Arg.Unit f, " activate all -easy* flags"
+;;
+(* currently only an alias for -easytype *)
+
 let mk_easytype f =
-  "-easytype", Arg.Unit f, " easier typing of beginner's code"
+  "-easytype", Arg.Unit f, " more informative typing errors"
 ;;
 
 let mk_for_pack_byt f =
@@ -668,6 +673,7 @@ struct
     mk_dllib F._dllib;
     mk_dllpath F._dllpath;
     mk_dtypes F._annot;
+    mk_easy F._easytype;
     mk_easytype F._easytype;
     mk_for_pack_byt F._for_pack;
     mk_g_byt F._g;

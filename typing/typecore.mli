@@ -16,9 +16,6 @@ open Asttypes
 open Types
 open Format
 
-(* Global flag to activate easytype typing mode *)
-val activate_easytype : bool ref
-
 val is_nonexpansive: Typedtree.expression -> bool
 
 val type_binding:

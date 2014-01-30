@@ -22,6 +22,9 @@ open Types
 open Btype
 open Outcometree
 
+let hack_to_display_message_at_the_right_place_easy =
+  ref false
+
 (* Print a long identifier *)
 
 let rec longident ppf = function
@@ -1319,18 +1322,23 @@ let print_tags ppf fields =
       fprintf ppf "`%s" t;
       List.iter (fun (t, _) -> fprintf ppf ",@ `%s" t) fields
 
+(* AC: TODO: get rid of this function and have get_explanation return an option *)
 let has_explanation unif t3 t4 =
   match t3.desc, t4.desc with
   (* case added for easytype *)
   | (Tconstr (p, [ty1], _), ty2 | ty2, Tconstr (p, [ty1], _)) 
-     when (match p with Pdot(Pident id, "ref", pos) 
+     when !activate_easytype && 
+          (match p with Pdot(Pident id, "ref", pos) 
            when Ident.same id ident_pervasive -> true | _ -> false) 
-     -> true
+     -> hack_to_display_message_at_the_right_place_easy := true; 
+        true
   (* case added for easytype *)
   | (Tarrow (_, ty1, _, _), ty2 | ty2, Tarrow (_, ty1, _, _)) 
      when (*AC: could also generalize to: (expand_head env ty1).desc *) 
+       !activate_easytype && 
        (match ty1.desc with Tconstr (p,_,_) when Path.same p Predef.path_unit -> true | _ -> false)
-     -> true
+     -> hack_to_display_message_at_the_right_place_easy := true;
+        true
 
   | Tfield _, (Tnil|Tconstr _) | (Tnil|Tconstr _), Tfield _
   | Tnil, Tconstr _ | Tconstr _, Tnil
@@ -1355,13 +1363,15 @@ let explanation unif t3 t4 ppf =
      AC--TODO: apply the case only when ty1 is unifiable with ty2,
      however do so without performing any side-effects on them. *)
   | (Tconstr (p, [ty1], _), ty2 | ty2, Tconstr (p, [ty1], _)) 
-     when (match p with Pdot(Pident id, "ref", pos) 
+     when !activate_easytype && 
+          (match p with Pdot(Pident id, "ref", pos) 
            when Ident.same id ident_pervasive -> true | _ -> false) ->
       fprintf ppf
         "@,@[You are probably missing a `!' operator somewhere.@]"
   (* case added for easytype *)
   | (Tarrow (_, ty1, _, _), ty2 | ty2, Tarrow (_, ty1, _, _)) 
-     when (*AC: could also generalize to: (expand_head env ty1).desc *) 
+     when !activate_easytype && 
+       (*AC: could also generalize to: (expand_head env ty1).desc *) 
        (match ty1.desc with Tconstr (p,_,_) when Path.same p Predef.path_unit -> true | _ -> false) ->
       fprintf ppf
         "@,@[You probably forgot to provide `()' as argument somewhere.@]"

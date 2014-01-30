@@ -85,3 +85,5 @@ val report_ambiguous_type_error:
 
 (* for toploop *)
 val hide_rec_items: signature_item list -> unit
+
+val hack_to_display_message_at_the_right_place_easy : bool ref
