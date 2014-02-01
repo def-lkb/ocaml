@@ -48,7 +48,7 @@ exception Error_forward of Location.error
   in case the first call ends on a typing error *)
 let wrap_typing_easy fct =
   try fct()
-  with Typecore.Error _ | Typetexp.Error _ ->
+  with (Typecore.Error _ | Typetexp.Error _) when !Clflags.easytype ->
     Ctype.activate_easytype := true;
     fct()
 

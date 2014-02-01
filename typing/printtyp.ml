@@ -1367,7 +1367,7 @@ let explanation unif t3 t4 ppf =
           (match p with Pdot(Pident id, "ref", pos) 
            when Ident.same id ident_pervasive -> true | _ -> false) ->
       fprintf ppf
-        "@,@[You are probably missing a `!' operator somewhere.@]"
+        "@,@[You probably forgot a `!' operator somewhere.@]"
   (* case added for easytype *)
   | (Tarrow (_, ty1, _, _), ty2 | ty2, Tarrow (_, ty1, _, _)) 
      when !activate_easytype && 
