@@ -2045,7 +2045,7 @@ and type_expect_ ?in_function env sexp ty_expected =
               in
             let show_count ls =
               let nb = List.length ls in
-              if nb = 1 then "an" else string_of_int nb
+              if nb = 1 then "one" else string_of_int nb
               in
             let show_type_list ltys =
               format_fprintf_list ppf (fun ppf -> Format.fprintf ppf "@, and ") format_labelled_type ltys in
@@ -2395,7 +2395,7 @@ and type_expect_ ?in_function env sexp ty_expected =
       end
   | Pexp_sequence(sexp1, sexp2) ->
       let exp1 = type_statement_easify ~force_easy:!Clflags.easytype env sexp1
-        (easy_report_so_but_string "This expression is followed by a semi-column") in
+        (easy_report_so_but_string "This expression is followed by a semi-colon") in
       let exp2 = type_expect env sexp2 ty_expected in
       re {
         exp_desc = Texp_sequence(exp1, exp2);
