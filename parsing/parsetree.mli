@@ -181,6 +181,8 @@ and pattern_desc =
         (* (module P)
            Note: (module P : S) is represented as Ppat_constraint(Ppat_unpack, Ptyp_package)
          *)
+  | Ppat_implicit of string loc
+        (* (implicit P: S) *)
   | Ppat_extension of extension
         (* [%id] *)
 
@@ -586,6 +588,8 @@ and signature_item_desc =
         (* module X : MT *)
   | Psig_recmodule of module_declaration list
         (* module rec X1 : MT1 and ... and Xn : MTn *)
+  | Psig_implicit of module_declaration
+        (* implicit module X : MT *)
   | Psig_modtype of module_type_declaration
         (* module type S = MT
            module type S *)
@@ -689,6 +693,8 @@ and structure_item_desc =
         (* module X = ME *)
   | Pstr_recmodule of module_binding list
         (* module rec X1 = ME1 and ... and Xn = MEn *)
+  | Pstr_implicit of module_binding
+        (* implicit module X = ME *)
   | Pstr_modtype of module_type_declaration
         (* module type S = MT *)
   | Pstr_open of override_flag * Longident.t loc * attributes

@@ -554,7 +554,7 @@ and transl_signature env sg =
             (if List.exists (Ident.equal id) (get_exceptions rem) then rem
              else Sig_exception(id, decl) :: rem),
             final_env
-        | Psig_module pmd ->
+        | Psig_module pmd | Psig_implicit pmd ->
             check "module" item.psig_loc module_names pmd.pmd_name.txt;
             let tmty = transl_modtype env pmd.pmd_type in
             let md = {
@@ -1162,7 +1162,11 @@ and type_structure ?(toplevel = false) funct_body anchor env sstr scope =
         newenv
     | Pstr_module {pmb_name = name; pmb_expr = smodl; pmb_attributes = attrs;
                    pmb_loc;
-                  } ->
+                  }
+    | Pstr_implicit {pmb_name = name; pmb_expr = smodl; pmb_attributes = attrs;
+                   pmb_loc;
+                  }
+      ->
         check "module" loc module_names name.txt;
         let modl =
           type_module ~alias:true true funct_body

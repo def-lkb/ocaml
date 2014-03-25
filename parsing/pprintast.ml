@@ -104,7 +104,7 @@ let pp = fprintf
 
 let rec is_irrefut_patt x =
   match x.ppat_desc with
-  | Ppat_any | Ppat_var _ | Ppat_unpack _ -> true
+  | Ppat_any | Ppat_var _ | Ppat_unpack _ | Ppat_implicit _ -> true
   | Ppat_alias (p,_) -> is_irrefut_patt p
   | Ppat_tuple (ps) -> List.for_all is_irrefut_patt ps
   | Ppat_constraint (p,_) -> is_irrefut_patt p
@@ -385,6 +385,8 @@ class printer  ()= object(self:'self)
         pp f "@[<2>[|%a|]@]"  (self#list self#pattern1 ~sep:";") l
     | Ppat_unpack (s) ->
         pp f "(module@ %s)@ " s.txt
+    | Ppat_implicit s ->
+        pp f "(implicit@ %s)@ " s.txt
     | Ppat_type li ->
         pp f "#%a" self#longident_loc li
     | Ppat_record (l, closed) ->
@@ -928,6 +930,13 @@ class printer  ()= object(self:'self)
         pp f "@[<hov>module@ %s@ :@ %a@]"
           pmd.pmd_name.txt
           self#module_type  pmd.pmd_type
+    | Psig_implicit {pmd_name; pmd_type={pmty_desc=Pmty_alias alias}} ->
+        pp f "@[<hov>implicit module@ %s@ =@ %a@]"
+          pmd_name.txt self#longident_loc alias
+    | Psig_implicit pmd ->
+        pp f "@[<hov>implicit module@ %s@ :@ %a@]"
+          pmd.pmd_name.txt
+          self#module_type  pmd.pmd_type
     | Psig_open (ovf, li, _attrs) ->
         pp f "@[<hov2>open%s@ %a@]" (override ovf) self#longident_loc li
     | Psig_include (mt, _attrs) ->
@@ -1056,6 +1065,8 @@ class printer  ()= object(self:'self)
     | Pstr_exception ed -> self#exception_declaration f ed
     | Pstr_module x ->
         pp f "@[<hov2>module@ %a@]" self#module_binding x
+    | Pstr_implicit x ->
+        pp f "@[<hov2>implicit module@ %a@]" self#module_binding x
     | Pstr_open (ovf, li, _attrs) ->
         pp f "@[<2>open%s@;%a@]" (override ovf) self#longident_loc li;
     | Pstr_modtype {pmtd_name=s; pmtd_type=md} ->
