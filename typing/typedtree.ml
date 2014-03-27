@@ -212,6 +212,7 @@ and structure_item_desc =
   | Tstr_exn_rebind of
       Ident.t * string loc * Path.t * Longident.t loc * attribute list
   | Tstr_module of module_binding
+  | Tstr_implicit of implicit_binding
   | Tstr_recmodule of module_binding list
   | Tstr_modtype of module_type_declaration
   | Tstr_open of override_flag * Path.t * Longident.t loc * attribute list
@@ -228,6 +229,16 @@ and module_binding =
      mb_attributes: attribute list;
      mb_loc: Location.t;
     }
+
+and 'a implicit_infos =
+  {
+    im_arity: int;
+    im_module: 'a;
+  }
+
+and implicit_binding = module_binding implicit_infos
+
+and implicit_declaration = module_declaration implicit_infos
 
 and value_binding =
   {
@@ -276,6 +287,7 @@ and signature_item_desc =
   | Tsig_type of type_declaration list
   | Tsig_exception of constructor_declaration
   | Tsig_module of module_declaration
+  | Tsig_implicit of implicit_declaration
   | Tsig_recmodule of module_declaration list
   | Tsig_modtype of module_type_declaration
   | Tsig_open of override_flag * Path.t * Longident.t loc * attribute list
