@@ -61,6 +61,14 @@ let default_mty = function
     Some mty -> mty
   | None -> Mty_signature []
 
+let mty_of_implicit_declaration imd =
+  let functorize (id,mty) final_mty =
+    Mty_functor (id, Some mty, final_mty)
+  in
+  List.fold_right functorize
+    imd.imd_parameters
+    imd.imd_type
+
 (**** Representative of a type ****)
 
 let rec field_kind_repr =
@@ -243,6 +251,7 @@ type type_iterators =
     it_type_declaration: type_iterators -> type_declaration -> unit;
     it_exception_declaration: type_iterators -> exception_declaration -> unit;
     it_module_declaration: type_iterators -> module_declaration -> unit;
+    it_implicit_declaration: type_iterators -> implicit_declaration -> unit;
     it_modtype_declaration: type_iterators -> modtype_declaration -> unit;
     it_class_declaration: type_iterators -> class_declaration -> unit;
     it_class_type_declaration: type_iterators -> class_type_declaration -> unit;
@@ -259,6 +268,7 @@ let type_iterators =
       Sig_value (_, vd)     -> it.it_value_description it vd
     | Sig_type (_, td, _)   -> it.it_type_declaration it td
     | Sig_exception (_, ed) -> it.it_exception_declaration it ed
+    | Sig_implicit (_, imd) -> it.it_implicit_declaration it imd
     | Sig_module (_, md, _) -> it.it_module_declaration it md
     | Sig_modtype (_, mtd)  -> it.it_modtype_declaration it mtd
     | Sig_class (_, cd, _)  -> it.it_class_declaration it cd
@@ -271,6 +281,9 @@ let type_iterators =
     it.it_type_kind it td.type_kind
   and it_exception_declaration it ed =
     List.iter (it.it_type_expr it) ed.exn_args
+  and it_implicit_declaration it imd =
+    List.iter (fun (_,ty) -> it.it_module_type it ty) imd.imd_parameters;
+    it.it_module_type it imd.imd_type
   and it_module_declaration it md =
     it.it_module_type it md.md_type
   and it_modtype_declaration it mtd =
@@ -328,8 +341,9 @@ let type_iterators =
   in
   { it_path; it_type_expr; it_type_kind; it_class_type; it_module_type;
     it_signature; it_class_type_declaration; it_class_declaration;
-    it_modtype_declaration; it_module_declaration; it_exception_declaration;
-    it_type_declaration; it_value_description; it_signature_item; }
+    it_modtype_declaration; it_implicit_declaration; it_module_declaration;
+    it_exception_declaration; it_type_declaration; it_value_description;
+    it_signature_item; }
 
 let copy_row f fixed row keep more =
   let fields = List.map

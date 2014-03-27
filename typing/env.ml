@@ -1020,11 +1020,11 @@ let rec scrape_alias env ?path mty =
       begin try
         scrape_alias env (find_module path env).md_type ~path
       with Not_found ->
-        Location.prerr_warning Location.none 
+        Location.prerr_warning Location.none
           (Warnings.Deprecated
              ("module " ^ Path.name path ^ " cannot be accessed"));
         mty
-      end      
+      end
   | mty, Some path ->
       !strengthen env mty path
   | _ -> mty
@@ -1077,6 +1077,11 @@ let rec prefix_idents root pos sub = function
       let (pl, final_sub) =
         prefix_idents root (pos+1) (Subst.add_module id p sub) rem in
       (p::pl, final_sub)
+  | Sig_implicit(id, imd) :: rem ->
+      let p = Pdot(root, Ident.name id, pos) in
+      let (pl, final_sub) =
+        prefix_idents root (pos+1) (Subst.add_module id p sub) rem in
+      (p::pl, final_sub)
   | Sig_modtype(id, decl) :: rem ->
       let p = Pdot(root, Ident.name id, nopos) in
       let (pl, final_sub) =
@@ -1104,6 +1109,8 @@ let subst_signature sub sg =
           Sig_exception (id, Subst.exception_declaration sub decl)
       | Sig_module(id, mty, x) ->
           Sig_module(id, Subst.module_declaration sub mty,x)
+      | Sig_implicit(id, imd) ->
+          Sig_implicit(id, Subst.implicit_declaration sub imd)
       | Sig_modtype(id, decl) ->
           Sig_modtype(id, Subst.modtype_declaration sub decl)
       | Sig_class(id, decl, x) ->
@@ -1204,6 +1211,16 @@ and components_of_module_maker (env, sub, path, mty) =
             c.comp_components <-
               Tbl.add (Ident.name id) (comps, !pos) c.comp_components;
             env := store_module None id path md !env !env;
+            incr pos
+        | Sig_implicit(id, imd) ->
+            let mty = mty_of_implicit_declaration imd in
+            let mty' = EnvLazy.create (sub, mty) in
+            c.comp_modules <-
+              Tbl.add (Ident.name id) (mty', !pos) c.comp_modules;
+            let comps = components_of_module !env sub path mty in
+            c.comp_components <-
+              Tbl.add (Ident.name id) (comps, !pos) c.comp_components;
+            env := store_module None id path mty !env !env;
             incr pos
         | Sig_modtype(id, decl) ->
             let decl' = Subst.modtype_declaration sub decl in
@@ -1357,6 +1374,16 @@ and store_module slot id path md env renv =
                  (path, components_of_module env Subst.identity path md.md_type)
                    env.components renv.components;
     summary = Env_module(env.summary, id, md) }
+
+and store_implicit slot id path imd env renv =
+  { env with
+    modules = EnvTbl.add "module" slot id (path, md) env.modules renv.modules;
+    components =
+      EnvTbl.add "module" slot id
+                 (path, components_of_module env Subst.identity path md.md_type)
+                   env.components renv.components;
+    summary = Env_module(env.summary, id, md) }
+
 
 and store_modtype slot id path info env renv =
   { env with

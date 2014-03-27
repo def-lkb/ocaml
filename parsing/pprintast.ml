@@ -930,13 +930,15 @@ class printer  ()= object(self:'self)
         pp f "@[<hov>module@ %s@ :@ %a@]"
           pmd.pmd_name.txt
           self#module_type  pmd.pmd_type
-    | Psig_implicit {pmd_name; pmd_type={pmty_desc=Pmty_alias alias}} ->
-        pp f "@[<hov>implicit module@ %s@ =@ %a@]"
-          pmd_name.txt self#longident_loc alias
-    | Psig_implicit pmd ->
+    | Psig_implicit ({pid_parameters = []; _} as pid) ->
         pp f "@[<hov>implicit module@ %s@ :@ %a@]"
-          pmd.pmd_name.txt
-          self#module_type  pmd.pmd_type
+          pid.pid_name.txt
+          self#module_type  pid.pid_type
+    | Psig_implicit pid ->
+        pp f "@[<hov>implicit functor@ %s@ %a@ :@ %a@]"
+          pid.pid_name.txt
+          (self#list self#implicit_parameter ~sep:"@ ") pid.pid_parameters
+          self#module_type  pid.pid_type
     | Psig_open (ovf, li, _attrs) ->
         pp f "@[<hov2>open%s@ %a@]" (override ovf) self#longident_loc li
     | Psig_include (mt, _attrs) ->
@@ -992,6 +994,10 @@ class printer  ()= object(self:'self)
     | Pmod_extension _ -> assert false
 
   method structure f x = self#list ~sep:"@\n" self#structure_item f x
+
+  method implicit_parameter f x =
+    pp f "@[<hov2>(%s@ :@ %a)]" x.pip_name.txt
+      self#module_type x.pip_mty
 
   method payload f = function
     | PStr x -> self#structure f x
@@ -1065,8 +1071,22 @@ class printer  ()= object(self:'self)
     | Pstr_exception ed -> self#exception_declaration f ed
     | Pstr_module x ->
         pp f "@[<hov2>module@ %a@]" self#module_binding x
-    | Pstr_implicit x ->
-        pp f "@[<hov2>implicit module@ %a@]" self#module_binding x
+    | Pstr_implicit pib ->
+        pp f "@[<hov2>implicit %s@ %s@ %a%a@]"
+          (match pib.pib_parameters with
+           | [] -> "module"
+           | _ -> "functor")
+          pib.pib_name.txt
+          (self#list self#implicit_parameter ~sep:"@ ") pib.pib_parameters
+          (fun f me ->
+             match me.pmod_desc with
+             | Pmod_constraint
+                 (me,
+                  ({pmty_desc=(Pmty_ident _ | Pmty_signature _);_} as mt)) ->
+                 pp f " :@;%a@;=@;%a@;"  self#module_type mt self#module_expr  me
+             | _ ->
+                 pp f " =@ %a"  self#module_expr  me
+          ) pib.pib_expr
     | Pstr_open (ovf, li, _attrs) ->
         pp f "@[<2>open%s@;%a@]" (override ovf) self#longident_loc li;
     | Pstr_modtype {pmtd_name=s; pmtd_type=md} ->

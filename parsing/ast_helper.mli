@@ -179,7 +179,7 @@ module Sig:
     val type_: ?loc:loc -> type_declaration list -> signature_item
     val exception_: ?loc:loc -> constructor_declaration -> signature_item
     val module_: ?loc:loc -> module_declaration -> signature_item
-    val implicit_: ?loc:loc -> module_declaration -> signature_item
+    val implicit_: ?loc:loc -> implicit_declaration -> signature_item
     val rec_module: ?loc:loc -> module_declaration list -> signature_item
     val modtype: ?loc:loc -> module_type_declaration -> signature_item
     val open_: ?loc:loc -> ?attrs:attrs -> override_flag -> lid -> signature_item
@@ -202,7 +202,7 @@ module Str:
     val exception_: ?loc:loc -> constructor_declaration -> structure_item
     val exn_rebind: ?loc:loc -> ?attrs:attrs -> str -> lid -> structure_item
     val module_: ?loc:loc -> module_binding -> structure_item
-    val implicit_: ?loc:loc -> module_binding -> structure_item
+    val implicit_: ?loc:loc -> implicit_binding -> structure_item
     val rec_module: ?loc:loc -> module_binding list -> structure_item
     val modtype: ?loc:loc -> module_type_declaration -> structure_item
     val open_: ?loc:loc -> ?attrs:attrs -> override_flag -> lid -> structure_item
@@ -229,6 +229,24 @@ module Mtd:
 module Mb:
   sig
     val mk: ?loc:loc -> ?attrs:attrs -> str -> module_expr -> module_binding
+  end
+
+(** Implicit declarations *)
+module Id:
+  sig
+    val mk: ?loc:loc -> ?attrs:attrs -> str -> implicit_parameter list -> module_type -> implicit_declaration
+  end
+
+(** Implicit bindings *)
+module Ib:
+  sig
+    val mk: ?loc:loc -> ?attrs:attrs -> str -> implicit_parameter list -> module_expr -> implicit_binding
+  end
+
+(** Implicit parameters *)
+module Ip:
+  sig
+    val mk: ?loc:loc -> ?attrs:attrs -> str -> module_type -> implicit_parameter
   end
 
 (** Value bindings *)

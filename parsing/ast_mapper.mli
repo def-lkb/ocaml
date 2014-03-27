@@ -40,8 +40,9 @@ type mapper = {
   module_expr: mapper -> module_expr -> module_expr;
   module_type: mapper -> module_type -> module_type;
   module_type_declaration: mapper -> module_type_declaration -> module_type_declaration;
-  implicit_binding: mapper -> module_binding -> module_binding;
-  implicit_declaration: mapper -> module_declaration -> module_declaration;
+  implicit_binding: mapper -> implicit_binding -> implicit_binding;
+  implicit_declaration: mapper -> implicit_declaration -> implicit_declaration;
+  implicit_parameter: mapper -> implicit_parameter -> implicit_parameter;
   pat: mapper -> pattern -> pattern;
   payload: mapper -> payload -> payload;
   signature: mapper -> signature -> signature;
