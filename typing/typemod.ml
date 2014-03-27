@@ -554,7 +554,7 @@ and transl_signature env sg =
             (if List.exists (Ident.equal id) (get_exceptions rem) then rem
              else Sig_exception(id, decl) :: rem),
             final_env
-        | Psig_module pmd | Psig_implicit pmd ->
+        | Psig_module pmd ->
             check "module" item.psig_loc module_names pmd.pmd_name.txt;
             let tmty = transl_modtype env pmd.pmd_type in
             let md = {
@@ -572,6 +572,8 @@ and transl_signature env sg =
               env loc :: trem,
             Sig_module(id, md, Trec_not) :: rem,
             final_env
+        | Psig_implicit _ ->
+            failwith "TODO"
         | Psig_recmodule sdecls ->
             List.iter
               (fun pmd ->
@@ -1163,9 +1165,6 @@ and type_structure ?(toplevel = false) funct_body anchor env sstr scope =
     | Pstr_module {pmb_name = name; pmb_expr = smodl; pmb_attributes = attrs;
                    pmb_loc;
                   }
-    | Pstr_implicit {pmb_name = name; pmb_expr = smodl; pmb_attributes = attrs;
-                   pmb_loc;
-                  }
       ->
         check "module" loc module_names name.txt;
         let modl =
@@ -1187,6 +1186,8 @@ and type_structure ?(toplevel = false) funct_body anchor env sstr scope =
                      md_loc = pmb_loc;
                     }, Trec_not)],
         newenv
+    | Pstr_implicit _ ->
+       failwith "TODO"
     | Pstr_recmodule sbind ->
         let sbind =
           List.map
@@ -1313,6 +1314,8 @@ and type_structure ?(toplevel = false) funct_body anchor env sstr scope =
                       Sig_module (id, {md with md_type =
                                        Mty_alias (Pdot(p,Ident.name id,n))},
                                   rs)
+                  | Sig_implicit (id, imd) ->
+                      failwith "TODO"
                   | Sig_value (_, {val_kind=Val_reg}) | Sig_exception _
                   | Sig_class _ as it ->
                       incr pos; it

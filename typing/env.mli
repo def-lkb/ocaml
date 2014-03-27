@@ -20,6 +20,7 @@ type summary =
   | Env_type of summary * Ident.t * type_declaration
   | Env_exception of summary * Ident.t * exception_declaration
   | Env_module of summary * Ident.t * module_declaration
+  | Env_implicit of summary * Ident.t * implicit_declaration
   | Env_modtype of summary * Ident.t * modtype_declaration
   | Env_class of summary * Ident.t * class_declaration
   | Env_cltype of summary * Ident.t * class_type_declaration
@@ -104,6 +105,7 @@ val add_type: check:bool -> Ident.t -> type_declaration -> t -> t
 val add_exception: check:bool -> Ident.t -> exception_declaration -> t -> t
 val add_module: ?arg:bool -> Ident.t -> module_type -> t -> t
 val add_module_declaration: ?arg:bool -> Ident.t -> module_declaration -> t -> t
+val add_implicit_declaration: Ident.t -> implicit_declaration -> t -> t
 val add_modtype: Ident.t -> modtype_declaration -> t -> t
 val add_class: Ident.t -> class_declaration -> t -> t
 val add_cltype: Ident.t -> class_type_declaration -> t -> t

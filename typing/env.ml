@@ -108,6 +108,7 @@ type summary =
   | Env_type of summary * Ident.t * type_declaration
   | Env_exception of summary * Ident.t * exception_declaration
   | Env_module of summary * Ident.t * module_declaration
+  | Env_implicit of summary * Ident.t * implicit_declaration
   | Env_modtype of summary * Ident.t * modtype_declaration
   | Env_class of summary * Ident.t * class_declaration
   | Env_cltype of summary * Ident.t * class_type_declaration
@@ -1202,7 +1203,7 @@ and components_of_module_maker (env, sub, path, mty) =
             c.comp_constrs <-
               add_to_tbl s (cstr, !pos) c.comp_constrs;
             incr pos
-        | Sig_module(id, md, _) ->
+        | Sig_module(id, md, _) | Sig_implicit (id, { imd_module = md; _ }) ->
             let mty = md.md_type in
             let mty' = EnvLazy.create (sub, mty) in
             c.comp_modules <-
@@ -1211,16 +1212,6 @@ and components_of_module_maker (env, sub, path, mty) =
             c.comp_components <-
               Tbl.add (Ident.name id) (comps, !pos) c.comp_components;
             env := store_module None id path md !env !env;
-            incr pos
-        | Sig_implicit(id, imd) ->
-            let mty = mty_of_implicit_declaration imd in
-            let mty' = EnvLazy.create (sub, mty) in
-            c.comp_modules <-
-              Tbl.add (Ident.name id) (mty', !pos) c.comp_modules;
-            let comps = components_of_module !env sub path mty in
-            c.comp_components <-
-              Tbl.add (Ident.name id) (comps, !pos) c.comp_components;
-            env := store_module None id path mty !env !env;
             incr pos
         | Sig_modtype(id, decl) ->
             let decl' = Subst.modtype_declaration sub decl in
@@ -1376,13 +1367,14 @@ and store_module slot id path md env renv =
     summary = Env_module(env.summary, id, md) }
 
 and store_implicit slot id path imd env renv =
+  let md = imd.imd_module in
   { env with
     modules = EnvTbl.add "module" slot id (path, md) env.modules renv.modules;
     components =
       EnvTbl.add "module" slot id
                  (path, components_of_module env Subst.identity path md.md_type)
                    env.components renv.components;
-    summary = Env_module(env.summary, id, md) }
+    summary = Env_implicit(env.summary, id, imd) }
 
 
 and store_modtype slot id path info env renv =
@@ -1449,6 +1441,14 @@ and add_module_declaration ?arg id md env =
   let env = store_module None id path md env env in
   add_functor_arg ?arg id env
 
+and add_implicit_declaration id imd env =
+  let path =
+    (*match md.md_type with
+      Mty_alias path -> normalize_path env path
+    | _ ->*) Pident id
+  in
+  store_implicit None id path imd env env
+
 and add_modtype id info env =
   store_modtype None id (Pident id) info env env
 
@@ -1498,7 +1498,8 @@ let add_item comp env =
     Sig_value(id, decl)     -> add_value id decl env
   | Sig_type(id, decl, _)   -> add_type ~check:false id decl env
   | Sig_exception(id, decl) -> add_exception ~check:false id decl env
-  | Sig_module(id, md, _)  -> add_module_declaration id md env
+  | Sig_module(id, md, _)   -> add_module_declaration id md env
+  | Sig_implicit(id, imd)   -> add_implicit_declaration id imd env
   | Sig_modtype(id, decl)   -> add_modtype id decl env
   | Sig_class(id, decl, _)  -> add_class id decl env
   | Sig_class_type(id, decl, _) -> add_cltype id decl env
@@ -1529,6 +1530,8 @@ let open_signature slot root sg env0 =
             store_exception ~check:false slot (Ident.hide id) p decl env env0
         | Sig_module(id, mty, _) ->
             store_module slot (Ident.hide id) p mty env env0
+        | Sig_implicit(id, imd) ->
+            store_implicit slot (Ident.hide id) p imd env env0
         | Sig_modtype(id, decl) ->
             store_modtype slot (Ident.hide id) p decl env env0
         | Sig_class(id, decl, _) ->

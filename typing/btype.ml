@@ -61,14 +61,6 @@ let default_mty = function
     Some mty -> mty
   | None -> Mty_signature []
 
-let mty_of_implicit_declaration imd =
-  let functorize (id,mty) final_mty =
-    Mty_functor (id, Some mty, final_mty)
-  in
-  List.fold_right functorize
-    imd.imd_parameters
-    imd.imd_type
-
 (**** Representative of a type ****)
 
 let rec field_kind_repr =
@@ -282,8 +274,7 @@ let type_iterators =
   and it_exception_declaration it ed =
     List.iter (it.it_type_expr it) ed.exn_args
   and it_implicit_declaration it imd =
-    List.iter (fun (_,ty) -> it.it_module_type it ty) imd.imd_parameters;
-    it.it_module_type it imd.imd_type
+    it.it_module_declaration it imd.imd_module
   and it_module_declaration it md =
     it.it_module_type it md.md_type
   and it_modtype_declaration it mtd =

@@ -186,6 +186,9 @@ let init_shape modl =
     | Sig_module(id, md, _) :: rem ->
         init_shape_mod env md.md_type ::
         init_shape_struct (Env.add_module_declaration id md env) rem
+    | Sig_implicit(id, imd) :: rem ->
+        init_shape_mod env imd.imd_module.md_type ::
+        init_shape_struct (Env.add_implicit_declaration id imd env) rem
     | Sig_modtype(id, minfo) :: rem ->
         init_shape_struct (Env.add_modtype id minfo env) rem
     | Sig_class(id, cdecl, _) :: rem ->
@@ -868,7 +871,7 @@ let transl_store_package component_names target_name coercion =
                        [Lprim(Pgetglobal target_name, []);
                         Lprim(Pfield pos, [Lvar blk])]))
                0 pos_cc_list))
-  (*    
+  (*
               (* ignore id_pos_list as the ids are already bound *)
       let id = Array.of_list component_names in
       (List.length pos_cc_list,
