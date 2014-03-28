@@ -1682,7 +1682,11 @@ let rec type_approx env sexp =
   | Pexp_fun (p,_,_, e) ->
        newty (Tarrow(tarr_of_parr p, newvar (), type_approx env e, Cok))
   | Pexp_function ({pc_rhs=e}::_) ->
+<<<<<<< HEAD
        newty (Tarrow(Tarr_simple, newvar (), type_approx env e, Cok))
+=======
+       newty (Tarrow(Simple, newvar (), type_approx env e, Cok))
+>>>>>>> Introduce Asttypes.arrow_flag to encode labelled arguments
   | Pexp_match (_, {pc_rhs=e}::_) -> type_approx env e
   | Pexp_try (e, _) -> type_approx env e
   | Pexp_tuple l -> newty (Ttuple(List.map (type_approx env) l))
@@ -2049,7 +2053,11 @@ and type_expect_ ?in_function env sexp ty_expected =
         (tarr_of_parr l) [{pc_lhs=spat; pc_guard=None; pc_rhs=sexp}]
   | Pexp_function caselist ->
       type_function ?in_function
+<<<<<<< HEAD
         loc sexp.pexp_attributes env ty_expected Tarr_simple caselist
+=======
+        loc sexp.pexp_attributes env ty_expected Simple caselist
+>>>>>>> Introduce Asttypes.arrow_flag to encode labelled arguments
   | Pexp_apply(sfunct, sargs) ->
       begin_def (); (* one more level for non-returning functions *)
       if !Clflags.principal then begin_def ();
@@ -2498,7 +2506,11 @@ and type_expect_ ?in_function env sexp ty_expected =
                     filter_self_method env met Private meths privty
                   in
                   let method_type = newvar () in
+<<<<<<< HEAD
                   let (obj_ty, res_ty) = filter_arrow env method_type Tarr_simple in
+=======
+                  let (obj_ty, res_ty) = filter_arrow env method_type Simple in
+>>>>>>> Introduce Asttypes.arrow_flag to encode labelled arguments
                   unify env obj_ty desc.val_type;
                   unify env res_ty (instance env typ);
                   let exp =
@@ -2512,7 +2524,11 @@ and type_expect_ ?in_function env sexp ty_expected =
                                 exp_type = method_type;
                                 exp_attributes = []; (* check *)
                                 exp_env = env},
+<<<<<<< HEAD
                           [Tapp_simple,
+=======
+                          [Simple,
+>>>>>>> Introduce Asttypes.arrow_flag to encode labelled arguments
                             Some {exp_desc = Texp_ident(path, lid, desc);
                                   exp_loc = obj.exp_loc; exp_extra = [];
                                   exp_type = desc.val_type;
@@ -2955,7 +2971,11 @@ and type_argument env sarg ty_expected' ty_expected =
   (* ty_expected' may be generic *)
   let no_labels ty =
     let ls, tvar = list_labels env ty in
+<<<<<<< HEAD
     not tvar && List.for_all (function Tarr_simple -> true | _ -> false) ls
+=======
+    not tvar && List.for_all is_simple ls
+>>>>>>> Introduce Asttypes.arrow_flag to encode labelled arguments
   in
   let rec is_inferred sexp =
     match sexp.pexp_desc with
@@ -2964,7 +2984,11 @@ and type_argument env sarg ty_expected' ty_expected =
     | _ -> false
   in
   match expand_head env ty_expected' with
+<<<<<<< HEAD
     {desc = Tarrow(Tarr_simple,ty_arg,ty_res,_); level = lv} when is_inferred sarg ->
+=======
+    {desc = Tarrow(Simple,ty_arg,ty_res,_); level = lv} when is_inferred sarg ->
+>>>>>>> Introduce Asttypes.arrow_flag to encode labelled arguments
       (* apply optional arguments when expected type is "" *)
       (* we must be very careful about not breaking the semantics *)
       if !Clflags.principal then begin_def ();
@@ -2977,10 +3001,15 @@ and type_argument env sarg ty_expected' ty_expected =
         match (expand_head env ty_fun).desc with
         | Tarrow (Tarr_optional s,ty_arg,ty_fun,_) ->
             let ty = option_none (instance env ty_arg) sarg.pexp_loc in
+<<<<<<< HEAD
             make_args ((Tapp_optional s, Some ty) :: args) ty_fun
         | Tarrow (l,_,ty_res',_)
           when (match l with Tarr_simple -> true | _ -> false)
             || !Clflags.classic ->
+=======
+            make_args ((l, Some ty, Optional) :: args) ty_fun
+        | Tarrow (l,_,ty_res',_) when is_simple l || !Clflags.classic ->
+>>>>>>> Introduce Asttypes.arrow_flag to encode labelled arguments
             args, ty_fun, no_labels ty_res'
         | Tvar _ ->  args, ty_fun, false
         |  _ -> [], texp.exp_type, false
@@ -3016,10 +3045,17 @@ and type_argument env sarg ty_expected' ty_expected =
           {texp with exp_type = ty_res; exp_desc =
            Texp_apply
              (texp,
+<<<<<<< HEAD
               List.rev args @ [Tapp_simple, Some eta_var])}
         in
         { texp with exp_type = ty_fun; exp_desc =
           Texp_function(Tarr_simple, [case eta_pat e], Total) }
+=======
+              List.rev args @ [Simple, Some eta_var, Required])}
+        in
+        { texp with exp_type = ty_fun; exp_desc =
+          Texp_function(Simple, [case eta_pat e], Total) }
+>>>>>>> Introduce Asttypes.arrow_flag to encode labelled arguments
       in
       if warn then Location.prerr_warning texp.exp_loc
           (Warnings.Without_principality "eliminated optional argument");
@@ -3059,7 +3095,13 @@ and type_application env funct (sargs : (Parsetree.apply_flag * Parsetree.expres
     ty_fun: type of the function applied
   *)
   let rec type_unknown_args
+<<<<<<< HEAD
       (typed : (Types.apply_flag * (unit -> Typedtree.expression) option) list)
+=======
+      (args :
+      (Asttypes.arrow_flag * (unit -> Typedtree.expression) option *
+         Typedtree.optional) list)
+>>>>>>> Introduce Asttypes.arrow_flag to encode labelled arguments
     omitted ty_fun = function
       [] ->
         (List.map
@@ -3084,8 +3126,13 @@ and type_application env funct (sargs : (Parsetree.apply_flag * Parsetree.expres
                 Location.prerr_warning sarg1.pexp_loc Warnings.Unused_argument;
               unify env ty_fun (newty (Tarrow(arr1,t1,t2,Clink(ref Cunknown))));
               (t1, t2)
+<<<<<<< HEAD
           | Tarrow (arr1,t1,t2,_)
             when arrow_is_applicable arr1 app1 ->
+=======
+          | Tarrow (l,t1,t2,_) when l = l1
+            || !Clflags.classic && is_simple l1 && not (is_optional l) ->
+>>>>>>> Introduce Asttypes.arrow_flag to encode labelled arguments
               (t1, t2)
           | td ->
               let ty_fun =
@@ -3118,8 +3165,13 @@ and type_application env funct (sargs : (Parsetree.apply_flag * Parsetree.expres
       not tvar &&
       let labels = List.filter (fun x -> not (arrow_is_optional x)) ls in
       List.length labels = List.length sargs &&
+<<<<<<< HEAD
       List.for_all (function (l,_) -> l = Tapp_simple) sargs &&
       List.exists (fun l -> l <> Tarr_simple) labels &&
+=======
+      List.for_all (fun (l,_) -> is_simple l) sargs &&
+      List.exists (fun l -> not (is_simple l)) labels &&
+>>>>>>> Introduce Asttypes.arrow_flag to encode labelled arguments
       (Location.prerr_warning funct.exp_loc Warnings.Labels_omitted;
        true)
     end
@@ -3145,9 +3197,15 @@ and type_application env funct (sargs : (Parsetree.apply_flag * Parsetree.expres
             match sargs, more_sargs with
             | (app, sarg0) :: _, _ ->
                 raise(Error(sarg0.pexp_loc, env,
+<<<<<<< HEAD
                             Apply_wrong_label(app, ty_old)))
             | _, (app, sarg0) :: more_sargs ->
                 if not (arrow_is_compatible arr app) then
+=======
+                            Apply_wrong_label(l', ty_old)))
+            | _, (l', sarg0) :: more_sargs ->
+                if l <> l' && not (is_simple l') then
+>>>>>>> Introduce Asttypes.arrow_flag to encode labelled arguments
                   raise(Error(sarg0.pexp_loc, env,
                               Apply_wrong_label(app, ty_fun')))
                 else
@@ -3178,6 +3236,7 @@ and type_application env funct (sargs : (Parsetree.apply_flag * Parsetree.expres
                 | _ -> false)
             then
               Location.prerr_warning sarg0.pexp_loc
+<<<<<<< HEAD
                 (Warnings.Nonoptional_label (label_raw arr));
             (* Optional apply or non optional arrow *)
             let f =
@@ -3188,6 +3247,13 @@ and type_application env funct (sargs : (Parsetree.apply_flag * Parsetree.expres
               then
                 (fun () -> type_argument env sarg0 ty ty0)
               else begin
+=======
+                (Warnings.Nonoptional_label (Btype.label_raw l));
+            sargs, more_sargs,
+            if optional = Required || is_optional l' then
+              Some (fun () -> type_argument env sarg0 ty ty0)
+            else begin
+>>>>>>> Introduce Asttypes.arrow_flag to encode labelled arguments
               may_warn sarg0.pexp_loc
                 (Warnings.Not_principal "using an optional argument here");
               (fun () -> option_some (type_argument env sarg0
@@ -3197,6 +3263,7 @@ and type_application env funct (sargs : (Parsetree.apply_flag * Parsetree.expres
             in
             sargs, more_sargs, Some f
           with Not_found ->
+<<<<<<< HEAD
             let f =
               if arrow_is_optional arr &&
                  (List.mem_assoc Tapp_simple sargs ||
@@ -3215,6 +3282,21 @@ and type_application env funct (sargs : (Parsetree.apply_flag * Parsetree.expres
                 end
             in
             sargs, more_sargs, f
+=======
+            sargs, more_sargs,
+            if optional = Optional &&
+              (List.mem_assoc Simple sargs || List.mem_assoc Simple more_sargs)
+            then begin
+              may_warn funct.exp_loc
+                (Warnings.Without_principality "eliminated optional argument");
+              ignored := (l,ty,lv) :: !ignored;
+              Some (fun () -> option_none (instance env ty) Location.none)
+            end else begin
+              may_warn funct.exp_loc
+                (Warnings.Without_principality "commuted an argument");
+              None
+            end
+>>>>>>> Introduce Asttypes.arrow_flag to encode labelled arguments
         in
         let omitted =
           if arg = None then (arr,ty,lv) :: omitted else omitted in
@@ -3233,8 +3315,13 @@ and type_application env funct (sargs : (Parsetree.apply_flag * Parsetree.expres
   match funct.exp_desc, sargs with
     (* Special case for ignore: avoid discarding warning *)
     Texp_ident (_, _, {val_kind=Val_prim{Primitive.prim_name="%ignore"}}),
+<<<<<<< HEAD
     [Tapp_simple, sarg] ->
       let ty_arg, ty_res = filter_arrow env (instance env funct.exp_type) Tarr_simple in
+=======
+    [Simple, sarg] ->
+      let ty_arg, ty_res = filter_arrow env (instance env funct.exp_type) Simple in
+>>>>>>> Introduce Asttypes.arrow_flag to encode labelled arguments
       let exp = type_expect env sarg ty_arg in
       begin match (expand_head env exp.exp_type).desc with
       | Tarrow _ ->
@@ -3243,7 +3330,11 @@ and type_application env funct (sargs : (Parsetree.apply_flag * Parsetree.expres
           add_delayed_check (fun () -> check_application_result env false exp)
       | _ -> ()
       end;
+<<<<<<< HEAD
       ([Tapp_simple, Some exp], ty_res)
+=======
+      ([Simple, Some exp, Required], ty_res)
+>>>>>>> Introduce Asttypes.arrow_flag to encode labelled arguments
   | _ ->
       let ty = funct.exp_type in
       if ignore_labels then
@@ -3741,9 +3832,15 @@ let report_error env ppf = function
       end
   | Apply_wrong_label (l, ty) ->
       let print_label ppf = function
+<<<<<<< HEAD
         | Tapp_simple -> fprintf ppf "without label"
         | Tapp_optional s -> fprintf ppf "with label ?%s" s
         | Tapp_labelled s -> fprintf ppf "with label ~%s" s
+=======
+        | Simple -> fprintf ppf "without label"
+        | Optional s -> fprintf ppf "with label ?%s" s
+        | Labelled s -> fprintf ppf "with label ~%s" s
+>>>>>>> Introduce Asttypes.arrow_flag to encode labelled arguments
       in
       reset_and_mark_loops ty;
       fprintf ppf
@@ -3835,11 +3932,17 @@ let report_error env ppf = function
       end
   | Abstract_wrong_label (l, ty) ->
       let label_mark = function
+<<<<<<< HEAD
         | Tarr_simple -> "but its first argument is not labelled"
         | Tarr_labelled s ->
             sprintf "but its first argument is labelled ~%s" s
         | Tarr_optional s ->
             sprintf "but its first argument is labelled ?%s" s
+=======
+        | Simple -> "but its first argument is not labelled"
+        | Labelled s | Optional s ->
+            sprintf "but its first argument is labelled ~%s" s
+>>>>>>> Introduce Asttypes.arrow_flag to encode labelled arguments
       in
       reset_and_mark_loops ty;
       fprintf ppf "@[<v>@[<2>This function should have type@ %a@]@,%s@]"
