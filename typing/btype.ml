@@ -12,7 +12,6 @@
 
 (* Basic operations on core types *)
 
-open Asttypes
 open Misc
 open Types
 
@@ -542,21 +541,26 @@ let check_memorized_abbrevs () =
                   (**********************************)
 
 let is_simple = function
-  | Simple -> true
+  | Tarr_simple -> true
   | _ -> false
 
 let is_optional = function
-  | Optional _ -> true
+  | Tarr_optional _ -> true
   | _ -> false
 
 let label_name = function
-  | Simple -> ""
-  | Optional s | Labelled s -> s
+  | Tarr_simple -> ""
+  | Tarr_optional s | Tarr_labelled s -> s
 
 let label_raw = function
-  | Simple -> ""
-  | Optional s -> "?" ^ s
-  | Labelled s -> s
+  | Tarr_simple -> ""
+  | Tarr_optional s -> "?" ^ s
+  | Tarr_labelled s -> s
+
+let tarr_of_parr = function
+  | Parsetree.Parr_simple     -> Tarr_simple
+  | Parsetree.Parr_optional s -> Tarr_optional s
+  | Parsetree.Parr_labelled s -> Tarr_labelled s
 
 let rec extract_label_aux hd l = function
     [] -> raise Not_found

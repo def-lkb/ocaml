@@ -222,7 +222,7 @@ module Analyser =
           let f {Types.cd_id=constructor_name;cd_args=type_expr_list;cd_res=ret_type} =
             let constructor_name = Ident.name constructor_name in
             let comment_opt =
-              try List.assoc constructor_name name_comment_list 
+              try List.assoc constructor_name name_comment_list
               with Not_found -> None
             in
             {
@@ -1258,7 +1258,7 @@ module Analyser =
       | (Parsetree.Pcty_arrow (parse_label, _, pclass_type), Types.Cty_arrow (label, type_expr, class_type)) ->
           (* label = string. Dans les signatures, pas de nom de parametres a l'interieur des tuples *)
           (* si label = "", pas de label. ici on a l'information pour savoir si on a un label explicite. *)
-          if parse_label = label then
+          if Btype.tarr_of_parr parse_label = label then
             (
              let new_param = Simple_name
                  {

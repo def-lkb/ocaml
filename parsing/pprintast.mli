@@ -50,10 +50,10 @@ class printer :
     method expression2 : Format.formatter -> Parsetree.expression -> unit
     method label_exp :
       Format.formatter ->
-      Asttypes.arrow_flag * Parsetree.expression option * Parsetree.pattern ->
+      Parsetree.arrow_flag * Parsetree.expression option * Parsetree.pattern ->
       unit
     method label_x_expression_param :
-      Format.formatter -> Asttypes.arrow_flag * Parsetree.expression -> unit
+      Format.formatter -> Parsetree.arrow_flag * Parsetree.expression -> unit
     method list :
       ?sep:space_formatter ->
       ?first:space_formatter ->
@@ -108,7 +108,7 @@ class printer :
     method type_var_option :
       Format.formatter -> string Asttypes.loc option -> unit
     method type_in_arrow :
-      Format.formatter -> Asttypes.arrow_flag * Parsetree.core_type -> unit
+      Format.formatter -> Parsetree.arrow_flag * Parsetree.core_type -> unit
     method tyvar : Format.formatter -> string -> unit
     method under_pipe : 'b
     method under_semi : 'b
