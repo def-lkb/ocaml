@@ -1383,8 +1383,8 @@ let rec is_nonexpansive exp =
       List.for_all (fun vb -> is_nonexpansive vb.vb_expr) pat_exp_list &&
       is_nonexpansive body
   | Texp_function _ -> true
-  | Texp_apply(e, (_,None,_)::el) ->
-      is_nonexpansive e && List.for_all is_nonexpansive_opt (List.map snd3 el)
+  | Texp_apply(e, (_,None)::el) ->
+      is_nonexpansive e && List.for_all is_nonexpansive_opt (List.map snd el)
   | Texp_match(e, cases, _) ->
       is_nonexpansive e &&
       List.for_all
@@ -2532,8 +2532,7 @@ and type_expect_ ?in_function env sexp ty_expected =
                                   exp_loc = obj.exp_loc; exp_extra = [];
                                   exp_type = desc.val_type;
                                   exp_attributes = []; (* check *)
-                                  exp_env = env},
-                               Required])
+                                  exp_env = env}])
                   in
                   (Tmeth_name met, Some (re {exp_desc = exp;
                                              exp_loc = loc; exp_extra = [];
@@ -2993,7 +2992,7 @@ and type_argument env sarg ty_expected' ty_expected =
         match (expand_head env ty_fun).desc with
         | Tarrow (Tarr_optional _ as l,ty_arg,ty_fun,_) ->
             let ty = option_none (instance env ty_arg) sarg.pexp_loc in
-            make_args ((l, Some ty, Optional) :: args) ty_fun
+            make_args ((l, Some ty) :: args) ty_fun
         | Tarrow (l,_,ty_res',_)
           when (match l with Tarr_simple -> true | _ -> false)
             || !Clflags.classic ->
@@ -3032,7 +3031,7 @@ and type_argument env sarg ty_expected' ty_expected =
           {texp with exp_type = ty_res; exp_desc =
            Texp_apply
              (texp,
-              List.rev args @ [Tarr_simple, Some eta_var, Required])}
+              List.rev args @ [Tarr_simple, Some eta_var])}
         in
         { texp with exp_type = ty_fun; exp_desc =
           Texp_function(Tarr_simple, [case eta_pat e], Total) }
@@ -3066,14 +3065,12 @@ and type_application env funct sargs =
   in
   let ignored = ref [] in
   let rec type_unknown_args
-      (args :
-      (Types.arrow_flag * (unit -> Typedtree.expression) option *
-         Typedtree.optional) list)
+      (args : (Types.arrow_flag * (unit -> Typedtree.expression) option) list)
     omitted ty_fun = function
       [] ->
         (List.map
-            (function l, None, x -> l, None, x
-                | l, Some f, x -> l, Some (f ()), x)
+           (function l, None -> l, None
+                   | l, Some f -> l, Some (f ()))
            (List.rev args),
          instance env (result_type omitted ty_fun))
     | (l1, sarg1) :: sargl ->
@@ -3110,17 +3107,13 @@ and type_application env funct sargs =
                   raise(Error(funct.exp_loc, env, Apply_non_function
                                 (expand_head env funct.exp_type)))
         in
-        let optional = match l1 with
-          | Tarr_optional _ -> Optional
-          | _ -> Required
-        in
         let arg1 () =
           let arg1 = type_expect env sarg1 ty1 in
-          if optional = Optional then
+          if Btype.is_optional l1 then
             unify_exp env arg1 (type_option(newvar()));
           arg1
         in
-        type_unknown_args ((l1, Some arg1, optional) :: args) omitted ty2 sargl
+        type_unknown_args ((l1, Some arg1) :: args) omitted ty2 sargl
   in
   let ignore_labels =
     !Clflags.classic ||
@@ -3148,13 +3141,9 @@ and type_application env funct sargs =
             Location.prerr_warning loc w
           end
         in
-        let name = label_name l
-        and optional = match l with
-          | Tarr_optional _ -> Optional
-          | _ -> Required
-        in
+        let name = label_name l in
         let sargs, more_sargs, arg =
-          if ignore_labels && not (optional = Optional) then begin
+          if ignore_labels && not (is_optional l) then begin
             (* In classic mode, omitted = [] *)
             match sargs, more_sargs with
               (l', sarg0) :: _, _ ->
@@ -3185,11 +3174,11 @@ and type_application env funct sargs =
                     (Warnings.Not_principal "commuting this argument");
                 (l', sarg0, sargs @ sargs1, sargs2)
             in
-            if optional = Required && is_optional l' then
+            if not (is_optional l) && is_optional l' then
               Location.prerr_warning sarg0.pexp_loc
                 (Warnings.Nonoptional_label (Btype.label_raw l));
             sargs, more_sargs,
-            if optional = Required || is_optional l' then
+            if not (is_optional l) || is_optional l' then
               Some (fun () -> type_argument env sarg0 ty ty0)
             else begin
               may_warn sarg0.pexp_loc
@@ -3200,7 +3189,7 @@ and type_application env funct sargs =
             end
           with Not_found ->
             sargs, more_sargs,
-            if optional = Optional &&
+            if is_optional l &&
                ( List.mem_assoc Tarr_simple sargs
                  || List.mem_assoc Tarr_simple more_sargs)
             then begin
@@ -3217,7 +3206,7 @@ and type_application env funct sargs =
         let omitted =
           if arg = None then (l,ty,lv) :: omitted else omitted in
         let ty_old = if sargs = [] then ty_fun else ty_old in
-        type_args ((l,arg,optional)::args) omitted ty_fun ty_fun0
+        type_args ((l,arg)::args) omitted ty_fun ty_fun0
           ty_old sargs more_sargs
     | _ ->
         match sargs with
@@ -3241,7 +3230,7 @@ and type_application env funct sargs =
           add_delayed_check (fun () -> check_application_result env false exp)
       | _ -> ()
       end;
-      ([Tarr_simple, Some exp, Required], ty_res)
+      ([Tarr_simple, Some exp], ty_res)
   | _ ->
       let ty = funct.exp_type in
       if ignore_labels then
