@@ -19,6 +19,12 @@ open Types
 (* Value expressions for the core language *)
 
 type partial = Partial | Total
+
+(** [optional] is used to pass knowledge of optional arguments up to
+    [Translcore.transl_apply].
+    When introduced in 2000, this enabled a more efficient code generation for
+    optional arguments. However, today the information is redundant as labels
+    are passed to [transl_apply] too. Could be cleaned up. *)
 type optional = Required | Optional
 
 type attribute = Parsetree.attribute
