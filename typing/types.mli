@@ -10,11 +10,50 @@
 (*                                                                     *)
 (***********************************************************************)
 
-(* Representation of types and declarations *)
+(** {0 Representation of types and declarations} *)
 
+(** [Types] defines the representation of types and declarations (that is, the
+  content of module signatures).
+
+  Those are all that is needed to express the content of cmi files.
+
+  Notably, typing of term expressions is left to another file, [Typedtree], as
+  terms doesn't appear at the signature level.
+*)
+
+(** Asttypes exposes basic definitions shared both by Parsetree and Types. *)
 open Asttypes
 
-(* Type expressions for the core language *)
+(** Type expressions for the core language.
+
+  The [type_desc] variant defines all the possible type expressions one can
+  find in Ocaml. [type_expr] wraps this with some annotations.
+
+  The [level] field tracks the level of polymorphism associated to a type,
+  guiding the generalization algorithm.
+  Put shortly, when referring to a type in a given environment, both the type
+  and the environment have a level. If the type has an higher level, then it
+  can be considered fully polymorphic (type variables will be printed as ['a]),
+  otherwise it'll be weakly polymorphic, or non generalizable (type variables
+  printed as ['_a]).
+  See [http://okmij.org/ftp/ML/generalization.html] for more information.
+
+  Note about [type_declaration]: one should not make the confusion between
+  [type_expr] and [type_declaration].
+
+  [type_declaration] refers specifically to the [type] construct in ocaml
+  language, where you create and name a new type or type alias.
+
+  [type_expr] is used when you refers to existing types, e.g. when annotating
+  the expected type of a value.
+
+  Also, as the type system of ocaml is generative, a [type_declaration] can
+  have the side-effect of introducing a new type, different from all other
+  known types. On the opposite, [type_expr] is a pure construct which allows
+  referring to existing types.
+
+  Note on mutability: TBD.
+ *)
 
 type type_expr =
   { mutable desc: type_desc;
@@ -22,18 +61,46 @@ type type_expr =
     mutable id: int }
 
 and type_desc =
-    Tvar of string option
+  (** [Tvar (Some "a")] ==> ['a] or ['_a]
+      [Tvar None]       ==> [_] *)
+  | Tvar of string option
+  (** [Tarrow (""  , e1, e2, c)] ==> [e1    -> e2]
+      [Tarrow ("l",  e1, e2, c)] ==> [l:e1  -> e2]
+      [Tarrow ("?l", e1, e2, c)] ==> [?l:e1 -> e2]
+    See [commutable] for the last argument. *)
   | Tarrow of label * type_expr * type_expr * commutable
+  (** [Ttuple [t1;...;tn]] ==> [(t1 * ... * tn)] *)
   | Ttuple of type_expr list
+  (** [Tconstr (`A.B.t', [t1;...;tn], _)] ==> [(t1,...,tn) A.B.t]
+      The last parameter keep tracks of known expansions, see [abbrev_memo]. *)
   | Tconstr of Path.t * type_expr list * abbrev_memo ref
+
+  (** [Tobject (`f1:t1;...;fn: tn', `None')] ==> [< f1: t1; ...; fn: tn >]
+      f1, fn are represented as a linked list of types using Tfield and Tnil
+      constructors.
+
+      [Tobject (_, `Some (`A.ct', [t1;...;tn]')] ==> [(t1, ..., tn) A.ct].
+      where A.ct is the type of some class.
+  *)
   | Tobject of type_expr * (Path.t * type_expr list) option ref
+  (** [Tfield ("foo", Fpresent, t, ts)] ==> [<...; foo : t; ts>] *)
   | Tfield of string * field_kind * type_expr * type_expr
+  (** [Tnil] ==> [<...; >] *)
   | Tnil
+  (** Indirection used by unification engine. *)
   | Tlink of type_expr
+  (** [Tsubst] seems to be used to store information during
+      instantiation or copy of a type.
+      This constructor should not be used outside of these cases. *)
   | Tsubst of type_expr         (* for copying *)
+  (** Representation of polymorphic variant *)
   | Tvariant of row_desc
   | Tunivar of string option
+  (** [Tpoly (ty,tyl)] ==> ['a1... 'an. ty],
+      where 'a1 ... 'an are names given to types in tyl
+      and occurences of those types in ty. *)
   | Tpoly of type_expr * type_expr list
+  (* Type of a first-class module (a.k.a package). *)
   | Tpackage of Path.t * Longident.t list * type_expr list
 
 and row_desc =
@@ -52,9 +119,30 @@ and row_field =
            is erased later *)
   | Rabsent
 
+(** [abbrev_memo] allows one to keep track of different expansions of a type
+    alias.
+
+    For instance, when defining [type 'a pair = 'a * 'a], when one refers to an
+    ['a pair], it is just a shortcut for the ['a * 'a] type.
+    This expansion will be stored in the [abbrev_memo] of the corresponding
+    [Tconstr] node.
+
+    In practice, [abbrev_memo] behaves like list of expansions with a mutable
+    tail.
+
+    Note on marshalling: [abbrev_memo] must not appear in saved types.
+    [Btype], with [cleanup_abbrev] and [memo], takes care of tracking and
+    removing abbreviations.
+*)
 and abbrev_memo =
-    Mnil
+  (** No known abbrevation *)
+  | Mnil
+  (** Found one abbreviation.
+    A valid abbreviation should be at least as visible and
+    reachable by the same path.
+    The first expression is the abbreviation and the second the expansion. *)
   | Mcons of private_flag * Path.t * type_expr * type_expr * abbrev_memo
+  (** Abbreviations can be found after this indirection *)
   | Mlink of abbrev_memo ref
 
 and field_kind =
@@ -62,6 +150,26 @@ and field_kind =
   | Fpresent
   | Fabsent
 
+(** [commutable] is a flag appended to every arrow type.
+
+    It's purpose is to carry information about what is known about the order of
+    applied arguments.
+
+    When typing an application (e.g [f x]), it is needed to infer the type of
+    the function being applied. However in presence of labels there is no
+    longer a strict order imposed on arguments.
+
+    As such, when applying a labelled argument we keep track of the fact that
+    the exact order is not known. When unifying with the correct actual
+    function type, the order is recovered.
+
+    When typing an abstraction, the correct order is always known
+    (e.g [fun ~a ~b -> ...] always produce [Cok] arguments).
+    Conversely, generalising a type containing [Cunknown] arguments is not a
+    good sign, and means that the order of arguments gets arbitrarily fixed.
+    There is no principal typing in presence of unordered, potentially optional
+    arguments. (FIXME is this the correct interpretation?)
+*)
 and commutable =
     Cok
   | Cunknown
