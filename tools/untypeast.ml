@@ -229,6 +229,11 @@ and untype_arrow_flag = function
   | Types.Tarr_optional s -> Parr_optional s
   | Types.Tarr_labelled s -> Parr_labelled s
 
+and untype_apply_flag = function
+  | Types.Tapp_simple     -> Papp_simple
+  | Types.Tapp_optional s -> Papp_optional s
+  | Types.Tapp_labelled s -> Papp_labelled s
+
 and untype_expression exp =
   let desc =
     match exp.exp_desc with
@@ -249,7 +254,7 @@ and untype_expression exp =
           List.fold_right (fun (label, expo) list ->
               match expo with
                 None -> list
-              | Some exp -> (untype_arrow_flag label, untype_expression exp) :: list
+              | Some exp -> (untype_apply_flag label, untype_expression exp) :: list
           ) list [])
     | Texp_match (exp, cases, _) ->
         Pexp_match (untype_expression exp, untype_cases cases)
@@ -445,7 +450,7 @@ and untype_class_expr cexpr =
           List.fold_right (fun (label, expo) list ->
               match expo with
                 None -> list
-              | Some exp -> (untype_arrow_flag label, untype_expression exp) :: list
+              | Some exp -> (untype_apply_flag label, untype_expression exp) :: list
           ) args [])
 
     | Tcl_let (rec_flat, bindings, _ivars, cl) ->
