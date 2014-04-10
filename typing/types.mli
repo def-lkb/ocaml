@@ -120,7 +120,7 @@ and row_field =
   | Rabsent
 
 (** [abbrev_memo] allows one to keep track of different expansions of a type
-    alias.
+    alias. This is done for performance purposes.
 
     For instance, when defining [type 'a pair = 'a * 'a], when one refers to an
     ['a pair], it is just a shortcut for the ['a * 'a] type.
