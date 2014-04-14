@@ -183,8 +183,6 @@ and pattern_desc =
         (* (module P)
            Note: (module P : S) is represented as Ppat_constraint(Ppat_unpack, Ptyp_package)
          *)
-  | Ppat_implicit of string loc
-        (* (implicit P: S) *)
   | Ppat_extension of extension
         (* [%id] *)
 
