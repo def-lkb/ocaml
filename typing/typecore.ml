@@ -113,6 +113,9 @@ let rp node =
 let case lhs rhs =
   {c_lhs = lhs; c_guard = None; c_rhs = rhs}
 
+let make_argument (f,e) =
+  {arg_flag = f; arg_expression = e}
+
 (* Upper approximation of free identifiers on the parse tree *)
 
 let iter_expression f e =
@@ -1371,8 +1374,8 @@ let rec is_nonexpansive exp =
       List.for_all (fun vb -> is_nonexpansive vb.vb_expr) pat_exp_list &&
       is_nonexpansive body
   | Texp_function _ -> true
-  | Texp_apply(e, (_,None)::el) ->
-      is_nonexpansive e && List.for_all is_nonexpansive_opt (List.map snd el)
+  | Texp_apply(e, {arg_expression = None} :: el) ->
+      is_nonexpansive e && List.for_all is_nonexpansive_opt (List.map (fun x -> x.arg_expression) el)
   | Texp_match(e, cases, _) ->
       is_nonexpansive e &&
       List.for_all
@@ -2507,22 +2510,26 @@ and type_expect_ ?in_function env sexp ty_expected =
                   unify env obj_ty desc.val_type;
                   unify env res_ty (instance env typ);
                   let exp =
-                    Texp_apply({exp_desc =
-                                Texp_ident(Path.Pident method_id, lid,
-                                           {val_type = method_type;
-                                            val_kind = Val_reg;
-                                            val_attributes = [];
-                                            Types.val_loc = Location.none});
-                                exp_loc = loc; exp_extra = [];
-                                exp_type = method_type;
-                                exp_attributes = []; (* check *)
-                                exp_env = env},
-                          [Tapp_simple,
-                            Some {exp_desc = Texp_ident(path, lid, desc);
+                    Texp_apply(
+                      {exp_desc =
+                         Texp_ident(Path.Pident method_id, lid,
+                                    {val_type = method_type;
+                                     val_kind = Val_reg;
+                                     val_attributes = [];
+                                     Types.val_loc = Location.none});
+                       exp_loc = loc; exp_extra = [];
+                       exp_type = method_type;
+                       exp_attributes = []; (* check *)
+                       exp_env = env},
+                      [{ arg_flag = Tapp_simple;
+                         arg_expression =
+                           Some { exp_desc = Texp_ident(path, lid, desc);
                                   exp_loc = obj.exp_loc; exp_extra = [];
                                   exp_type = desc.val_type;
                                   exp_attributes = []; (* check *)
-                                  exp_env = env}])
+                                  exp_env = env };
+                       }]
+                    )
                   in
                   (Tmeth_name met, Some (re {exp_desc = exp;
                                              exp_loc = loc; exp_extra = [];
@@ -3054,10 +3061,9 @@ and type_argument env sarg ty_expected' ty_expected =
       let eta_pat, eta_var = var_pair "eta" ty_arg in
       let func texp =
         let e =
-          {texp with exp_type = ty_res; exp_desc =
-           Texp_apply
-             (texp,
-              List.rev args @ [Tapp_simple, Some eta_var])}
+          let args = (Tapp_simple, Some eta_var) :: args in
+          let args = List.rev_map make_argument args in
+          {texp with exp_type = ty_res; exp_desc = Texp_apply (texp,args)}
         in
         { texp with exp_type = ty_fun; exp_desc =
           Texp_function(Tarr_simple, [case eta_pat e], Total) }
@@ -3104,8 +3110,17 @@ and type_application env funct (sargs : (Parsetree.apply_flag * Parsetree.expres
     omitted ty_fun = function
       [] ->
         (List.map
-           (function l, None -> l, None
-                   | l, Some f -> l, Some (f ()))
+           (fun (flag,expr) ->
+             begin match flag, expr with
+             | Tapp_implicit, None ->
+                 prerr_endline "uninstanciated implicit";
+             | _ -> ()
+             end;
+             let expr = match expr with
+               | None -> None
+               | Some f -> Some (f ())
+             in
+             make_argument (flag,expr))
            (List.rev typed),
          instance env (result_type omitted ty_fun))
     | (app1, sarg1) :: sargl ->
@@ -3286,7 +3301,7 @@ and type_application env funct (sargs : (Parsetree.apply_flag * Parsetree.expres
           add_delayed_check (fun () -> check_application_result env false exp)
       | _ -> ()
       end;
-      ([Tapp_simple, Some exp], ty_res)
+      ([{arg_flag = Tapp_simple; arg_expression = Some exp}], ty_res)
   | _ ->
       let ty = funct.exp_type in
       if ignore_labels then
