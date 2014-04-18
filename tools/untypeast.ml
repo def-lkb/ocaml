@@ -257,11 +257,7 @@ and untype_expression exp =
         assert false
     | Texp_apply (exp, list) ->
         Pexp_apply (untype_expression exp,
-          List.fold_right (fun (label, expo) list ->
-              match expo with
-                None -> list
-              | Some exp -> (untype_apply_flag label, untype_expression exp) :: list
-          ) list [])
+          List.fold_right untype_argument list [])
     | Texp_match (exp, cases, _) ->
         Pexp_match (untype_expression exp, untype_cases cases)
     | Texp_try (exp, cases) ->
@@ -332,6 +328,12 @@ and untype_expression exp =
   in
   List.fold_right untype_extra exp.exp_extra
     (Exp.mk ~loc:exp.exp_loc ~attrs:exp.exp_attributes desc)
+
+and untype_argument arg list =
+  match arg.arg_expression with
+    None -> list
+  | Some exp -> (untype_apply_flag arg.arg_flag,
+                 untype_expression exp) :: list
 
 and untype_package_type pack =
   (pack.pack_txt,
@@ -466,11 +468,7 @@ and untype_class_expr cexpr =
 
     | Tcl_apply (cl, args) ->
         Pcl_apply (untype_class_expr cl,
-          List.fold_right (fun (label, expo) list ->
-              match expo with
-                None -> list
-              | Some exp -> (untype_apply_flag label, untype_expression exp) :: list
-          ) args [])
+          List.fold_right untype_argument args [])
 
     | Tcl_let (rec_flat, bindings, _ivars, cl) ->
         Pcl_let (rec_flat,
