@@ -69,6 +69,7 @@ type error =
   | Invalid_interval
   | Invalid_for_loop_index
   | Extension of string
+  | Pending_implicit of pending_implicit
 
 exception Error of Location.t * Env.t * error
 
@@ -116,6 +117,11 @@ let case lhs rhs =
 
 let make_argument (f,e) =
   {arg_flag = f; arg_expression = e}
+
+let generalize_implicits () =
+  try generalize_implicits ()
+  with Uninstantiable_implicit inst ->
+    raise (Error (inst.implicit_loc, inst.implicit_env, Pending_implicit inst))
 
 (* Upper approximation of free identifiers on the parse tree *)
 
@@ -4064,6 +4070,9 @@ let report_error env ppf = function
         "@[Invalid for-loop index: only variables and _ are allowed.@]"
   | Extension s ->
       fprintf ppf "Uninterpreted extension '%s'." s
+  | Pending_implicit inst ->
+      fprintf ppf "Cannot find instance for implicit %s."
+        (Ident.name inst.implicit_id)
 
 let report_error env ppf err =
   wrap_printing_env env (fun () -> report_error env ppf err)

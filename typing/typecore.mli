@@ -110,6 +110,7 @@ type error =
   | Invalid_interval
   | Invalid_for_loop_index
   | Extension of string
+  | Pending_implicit of Typeimplicit.pending_implicit
 
 exception Error of Location.t * Env.t * error
 

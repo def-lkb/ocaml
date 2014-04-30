@@ -90,7 +90,7 @@ typing/cmi_format.cmi : typing/types.cmi
 typing/cmt_format.cmi : typing/types.cmi typing/typedtree.cmi \
     parsing/location.cmi typing/env.cmi typing/cmi_format.cmi
 typing/ctype.cmi : typing/types.cmi typing/path.cmi parsing/longident.cmi \
-    typing/ident.cmi typing/env.cmi parsing/asttypes.cmi
+    parsing/location.cmi typing/ident.cmi typing/env.cmi parsing/asttypes.cmi
 typing/datarepr.cmi : typing/types.cmi typing/path.cmi typing/ident.cmi \
     parsing/asttypes.cmi
 typing/envaux.cmi : typing/subst.cmi typing/path.cmi typing/env.cmi
@@ -124,9 +124,10 @@ typing/subst.cmi : typing/types.cmi typing/path.cmi typing/ident.cmi
 typing/typeclass.cmi : typing/types.cmi typing/typedtree.cmi \
     parsing/parsetree.cmi parsing/longident.cmi parsing/location.cmi \
     typing/ident.cmi typing/env.cmi typing/ctype.cmi parsing/asttypes.cmi
-typing/typecore.cmi : typing/types.cmi typing/typedtree.cmi typing/path.cmi \
-    parsing/parsetree.cmi parsing/longident.cmi parsing/location.cmi \
-    typing/ident.cmi typing/env.cmi parsing/asttypes.cmi typing/annot.cmi
+typing/typecore.cmi : typing/types.cmi typing/typeimplicit.cmo \
+    typing/typedtree.cmi typing/path.cmi parsing/parsetree.cmi \
+    parsing/longident.cmi parsing/location.cmi typing/ident.cmi \
+    typing/env.cmi parsing/asttypes.cmi typing/annot.cmi
 typing/typedecl.cmi : typing/types.cmi typing/typedtree.cmi typing/path.cmi \
     parsing/parsetree.cmi parsing/longident.cmi parsing/location.cmi \
     typing/includecore.cmi typing/ident.cmi typing/env.cmi
