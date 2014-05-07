@@ -97,7 +97,6 @@ type type_iterators =
     it_type_declaration: type_iterators -> type_declaration -> unit;
     it_exception_declaration: type_iterators -> exception_declaration -> unit;
     it_module_declaration: type_iterators -> module_declaration -> unit;
-    it_implicit_declaration: type_iterators -> implicit_declaration -> unit;
     it_modtype_declaration: type_iterators -> modtype_declaration -> unit;
     it_class_declaration: type_iterators -> class_declaration -> unit;
     it_class_type_declaration: type_iterators -> class_type_declaration -> unit;

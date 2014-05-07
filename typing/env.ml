@@ -108,13 +108,11 @@ type summary =
   | Env_type of summary * Ident.t * type_declaration
   | Env_exception of summary * Ident.t * exception_declaration
   | Env_module of summary * Ident.t * module_declaration
-  | Env_implicit of summary * Ident.t * implicit_declaration
   | Env_modtype of summary * Ident.t * modtype_declaration
   | Env_class of summary * Ident.t * class_declaration
   | Env_cltype of summary * Ident.t * class_type_declaration
   | Env_open of summary * Path.t
   | Env_functor_arg of summary * Ident.t
-  | Env_implicit_arg of summary * Ident.t
 
 module EnvTbl =
   struct
@@ -178,7 +176,7 @@ type t = {
   cltypes: (Path.t * class_type_declaration) EnvTbl.t;
   functor_args: unit Ident.tbl;
   implicit_args: unit Ident.tbl;
-  implicit_instances: (Path.t * implicit_declaration) list;
+  implicit_instances: (Path.t * module_declaration) list;
   summary: summary;
   local_constraints: bool;
   gadt_instances: (int * TypeSet.t ref) list;
@@ -278,11 +276,8 @@ let strengthen =
   ref ((fun env mty path -> assert false) :
          t -> module_type -> Path.t -> module_type)
 
-let md md_type =
-  {md_type; md_attributes=[]; md_loc=Location.none}
-
-let imd imd_arity md_type =
-  {imd_module = md md_type; imd_arity = imd_arity}
+let md ?(implicit_ = Asttypes.Nonimplicit) md_type =
+  {md_type; md_attributes=[]; md_loc=Location.none; md_implicit = implicit_}
 
 (* The name of the compilation unit currently compiled.
    "" if outside a compilation unit. *)
@@ -1097,11 +1092,6 @@ let rec prefix_idents root pos sub = function
       let (pl, final_sub) =
         prefix_idents root (pos+1) (Subst.add_module id p sub) rem in
       (p::pl, final_sub)
-  | Sig_implicit(id, imd) :: rem ->
-      let p = Pdot(root, Ident.name id, pos) in
-      let (pl, final_sub) =
-        prefix_idents root (pos+1) (Subst.add_module id p sub) rem in
-      (p::pl, final_sub)
   | Sig_modtype(id, decl) :: rem ->
       let p = Pdot(root, Ident.name id, nopos) in
       let (pl, final_sub) =
@@ -1129,8 +1119,6 @@ let subst_signature sub sg =
           Sig_exception (id, Subst.exception_declaration sub decl)
       | Sig_module(id, mty, x) ->
           Sig_module(id, Subst.module_declaration sub mty,x)
-      | Sig_implicit(id, imd) ->
-          Sig_implicit(id, Subst.implicit_declaration sub imd)
       | Sig_modtype(id, decl) ->
           Sig_modtype(id, Subst.modtype_declaration sub decl)
       | Sig_class(id, decl, x) ->
@@ -1222,7 +1210,7 @@ and components_of_module_maker (env, sub, path, mty) =
             c.comp_constrs <-
               add_to_tbl s (cstr, !pos) c.comp_constrs;
             incr pos
-        | Sig_module(id, md, _) | Sig_implicit (id, { imd_module = md; _ }) ->
+        | Sig_module(id, md, _) ->
             let mty = md.md_type in
             let mty' = EnvLazy.create (sub, mty) in
             c.comp_modules <-
@@ -1383,20 +1371,12 @@ and store_module slot id path md env renv =
       EnvTbl.add "module" slot id
                  (path, components_of_module env Subst.identity path md.md_type)
                    env.components renv.components;
-    summary = Env_module(env.summary, id, md) }
-
-and store_implicit slot id path imd env renv =
-  let md = imd.imd_module in
-  { env with
-    modules = EnvTbl.add "module" slot id (path, md) env.modules renv.modules;
-    components =
-      EnvTbl.add "module" slot id
-                 (path, components_of_module env Subst.identity path md.md_type)
-                   env.components renv.components;
-    summary = Env_implicit(env.summary, id, imd);
-    implicit_instances = (path, imd) :: env.implicit_instances;
+    summary = Env_module(env.summary, id, md);
+    implicit_instances =
+      match md.md_implicit with
+      | Asttypes.Nonimplicit -> env.implicit_instances
+      | Asttypes.Implicit _ -> (path, md) :: env.implicit_instances;
   }
-
 
 and store_modtype slot id path info env renv =
   { env with
@@ -1438,17 +1418,19 @@ let _ =
 
 (* Insertion of bindings by identifier *)
 
-let add_functor_arg ?(arg=false) id env =
-  if not arg then env else
-  {env with
-   functor_args = Ident.add id () env.functor_args;
-   summary = Env_functor_arg (env.summary, id)}
-
-let add_implicit_arg ?(arg=false) id env =
-  if not arg then env else
-  {env with
-   implicit_args = Ident.add id () env.implicit_args;
-   summary = Env_functor_arg (env.summary, id)}
+let add_functor_arg ?(arg = false) ~implicit_ id env =
+  match arg, implicit_ with
+  | false, _ -> env
+  | true, Nonimplicit ->
+      (* Nonimplicit are normal functor argument *)
+      {env with
+       functor_args = Ident.add id () env.functor_args;
+       summary = Env_functor_arg (env.summary, id)}
+  | true, Implicit _ ->
+      (* Implicit args are bound in a function, and are not functors! *)
+      {env with
+       implicit_args = Ident.add id () env.implicit_args;
+       summary = Env_functor_arg (env.summary, id)}
 
 let add_value ?check id desc env =
   store_value None ?check id (Pident id) desc env env
@@ -1466,16 +1448,7 @@ and add_module_declaration ?arg id md env =
     | _ ->*) Pident id
   in
   let env = store_module None id path md env env in
-  add_functor_arg ?arg id env
-
-and add_implicit_declaration ?arg id imd env =
-  let path =
-    (*match md.md_type with
-      Mty_alias path -> normalize_path env path
-    | _ ->*) Pident id
-  in
-  let env = store_implicit None id path imd env env in
-  add_implicit_arg ?arg id env
+  add_functor_arg ?arg ~implicit_:md.md_implicit id env
 
 and add_modtype id info env =
   store_modtype None id (Pident id) info env env
@@ -1486,11 +1459,8 @@ and add_class id ty env =
 and add_cltype id ty env =
   store_cltype None id (Pident id) ty env env
 
-let add_module ?arg id mty env =
-  add_module_declaration ?arg id (md mty) env
-
-let add_implicit ?arg id ~arity mty env =
-  add_implicit_declaration ?arg id (imd arity mty) env
+let add_module ?arg ?implicit_ id mty env =
+  add_module_declaration ?arg id (md ?implicit_ mty) env
 
 let add_local_constraint id info elv env =
   match info with
@@ -1515,20 +1485,12 @@ and enter_module_declaration ?arg name md env =
   (id, add_module_declaration ?arg id md env)
   (* let (id, env) = enter store_module name md env in
   (id, add_functor_arg ?arg id env) *)
-and enter_implicit_declaration name imd env =
-  let id = Ident.create name in
-  (id, add_implicit_declaration id imd env)
-  (* let (id, env) = enter store_module name md env in
-  (id, add_functor_arg ?arg id env) *)
 and enter_modtype = enter store_modtype
 and enter_class = enter store_class
 and enter_cltype = enter store_cltype
 
-let enter_module ?arg s mty env =
-  enter_module_declaration ?arg s (md mty) env
-
-let enter_implicit s ~arity mty env =
-  enter_implicit_declaration s (imd arity mty) env
+let enter_module ?arg ~implicit_ s mty env =
+  enter_module_declaration ?arg s (md ~implicit_ mty) env
 
 (* Insertion of all components of a signature *)
 
@@ -1538,7 +1500,6 @@ let add_item comp env =
   | Sig_type(id, decl, _)   -> add_type ~check:false id decl env
   | Sig_exception(id, decl) -> add_exception ~check:false id decl env
   | Sig_module(id, md, _)   -> add_module_declaration id md env
-  | Sig_implicit(id, imd)   -> add_implicit_declaration id imd env
   | Sig_modtype(id, decl)   -> add_modtype id decl env
   | Sig_class(id, decl, _)  -> add_class id decl env
   | Sig_class_type(id, decl, _) -> add_cltype id decl env
@@ -1569,8 +1530,6 @@ let open_signature slot root sg env0 =
             store_exception ~check:false slot (Ident.hide id) p decl env env0
         | Sig_module(id, mty, _) ->
             store_module slot (Ident.hide id) p mty env env0
-        | Sig_implicit(id, imd) ->
-            store_implicit slot (Ident.hide id) p imd env env0
         | Sig_modtype(id, decl) ->
             store_modtype slot (Ident.hide id) p decl env env0
         | Sig_class(id, decl, _) ->

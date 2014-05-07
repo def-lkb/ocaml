@@ -186,9 +186,6 @@ let init_shape modl =
     | Sig_module(id, md, _) :: rem ->
         init_shape_mod env md.md_type ::
         init_shape_struct (Env.add_module_declaration id md env) rem
-    | Sig_implicit(id, imd) :: rem ->
-        init_shape_mod env imd.imd_module.md_type ::
-        init_shape_struct (Env.add_implicit_declaration id imd env) rem
     | Sig_modtype(id, minfo) :: rem ->
         init_shape_struct (Env.add_modtype id minfo env) rem
     | Sig_class(id, cdecl, _) :: rem ->
@@ -373,7 +370,7 @@ and transl_structure fields cc rootpath = function
   | Tstr_exn_rebind( id, _, path, {Location.loc=loc}, _) ->
       Llet(Strict, id, transl_path ~loc item.str_env path,
            transl_structure (id :: fields) cc rootpath rem)
-  | Tstr_module mb | Tstr_implicit {im_module = mb; _} ->
+  | Tstr_module mb ->
       let id = mb.mb_id in
       Llet(pure_module mb.mb_expr, id,
            transl_module Tcoerce_none (field_path rootpath id) mb.mb_expr,
@@ -449,7 +446,7 @@ let rec defined_idents = function
     | Tstr_type decls -> defined_idents rem
     | Tstr_exception decl -> decl.cd_id :: defined_idents rem
     | Tstr_exn_rebind(id, _, path, _, _) -> id :: defined_idents rem
-    | Tstr_module mb | Tstr_implicit {im_module = mb; _} ->
+    | Tstr_module mb ->
       mb.mb_id :: defined_idents rem
     | Tstr_recmodule decls ->
       List.map (fun mb -> mb.mb_id) decls @ defined_idents rem
@@ -482,7 +479,6 @@ let rec more_idents = function
     | Tstr_module {mb_expr={mod_desc = Tmod_structure str}} ->
         all_idents str.str_items @ more_idents rem
     | Tstr_module _ -> more_idents rem
-    | Tstr_implicit _ -> more_idents rem
     | Tstr_attribute _ -> more_idents rem
 
 and all_idents = function
@@ -504,7 +500,7 @@ and all_idents = function
       List.map (fun (ci, _, _) -> ci.ci_id_class) cl_list @ all_idents rem
     | Tstr_class_type cl_list -> all_idents rem
     | Tstr_include(modl, sg, _) -> bound_value_identifiers sg @ all_idents rem
-    | Tstr_module mb | Tstr_implicit {im_module = mb; _} ->
+    | Tstr_module mb ->
       begin match mb with
       | {mb_id;mb_expr={mod_desc = Tmod_structure str}} ->
           mb_id :: all_idents str.str_items @ all_idents rem
@@ -562,7 +558,7 @@ let transl_store_structure glob map prims str =
       let lam = subst_lambda subst (transl_path ~loc item.str_env path) in
       Lsequence(Llet(Strict, id, lam, store_ident id),
                 transl_store rootpath (add_ident false id subst) rem)
-  | Tstr_module mb | Tstr_implicit {im_module = mb; _} ->
+  | Tstr_module mb ->
       begin match mb with
       | {mb_id=id; mb_expr={mod_desc = Tmod_structure str}} ->
           let lam = transl_store (field_path rootpath id) subst str.str_items in
@@ -775,8 +771,7 @@ let transl_toplevel_item item =
       toploop_setvalue decl.cd_id (transl_exception None decl)
   | Tstr_exn_rebind(id, _, path, {Location.loc=loc}, _) ->
       toploop_setvalue id (transl_path ~loc item.str_env path)
-  | Tstr_module {mb_id=id; mb_expr=modl}
-  | Tstr_implicit {im_module = {mb_id=id; mb_expr=modl}; _} ->
+  | Tstr_module {mb_id=id; mb_expr=modl} ->
       (* we need to use the unique name for the module because of issues
          with "open" (PR#1672) *)
       set_toplevel_unique_name id;

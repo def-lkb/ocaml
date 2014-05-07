@@ -927,18 +927,18 @@ class printer  ()= object(self:'self)
                 self#list ~first:"@[<v0>class @[<2>" ~sep:"@]@;and @["
                   ~last:"@]@]" class_description f l)
           l
-    | Psig_module {pmd_name; pmd_type={pmty_desc=Pmty_alias alias}} ->
+    | Psig_module {pmd_name; pmd_type={pmty_desc=Pmty_alias alias}; pmd_implicit = Nonimplicit} ->
         pp f "@[<hov>module@ %s@ =@ %a@]"
           pmd_name.txt self#longident_loc alias
-    | Psig_module pmd ->
+    | Psig_module {pmd_name; pmd_type; pmd_implicit = Nonimplicit} ->
         pp f "@[<hov>module@ %s@ :@ %a@]"
-          pmd.pmd_name.txt
-          self#module_type  pmd.pmd_type
-    | Psig_implicit pid ->
+          pmd_name.txt
+          self#module_type pmd_type
+    | Psig_module {pmd_name; pmd_type; pmd_implicit = Implicit arity} ->
         pp f "@[<hov>implicit %s@ %s@ :@ %a@]"
-          (if pid.pim_arity = 0 then "module" else "functor")
-          pid.pim_module.pmd_name.txt
-          (self#implicit_declaration pid.pim_arity) pid.pim_module.pmd_type
+          (if arity = 0 then "module" else "functor")
+          pmd_name.txt
+          (self#implicit_declaration arity) pmd_type
     | Psig_open (ovf, li, _attrs) ->
         pp f "@[<hov2>open%s@ %a@]" (override ovf) self#longident_loc li
     | Psig_include (mt, _attrs) ->
@@ -1091,13 +1091,13 @@ class printer  ()= object(self:'self)
     | Pstr_value (rf, l) -> (* pp f "@[<hov2>let %a%a@]"  self#rec_flag rf self#bindings l *)
         pp f "@[<2>%a@]" self#bindings (rf,l)
     | Pstr_exception ed -> self#exception_declaration f ed
-    | Pstr_module x ->
+    | Pstr_module ({pmb_implicit = Nonimplicit} as x) ->
         pp f "@[<hov2>module@ %a@]" self#module_binding x
-    | Pstr_implicit pib ->
+    | Pstr_module {pmb_implicit = Implicit arity; pmb_name; pmb_expr} ->
         pp f "@[<hov2>implicit %s@ %s@ %a@]"
-          (if pib.pim_arity = 0 then "module" else "functor")
-          pib.pim_module.pmb_name.txt
-          (self#implicit_binding pib.pim_arity) pib.pim_module.pmb_expr
+          (if arity = 0 then "module" else "functor")
+          pmb_name.txt
+          (self#implicit_binding arity) pmb_expr
     | Pstr_open (ovf, li, _attrs) ->
         pp f "@[<2>open%s@;%a@]" (override ovf) self#longident_loc li;
     | Pstr_modtype {pmtd_name=s; pmtd_type=md} ->

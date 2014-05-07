@@ -118,8 +118,6 @@ module MakeMap(Map : MapArgument) = struct
           Tstr_exn_rebind (id, name, path, lid, attrs)
         | Tstr_module x ->
           Tstr_module (map_module_binding x)
-        | Tstr_implicit x ->
-          Tstr_implicit {x with im_module = map_module_binding x.im_module}
         | Tstr_recmodule list ->
           let list = List.map map_module_binding list in
           Tstr_recmodule list
@@ -326,11 +324,6 @@ module MakeMap(Map : MapArgument) = struct
           )
         | Texp_letmodule (mb, exp) ->
           Texp_letmodule (map_module_binding mb, map_expression exp)
-        | Texp_letimplicit (x, exp) ->
-          Texp_letimplicit (
-            {x with im_module = map_module_binding x.im_module},
-            map_expression exp
-          )
         | Texp_assert exp -> Texp_assert (map_expression exp)
         | Texp_lazy exp -> Texp_lazy (map_expression exp)
         | Texp_object (cl, string_list) ->
@@ -387,10 +380,6 @@ module MakeMap(Map : MapArgument) = struct
           Tsig_exception (map_constructor_declaration cd)
         | Tsig_module md ->
           Tsig_module {md with md_type = map_module_type md.md_type}
-        | Tsig_implicit im ->
-          let md = im.im_module in
-          let md = {md with md_type = map_module_type md.md_type} in
-          Tsig_implicit {im with im_module = md}
         | Tsig_recmodule list ->
           Tsig_recmodule
               (List.map

@@ -89,9 +89,7 @@ and out_sig_item =
         out_rec_status
   | Osig_exception of string * out_type list
   | Osig_modtype of string * out_module_type
-  | Osig_module of string * out_module_type * out_rec_status
-  (** name, number of implicit parameters, module type *)
-  | Osig_implicit of string * int * out_module_type
+  | Osig_module of string * out_module_type * out_rec_status * Asttypes.implicit_flag
   | Osig_type of out_type_decl * out_rec_status
   | Osig_value of string * out_type * string list
 and out_type_decl =

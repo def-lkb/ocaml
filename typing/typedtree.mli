@@ -100,7 +100,6 @@ and expression_desc =
   | Texp_setinstvar of Path.t * Path.t * string loc * expression
   | Texp_override of Path.t * (Path.t * string loc * expression) list
   | Texp_letmodule of module_binding * expression
-  | Texp_letimplicit of implicit_binding * expression
   | Texp_assert of expression
   | Texp_lazy of expression
   | Texp_object of class_structure * string list
@@ -219,7 +218,6 @@ and structure_item_desc =
   | Tstr_exception of constructor_declaration
   | Tstr_exn_rebind of Ident.t * string loc * Path.t * Longident.t loc * attributes
   | Tstr_module of module_binding
-  | Tstr_implicit of implicit_binding
   | Tstr_recmodule of module_binding list
   | Tstr_modtype of module_type_declaration
   | Tstr_open of override_flag * Path.t * Longident.t loc * attributes
@@ -235,17 +233,8 @@ and module_binding =
      mb_expr: module_expr;
      mb_attributes: attributes;
      mb_loc: Location.t;
+     mb_implicit: implicit_flag;
     }
-
-and 'a implicit_infos =
-  {
-    im_arity: int;
-    im_module: 'a;
-  }
-
-and implicit_binding = module_binding implicit_infos
-
-and implicit_declaration = module_declaration implicit_infos
 
 and value_binding =
   {
@@ -294,7 +283,6 @@ and signature_item_desc =
   | Tsig_type of type_declaration list
   | Tsig_exception of constructor_declaration
   | Tsig_module of module_declaration
-  | Tsig_implicit of implicit_declaration
   | Tsig_recmodule of module_declaration list
   | Tsig_modtype of module_type_declaration
   | Tsig_open of override_flag * Path.t * Longident.t loc * attributes
@@ -310,6 +298,7 @@ and module_declaration =
      md_type: module_type;
      md_attributes: attributes;
      md_loc: Location.t;
+     md_implicit: implicit_flag;
     }
 
 and module_type_declaration =

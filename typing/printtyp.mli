@@ -49,8 +49,7 @@ val tree_of_exception_declaration:
     Ident.t -> exception_declaration -> out_sig_item
 val exception_declaration:
     Ident.t -> formatter -> exception_declaration -> unit
-val tree_of_module: Ident.t -> module_type -> rec_status -> out_sig_item
-val tree_of_implicit: Ident.t -> implicit_declaration -> out_sig_item
+val tree_of_module: Ident.t -> ?implicit_:Asttypes.implicit_flag -> module_type -> rec_status -> out_sig_item
 val modtype: formatter -> module_type -> unit
 val signature: formatter -> signature -> unit
 val tree_of_modtype_declaration:
