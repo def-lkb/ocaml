@@ -59,15 +59,10 @@ and untype_structure_item item =
         Pstr_exn_rebind (name, lid, attrs)
     | Tstr_module mb ->
         Pstr_module (untype_module_binding mb)
-    | Tstr_implicit imb ->
-        let mb = imb.im_module in
-        let pmb = untype_module_binding mb in
-        Pstr_implicit { pim_module = pmb; pim_arity = imb.im_arity }
     | Tstr_recmodule list ->
         Pstr_recmodule (List.map untype_module_binding list)
     | Tstr_modtype mtd ->
-        Pstr_modtype {pmtd_name=mtd.mtd_name; pmtd_type=option untype_module_type mtd.mtd_type;
-                      pmtd_loc=mtd.mtd_loc;pmtd_attributes=mtd.mtd_attributes;}
+        Pstr_modtype (untype_module_type_declaration mtd)
     | Tstr_open (ovf, _path, lid, attrs) -> Pstr_open (ovf, lid, attrs)
     | Tstr_class list ->
         Pstr_class (List.map (fun (ci, _, _) ->
@@ -112,6 +107,24 @@ and untype_module_binding mb =
    pmb_expr = untype_module_expr mb.mb_expr;
    pmb_attributes = mb.mb_attributes;
    pmb_loc = mb.mb_loc;
+   pmb_implicit = mb.mb_implicit;
+  }
+
+and untype_module_declaration md =
+  {
+    pmd_name = md.md_name;
+    pmd_type = untype_module_type md.md_type;
+    pmd_attributes = md.md_attributes;
+    pmd_loc = md.md_loc;
+    pmd_implicit = md.md_implicit;
+  }
+
+and untype_module_type_declaration mtd =
+  {
+    pmtd_name = mtd.mtd_name;
+    pmtd_type = option untype_module_type mtd.mtd_type;
+    pmtd_attributes = mtd.mtd_attributes;
+    pmtd_loc = mtd.mtd_loc;
   }
 
 and untype_type_declaration decl =
@@ -314,11 +327,6 @@ and untype_expression exp =
           ) list)
     | Texp_letmodule (mb, exp) ->
         Pexp_letmodule (untype_module_binding mb, untype_expression exp)
-    | Texp_letimplicit (imb, exp) ->
-        let mb = imb.im_module in
-        let pmb = untype_module_binding mb in
-        let pib = { pim_module = pmb; pim_arity = imb.im_arity } in
-        Pexp_letimplicit (pib, untype_expression exp)
     | Texp_assert exp -> Pexp_assert (untype_expression exp)
     | Texp_lazy exp -> Pexp_lazy (untype_expression exp)
     | Texp_object (cl, _) ->
@@ -353,24 +361,11 @@ and untype_signature_item item =
     | Tsig_exception decl ->
         Psig_exception (untype_constructor_declaration decl)
     | Tsig_module md ->
-        Psig_module {pmd_name = md.md_name; pmd_type = untype_module_type md.md_type;
-                     pmd_attributes = md.md_attributes; pmd_loc = md.md_loc;
-                    }
-    | Tsig_implicit imd ->
-        let md = imd.im_module in
-        let pmd = {pmd_name = md.md_name;
-                   pmd_type = untype_module_type md.md_type;
-                   pmd_attributes = md.md_attributes; pmd_loc = md.md_loc;
-                  } in
-        Psig_implicit { pim_module = pmd; pim_arity = imd.im_arity }
-
+        Psig_module (untype_module_declaration md)
     | Tsig_recmodule list ->
-        Psig_recmodule (List.map (fun md ->
-              {pmd_name = md.md_name; pmd_type = untype_module_type md.md_type;
-               pmd_attributes = md.md_attributes; pmd_loc = md.md_loc}) list)
+        Psig_recmodule (List.map untype_module_declaration list)
     | Tsig_modtype mtd ->
-        Psig_modtype {pmtd_name=mtd.mtd_name; pmtd_type=option untype_module_type mtd.mtd_type;
-                      pmtd_attributes=mtd.mtd_attributes; pmtd_loc=mtd.mtd_loc}
+        Psig_modtype (untype_module_type_declaration mtd)
     | Tsig_open (ovf, _path, lid, attrs) -> Psig_open (ovf, lid, attrs)
     | Tsig_include (mty, _, attrs) -> Psig_include (untype_module_type mty, attrs)
     | Tsig_class list ->
