@@ -1989,7 +1989,14 @@ and type_expect_ ?in_function env sexp ty_expected =
   | Pexp_function caselist ->
       type_function ?in_function
         loc sexp.pexp_attributes env ty_expected "" caselist
-  | Pexp_apply(sfunct, sargs) when !activate_easytype ->
+  | Pexp_apply(sfunct, sargs) when !activate_easytype && not (  (* printf instance *)
+         match sfunct.pexp_desc with
+         | Pexp_ident lid -> 
+            begin match lid.txt with 
+            (* "Printf" || s = "Format" || s = "Scanf" *)
+            | (Longident.Lident s | Longident.Ldot (_, s)) when s = "sprintf" || s = "fprintf" || s = "printf" || s = "sscanf" || s = "fscanf" || s = "scanf" -> true
+            | _ -> false end
+         | _ -> false) ->
       begin_def ();
       let funct = type_exp env sfunct in
       end_def ();
@@ -2016,7 +2023,6 @@ and type_expect_ ?in_function env sexp ty_expected =
         | _ -> ()
       in
       wrap_trace_gadt_instances env (lower_args []) ty;
-
       (* save the type of the arguments *)
       let save_arg_type (l,arg) =
         begin_def ();
