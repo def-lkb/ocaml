@@ -80,6 +80,12 @@ let fmt_override_flag f x =
   | Fresh -> fprintf f "Fresh";
 ;;
 
+let fmt_open_flag f x =
+  match x with
+  | Open_all x -> fprintf f "Open_all %a" fmt_override_flag x;
+  | Open_implicit -> fprintf f "Open_implicit";
+;;
+
 let fmt_closed_flag f x =
   match x with
   | Closed -> fprintf f "Closed"
@@ -367,7 +373,7 @@ and expression i ppf x =
       line i ppf "Pexp_pack\n";
       module_expr i ppf me
   | Pexp_open (ovf, m, e) ->
-      line i ppf "Pexp_open %a \"%a\"\n" fmt_override_flag ovf
+      line i ppf "Pexp_open %a \"%a\"\n" fmt_open_flag ovf
         fmt_longident_loc m;
       expression i ppf e
   | Pexp_extension (s, arg) ->
@@ -638,7 +644,7 @@ and signature_item i ppf x =
       modtype_declaration i ppf x.pmtd_type
   | Psig_open (ovf, li, attrs) ->
       line i ppf "Psig_open %a %a\n"
-        fmt_override_flag ovf
+        fmt_open_flag ovf
         fmt_longident_loc li;
       attributes i ppf attrs
   | Psig_include (mt, attrs) ->
@@ -747,7 +753,7 @@ and structure_item i ppf x =
       modtype_declaration i ppf x.pmtd_type
   | Pstr_open (ovf, li, attrs) ->
       line i ppf "Pstr_open %a %a\n"
-        fmt_override_flag ovf
+        fmt_open_flag ovf
         fmt_longident_loc li;
       attributes i ppf attrs
   | Pstr_class (l) ->

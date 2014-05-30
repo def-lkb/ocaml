@@ -62,6 +62,10 @@ let override = function
   | Override -> "!"
   | Fresh -> ""
 
+let open_flag = function
+  | Open_all x -> override x
+  | Open_implicit -> " implicit"
+
 (* variance encoding: need to sync up with the [parser.mly] *)
 let type_variance = function
   | Invariant -> ""
@@ -619,7 +623,7 @@ class printer  ()= object(self:'self)
     | Pexp_poly _ ->
         assert false
     | Pexp_open (ovf, lid, e) ->
-        pp f "@[<2>let open%s %a in@;%a@]" (override ovf) self#longident_loc lid
+        pp f "@[<2>let open%s %a in@;%a@]" (open_flag ovf) self#longident_loc lid
           self#expression  e
     | Pexp_variant (l,Some eo) ->
         pp f "@[<2>`%s@;%a@]" l  self#simple_expr eo
@@ -940,7 +944,7 @@ class printer  ()= object(self:'self)
           pmd_name.txt
           (self#implicit_declaration arity) pmd_type
     | Psig_open (ovf, li, _attrs) ->
-        pp f "@[<hov2>open%s@ %a@]" (override ovf) self#longident_loc li
+        pp f "@[<hov2>open%s@ %a@]" (open_flag ovf) self#longident_loc li
     | Psig_include (mt, _attrs) ->
         pp f "@[<hov2>include@ %a@]"
           self#module_type  mt
@@ -1099,7 +1103,7 @@ class printer  ()= object(self:'self)
           pmb_name.txt
           (self#implicit_binding arity) pmb_expr
     | Pstr_open (ovf, li, _attrs) ->
-        pp f "@[<2>open%s@;%a@]" (override ovf) self#longident_loc li;
+        pp f "@[<2>open%s@;%a@]" (open_flag ovf) self#longident_loc li;
     | Pstr_modtype {pmtd_name=s; pmtd_type=md} ->
         pp f "@[<hov2>module@ type@ %s%a@]"
           s.txt

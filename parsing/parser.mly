@@ -653,7 +653,7 @@ structure_item:
                               ~typ:$5 ~attrs:$6 ~loc:(symbol_rloc()))) }
   | IMPLICIT implicit_binding
       { mkstr(Pstr_module $2) }
-  | OPEN override_flag mod_longident post_item_attributes
+  | OPEN open_flag mod_longident post_item_attributes
       { mkstr(Pstr_open ($2, mkrhs $3 3, $4)) }
   | CLASS class_declarations
       { mkstr(Pstr_class (List.rev $2)) }
@@ -792,7 +792,7 @@ signature_item:
       { mksig(Psig_modtype (Mtd.mk (mkrhs $3 3) ~typ:$5
                               ~loc:(symbol_rloc())
                               ~attrs:$6)) }
-  | OPEN override_flag mod_longident post_item_attributes
+  | OPEN open_flag mod_longident post_item_attributes
       { mksig(Psig_open ($2, mkrhs $3 3, $4)) }
   | INCLUDE module_type post_item_attributes %prec below_WITH
       { mksig(Psig_include ($2, $3)) }
@@ -1115,7 +1115,7 @@ expr:
       { mkexp_attrs (Pexp_letmodule($4, $6)) $3 }
   | LET IMPLICIT ext_attributes implicit_binding IN seq_expr
       { mkexp_attrs (Pexp_letmodule($4, $6)) $3 }
-  | LET OPEN override_flag ext_attributes mod_longident IN seq_expr
+  | LET OPEN open_flag ext_attributes mod_longident IN seq_expr
       { mkexp_attrs (Pexp_open($3, mkrhs $5 5, $7)) $4 }
   | FUNCTION ext_attributes opt_bar match_cases
       { mkexp_attrs (Pexp_function(List.rev $4)) $2 }
@@ -1238,7 +1238,7 @@ simple_expr:
   | simple_expr DOT label_longident
       { mkexp(Pexp_field($1, mkrhs $3 3)) }
   | mod_longident DOT LPAREN seq_expr RPAREN
-      { mkexp(Pexp_open(Fresh, mkrhs $1 1, $4)) }
+      { mkexp(Pexp_open(Open_all Fresh, mkrhs $1 1, $4)) }
   | mod_longident DOT LPAREN seq_expr error
       { unclosed "(" 3 ")" 5 }
   | simple_expr DOT LPAREN seq_expr RPAREN
@@ -1262,7 +1262,7 @@ simple_expr:
   | mod_longident DOT LBRACE record_expr RBRACE
       { let (exten, fields) = $4 in
         let rec_exp = mkexp(Pexp_record(fields, exten)) in
-        mkexp(Pexp_open(Fresh, mkrhs $1 1, rec_exp)) }
+        mkexp(Pexp_open(Open_all Fresh, mkrhs $1 1, rec_exp)) }
   | mod_longident DOT LBRACE record_expr error
       { unclosed "{" 3 "}" 5 }
   | LBRACKETBAR expr_semi_list opt_semi BARRBRACKET
@@ -1272,7 +1272,7 @@ simple_expr:
   | LBRACKETBAR BARRBRACKET
       { mkexp (Pexp_array []) }
   | mod_longident DOT LBRACKETBAR expr_semi_list opt_semi BARRBRACKET
-      { mkexp(Pexp_open(Fresh, mkrhs $1 1, mkexp(Pexp_array(List.rev $4)))) }
+      { mkexp(Pexp_open(Open_all Fresh, mkrhs $1 1, mkexp(Pexp_array(List.rev $4)))) }
   | mod_longident DOT LBRACKETBAR expr_semi_list opt_semi error
       { unclosed "[|" 3 "|]" 6 }
   | LBRACKET expr_semi_list opt_semi RBRACKET
@@ -1281,7 +1281,7 @@ simple_expr:
       { unclosed "[" 1 "]" 4 }
   | mod_longident DOT LBRACKET expr_semi_list opt_semi RBRACKET
       { let list_exp = reloc_exp (mktailexp (rhs_loc 6) (List.rev $4)) in
-        mkexp(Pexp_open(Fresh, mkrhs $1 1, list_exp)) }
+        mkexp(Pexp_open(Open_all Fresh, mkrhs $1 1, list_exp)) }
   | mod_longident DOT LBRACKET expr_semi_list opt_semi error
       { unclosed "[" 3 "]" 6 }
   | PREFIXOP simple_expr
@@ -1297,7 +1297,7 @@ simple_expr:
   | LBRACELESS GREATERRBRACE
       { mkexp (Pexp_override [])}
   | mod_longident DOT LBRACELESS field_expr_list opt_semi GREATERRBRACE
-      { mkexp(Pexp_open(Fresh, mkrhs $1 1, mkexp (Pexp_override(List.rev $4)))) }
+      { mkexp(Pexp_open(Open_all Fresh, mkrhs $1 1, mkexp (Pexp_override(List.rev $4)))) }
   | mod_longident DOT LBRACELESS field_expr_list opt_semi error
       { unclosed "{<" 3 ">}" 6 }
   | simple_expr SHARP label
@@ -1310,7 +1310,7 @@ simple_expr:
   | LPAREN MODULE module_expr COLON error
       { unclosed "(" 1 ")" 5 }
   | mod_longident DOT LPAREN MODULE module_expr COLON package_type RPAREN
-      { mkexp(Pexp_open(Fresh, mkrhs $1 1,
+      { mkexp(Pexp_open(Open_all Fresh, mkrhs $1 1,
         mkexp (Pexp_constraint (ghexp (Pexp_pack $5),
                                 ghtyp (Ptyp_package $7))))) }
   | mod_longident DOT LPAREN MODULE module_expr COLON error
@@ -2028,6 +2028,10 @@ private_virtual_flags:
   | VIRTUAL { Public, Virtual }
   | PRIVATE VIRTUAL { Private, Virtual }
   | VIRTUAL PRIVATE { Private, Virtual }
+;
+open_flag:
+  | IMPLICIT                                    { Open_implicit }
+  | override_flag                               { Open_all $1 }
 ;
 override_flag:
     /* empty */                                 { Fresh }
