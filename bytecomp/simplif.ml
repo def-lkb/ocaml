@@ -591,3 +591,154 @@ let simplify_lambda lam =
   let res = simplify_lets (simplify_exits lam) in
   if !Clflags.annotations then emit_tail_infos true res;
   res
+
+let is_returnpoint = function
+  | Lvar _ | Lconst _ | Lapply _ | Lfunction _ | Lprim _
+  | Lstaticraise _ | Lwhile _ | Lfor _
+  | Lassign _ | Lsend _ | Lifused _ -> true
+  | _ -> false
+
+let map_tailcall f =
+  let rec aux = function
+    | lam when is_returnpoint lam -> lam
+
+    | Llet (lk, id, arg, body) ->
+      Llet (lk, id, arg, f aux body)
+    | Lletrec (args, body) ->
+      Lletrec (args, f aux body)
+    | Lswitch (lam, sw) ->
+      Lswitch (lam, {sw with
+                      sw_consts = List.map aux_assoc sw.sw_consts;
+                      sw_blocks = List.map aux_assoc sw.sw_blocks;
+                      sw_failaction = aux_option sw.sw_failaction })
+    | Lstringswitch (lam, bodies, fallback) ->
+       Lstringswitch (lam, List.map aux_assoc bodies, aux_option fallback)
+    | Lstaticcatch (lam, args, body) ->
+       (* Not sure :') *)
+       Lstaticcatch (f aux lam, args, f aux body)
+    | Ltrywith (lam, id, body) ->
+       Ltrywith (lam, id, f aux body)
+    | Lifthenelse (l1,l2,l3) ->
+       Lifthenelse (l1, f aux l2, f aux l3)
+    | Lsequence (l1, l2) ->
+       Lsequence (l1, f aux l2)
+    | Levent (lam, _) -> f aux lam
+
+    | _ -> assert false
+
+  and aux_assoc : 'a. 'a * _ -> 'a * _ = fun (k, v) -> k, f aux v
+  and aux_option = function
+    | None -> None
+    | Some lam -> Some (f aux lam)
+
+  in
+  f aux
+
+let introduce_trmc = function
+  (* Rewrite recursive functions *)
+  | id, Lfunction (fk, params, body) ->
+     let recbodies = ref [] in
+     let need_recfunc offset =
+       try List.assoc offset !recbodies
+       with Not_found ->
+         let id' = Ident.create (Ident.name id ^ "_" ^ string_of_int offset) in
+         recbodies := (offset, id') :: !recbodies;
+         id'
+     in
+     let arity = List.length params in
+     (* Find recursive call to id in trmc position *)
+     let is_reccall = function
+       | Lapply (Lvar id', args, _)
+            when Ident.same id id' && List.length args = arity
+         -> true
+       | _ -> false
+     in
+     let rec find_reccall acc = function
+       | arg :: args when is_reccall arg -> acc, arg, args
+       | arg :: args -> find_reccall (arg :: acc) args
+       | [] -> assert false
+     in
+     let find_recall values =
+       let pre, call, suf = find_reccall [] values in
+       let values' = List.rev_append pre (Lconst (Const_base (Const_int 0)) :: suf) in
+       let func = Lvar (need_recfunc (List.length pre)) in
+       let args, loc = match call with
+         | Lapply (_, args, loc) -> args, loc
+         | _ -> assert false
+       in
+       func, args, loc, values'
+     in
+     let find_trmc next = function
+       | Lprim (Pmakeblock (n,flag), values) when List.exists is_reccall values ->
+          let func, args, loc, values = find_recall values in
+          let name = Ident.create "trmc_result" in
+          Llet (Strict, name, Lprim (Pmakeblock (n,Mutable), values),
+                Lsequence (Lapply (func, (Lvar name :: args), loc), Lvar name))
+       | lam -> next lam
+     in
+     let main_binding = (id, Lfunction (fk, params, map_tailcall find_trmc body)) in
+     let subfunction (offset, id') =
+       let result = Ident.create "trmc_result" in
+       let call_trmc next = function
+         | Lprim (Pmakeblock (n,flag), values) when List.exists is_reccall values ->
+            let func, args, loc, values = find_recall values in
+            let name = Ident.create "trmc_result" in
+            Llet (Strict, name, Lprim (Pmakeblock (n,Mutable), values),
+                  Lsequence (Lprim (Psetfield (offset, true), [Lvar result; Lvar name]),
+                             Lapply (func, (Lvar name :: args), loc)))
+         | lam when is_returnpoint lam ->
+            Lprim (Psetfield (offset, true), [Lvar result; lam])
+         | lam -> next lam
+       in
+       id', Lfunction (fk, result :: params, map_tailcall call_trmc body)
+     in
+     main_binding :: List.map subfunction !recbodies
+
+  (* Don't touch other bindings *)
+  | binding -> [binding]
+
+
+let rec rewrite_trmc lam =
+  match lam with
+  (* FIXME *)
+  | Lletrec (lams,lam) ->
+     let lams = List.map rewrite_trmc_assoc lams in
+     let lams = List.concat (List.map introduce_trmc lams) in
+     Lletrec (lams, lam)
+  | Lvar _ | Lconst _ -> lam
+  | Lapply (lam, lams, loc) -> Lapply (rewrite_trmc lam, List.map rewrite_trmc lams, loc)
+  | Lfunction (fk, args, lam) -> Lfunction (fk, args, rewrite_trmc lam)
+  | Llet (lk, id, lam1, lam2) -> Llet (lk, id, rewrite_trmc lam1, rewrite_trmc lam2)
+  | Lprim (p, lams) -> Lprim (p, List.map rewrite_trmc lams)
+  | Lswitch (lam, sw) -> Lswitch (rewrite_trmc lam, rewrite_trmc_switch sw)
+  | Lstringswitch (lam, lams, lamo) ->
+    Lstringswitch (rewrite_trmc lam, List.map rewrite_trmc_assoc lams, rewrite_trmc_option lamo)
+  | Lstaticraise (i, lams) -> Lstaticraise (i, List.map rewrite_trmc lams)
+  | Lstaticcatch (lam1, ids, lam2) -> Lstaticcatch (rewrite_trmc lam1, ids, rewrite_trmc lam2)
+  | Ltrywith (lam1, id, lam2) -> Ltrywith (rewrite_trmc lam1, id, rewrite_trmc lam2)
+  | Lifthenelse (l1,l2,l3) -> Lifthenelse (rewrite_trmc l1, rewrite_trmc l2, rewrite_trmc l3)
+  | Lsequence (l1,l2) -> Lsequence (rewrite_trmc l1, rewrite_trmc l2)
+  | Lwhile (l1,l2) -> Lwhile (rewrite_trmc l1, rewrite_trmc l2)
+  | Lfor (id,l1,l2,f,l3) -> Lfor (id, rewrite_trmc l1, rewrite_trmc l2, f, rewrite_trmc l3)
+  | Lassign (id, lam) -> Lassign (id, rewrite_trmc lam)
+  | Lsend (mk, lam1, lam2, lams, loc) ->
+     Lsend (mk, rewrite_trmc lam1, rewrite_trmc lam2, List.map rewrite_trmc lams, loc)
+  | Levent (lambda, lev) -> Levent (rewrite_trmc lambda, lev)
+  | Lifused (id, lam) -> Lifused (id, rewrite_trmc lam)
+
+and rewrite_trmc_switch sw =
+  { sw with
+    sw_consts = List.map rewrite_trmc_assoc sw.sw_consts;
+    sw_blocks = List.map rewrite_trmc_assoc sw.sw_blocks;
+    sw_failaction = rewrite_trmc_option sw.sw_failaction;
+  }
+
+and rewrite_trmc_option = function
+  | None -> None
+  | Some lam -> Some (rewrite_trmc lam)
+
+and rewrite_trmc_assoc : 'a . 'a * lambda -> 'a * lambda = fun (k, lam) ->
+  k, rewrite_trmc lam
+
+
+let simplify_lambda lam = rewrite_trmc (simplify_lambda lam)
