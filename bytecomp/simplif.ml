@@ -731,6 +731,7 @@ let introduce_trmc = function
      (* Find recursive call to id in trmc position *)
      let is_reccall = function
        | Lapply (Lvar id', args, _)
+       | Levent (Lapply (Lvar id', args, _), _)
             when Ident.same id id' && List.length args = arity
          -> true
        | _ -> false
@@ -744,18 +745,19 @@ let introduce_trmc = function
        let pre, call, suf = find_reccall [] values in
        let values' = List.rev_append pre (Lconst (Const_base (Const_int 0)) :: suf) in
        let func = Lvar (need_recfunc (List.length pre)) in
-       let args, loc = match call with
-         | Lapply (_, args, loc) -> args, loc
+       let args, loc, lev = match call with
+         | Lapply (_, args, loc) -> args, loc, (fun x -> x)
+         | Levent (Lapply (_, args, loc), lev) -> args, loc, (fun x -> Levent (x,lev))
          | _ -> assert false
        in
-       func, args, loc, values'
+       func, args, loc, lev, values'
      in
      let on_trmc = function
        | Lprim (Pmakeblock (n,flag), values) when List.exists is_reccall values ->
-          let func, args, loc, values = find_recall values in
+          let func, args, loc, lev, values = find_recall values in
           let name = Ident.create "trmc_result" in
           Llet (Strict, name, Lprim (Pmakeblock (n,Mutable), values),
-                Lsequence (Lapply (func, (Lvar name :: args), loc), Lvar name))
+                Lsequence (lev (Lapply (func, (Lvar name :: args), loc)), Lvar name))
        | lam -> lam
      in
      let main_binding = (id, Lfunction (fk, params, map_tail (fun x -> x) on_trmc body)) in
@@ -766,11 +768,11 @@ let introduce_trmc = function
        in
        let on_tail = function
          | Lprim (Pmakeblock (n,flag), values) when List.exists is_reccall values ->
-            let func, args, loc, values = find_recall values in
+            let func, args, loc, lev, values = find_recall values in
             let name = Ident.create "trmc_result" in
             Llet (Strict, name, Lprim (Pmakeblock (n,Mutable), values),
                   Lsequence (Lprim (Psetfield (offset, true), [Lvar result; Lvar name]),
-                             Lapply (func, (Lvar name :: args), loc)))
+                             lev (Lapply (func, (Lvar name :: args), loc))))
          | lam -> on_return lam
        in
        id', Lfunction (fk, result :: params, map_tail (map_return on_return) on_tail body)
