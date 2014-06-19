@@ -592,47 +592,129 @@ let simplify_lambda lam =
   if !Clflags.annotations then emit_tail_infos true res;
   res
 
-let is_returnpoint = function
-  | Lvar _ | Lconst _ | Lapply _ | Lfunction _ | Lprim _
-  | Lstaticraise _ | Lwhile _ | Lfor _
-  | Lassign _ | Lsend _ | Lifused _ -> true
-  | _ -> false
-
-let map_tailcall f =
+let sub_map_lambda f lam =
   let rec aux = function
-    | lam when is_returnpoint lam -> lam
+    | Lvar _ | Lconst _ as lam -> lam
+    | Lapply (lam, lams, loc) ->
+      Lapply (f aux lam, List.map f_aux lams, loc)
+    | Lfunction (fk, ids, body) ->
+      Lfunction (fk, ids, f aux body)
+    | Llet (lk, id, l1, l2) ->
+      Llet (lk, id, f aux l1, f aux l2)
+    | Lletrec (binds, lam) ->
+      Lletrec (List.map f_aux_assoc binds, f aux lam)
+    | Lprim (p, ls) ->
+      Lprim (p, List.map f_aux ls)
+    | Lswitch (l1, sw) ->
+      Lswitch (f aux l1,
+          {sw with
+            sw_consts = List.map f_aux_assoc sw.sw_consts;
+            sw_blocks = List.map f_aux_assoc sw.sw_blocks;
+            sw_failaction = f_aux_option sw.sw_failaction })
+    | Lstringswitch (l1, ls, lo) ->
+      Lstringswitch (f aux l1, List.map f_aux_assoc ls, f_aux_option lo)
+    | Lstaticraise (id, ls) ->
+      Lstaticraise (id, List.map f_aux ls)
+    | Lstaticcatch (l1, ids, l2) ->
+      Lstaticcatch (f aux l1, ids, f aux l2)
+    | Ltrywith (l1, id, l2) ->
+      Ltrywith (f aux l1, id, f aux l2)
+    | Lifthenelse (l1, l2, l3) ->
+      Lifthenelse (f aux l1, f aux l2, f aux l3)
+    | Lsequence (l1, l2) -> Lsequence (f aux l1, f aux l2)
+    | Lwhile (l1, l2) -> Lwhile (f aux l1, f aux l2)
+    | Lfor (id, l1, l2, fl, body) ->
+      Lfor (id, f aux l1, f aux l2, fl, f aux body)
+    | Lassign (id, lam) -> Lassign (id, f aux lam)
+    | Lsend (mk, l1, l2, lams, loc) ->
+      Lsend (mk, f aux l1, f aux l2, List.map f_aux lams, loc)
+    | Levent (lam, lev) -> Levent (f aux lam, lev)
+    | Lifused (id, lam) -> Lifused (id, f aux lam)
 
-    | Llet (lk, id, arg, body) ->
-      Llet (lk, id, arg, f aux body)
-    | Lletrec (args, body) ->
-      Lletrec (args, f aux body)
-    | Lswitch (lam, sw) ->
-      Lswitch (lam, {sw with
-                      sw_consts = List.map aux_assoc sw.sw_consts;
-                      sw_blocks = List.map aux_assoc sw.sw_blocks;
-                      sw_failaction = aux_option sw.sw_failaction })
-    | Lstringswitch (lam, bodies, fallback) ->
-       Lstringswitch (lam, List.map aux_assoc bodies, aux_option fallback)
-    | Lstaticcatch (lam, args, body) ->
-       (* Not sure :') *)
-       Lstaticcatch (f aux lam, args, f aux body)
-    | Ltrywith (lam, id, body) ->
-       Ltrywith (lam, id, f aux body)
-    | Lifthenelse (l1,l2,l3) ->
-       Lifthenelse (l1, f aux l2, f aux l3)
-    | Lsequence (l1, l2) ->
-       Lsequence (l1, f aux l2)
-    | Levent (lam, _) -> f aux lam
+  and f_aux_assoc : 'a. 'a * _ -> 'a * _ =
+    fun (k, v) -> k, f aux v
 
-    | _ -> assert false
-
-  and aux_assoc : 'a. 'a * _ -> 'a * _ = fun (k, v) -> k, f aux v
-  and aux_option = function
+  and f_aux_option = function
     | None -> None
     | Some lam -> Some (f aux lam)
 
+  and f_aux lam = f aux lam
+
   in
-  f aux
+  f aux lam
+
+let is_returnpoint = function
+  | Lvar _ | Lconst _ | Lapply _ | Lfunction _ | Lprim _ | Lsend _ -> true
+  | _ -> false
+
+let rec map_return f =
+  let on_assoc (k,v) = k, map_return f v in
+  let on_option = function
+    | None -> None
+    | Some v -> Some (map_return f v)
+  in
+  function
+  | Lvar _ | Lconst _ | Lapply _ | Lfunction _ | Lprim _ | Lsend _
+  | Lassign _ | Lfor _ | Lwhile _
+    as lam -> f lam
+  | Llet (lk, id, l1, l2) ->
+    Llet (lk, id, l1, map_return f l2)
+  | Lletrec (binds, lam) ->
+    Lletrec (binds, map_return f lam)
+  | Lswitch (l1, sw) ->
+    Lswitch (l1,
+        {sw with
+          sw_consts = List.map on_assoc sw.sw_consts;
+          sw_blocks = List.map on_assoc sw.sw_blocks;
+          sw_failaction = on_option sw.sw_failaction })
+  | Lstringswitch (l1, ls, lo) ->
+    Lstringswitch (l1, List.map on_assoc ls, on_option lo)
+  | Lstaticraise (id, ls) ->
+    Lstaticraise (id, ls)
+  | Lstaticcatch (l1, ids, l2) ->
+    Lstaticcatch (map_return f l1, ids, map_return f l2)
+  | Ltrywith (l1, id, l2) ->
+    Ltrywith (map_return f l1, id, map_return f l2)
+  | Lifthenelse (l1, l2, l3) ->
+    Lifthenelse (l1, map_return f l2, map_return f l3)
+  | Lsequence (l1, l2) -> Lsequence (l1, map_return f l2)
+  | Levent (lam, lev) -> Levent (map_return f lam, lev)
+  | Lifused _ -> assert false
+
+let rec map_tail return_on tail =
+  let on lam = map_tail return_on tail lam in
+  let on_assoc (k,v) = k, on v in
+  let on_option = function
+    | None -> None
+    | Some v -> Some (on v)
+  in
+  function
+  | Lvar _ | Lconst _ | Lapply _ | Lfunction _ | Lprim _ | Lsend _
+  | Lassign _ | Lfor _ | Lwhile _
+    as lam -> tail lam
+  | Llet (lk, id, l1, l2) ->
+    Llet (lk, id, l1, on l2)
+  | Lletrec (binds, lam) ->
+    Lletrec (binds, on lam)
+  | Lswitch (l1, sw) ->
+    Lswitch (l1,
+        {sw with
+          sw_consts = List.map on_assoc sw.sw_consts;
+          sw_blocks = List.map on_assoc sw.sw_blocks;
+          sw_failaction = on_option sw.sw_failaction })
+  | Lstringswitch (l1, ls, lo) ->
+    Lstringswitch (l1, List.map on_assoc ls, on_option lo)
+  | Lstaticraise (id, ls) ->
+    Lstaticraise (id, ls)
+  | Lstaticcatch (l1, ids, l2) ->
+    Lstaticcatch (on l1, ids, on l2)
+  | Ltrywith (l1, id, l2) ->
+    Ltrywith (return_on l1, id, on l2)
+  | Lifthenelse (l1, l2, l3) ->
+    Lifthenelse (l1, on l2, on l3)
+  | Lsequence (l1, l2) -> Lsequence (l1, on l2)
+  | Levent (lam, lev) -> Levent (on lam, lev)
+  | Lifused _ -> assert false
 
 let introduce_trmc = function
   (* Rewrite recursive functions *)
@@ -668,29 +750,30 @@ let introduce_trmc = function
        in
        func, args, loc, values'
      in
-     let find_trmc next = function
+     let on_trmc = function
        | Lprim (Pmakeblock (n,flag), values) when List.exists is_reccall values ->
           let func, args, loc, values = find_recall values in
           let name = Ident.create "trmc_result" in
           Llet (Strict, name, Lprim (Pmakeblock (n,Mutable), values),
                 Lsequence (Lapply (func, (Lvar name :: args), loc), Lvar name))
-       | lam -> next lam
+       | lam -> lam
      in
-     let main_binding = (id, Lfunction (fk, params, map_tailcall find_trmc body)) in
+     let main_binding = (id, Lfunction (fk, params, map_tail (fun x -> x) on_trmc body)) in
      let subfunction (offset, id') =
        let result = Ident.create "trmc_result" in
-       let call_trmc next = function
+       let on_return lam =
+            Lprim (Psetfield (offset, true), [Lvar result; lam])
+       in
+       let on_tail = function
          | Lprim (Pmakeblock (n,flag), values) when List.exists is_reccall values ->
             let func, args, loc, values = find_recall values in
             let name = Ident.create "trmc_result" in
             Llet (Strict, name, Lprim (Pmakeblock (n,Mutable), values),
                   Lsequence (Lprim (Psetfield (offset, true), [Lvar result; Lvar name]),
                              Lapply (func, (Lvar name :: args), loc)))
-         | lam when is_returnpoint lam ->
-            Lprim (Psetfield (offset, true), [Lvar result; lam])
-         | lam -> next lam
+         | lam -> on_return lam
        in
-       id', Lfunction (fk, result :: params, map_tailcall call_trmc body)
+       id', Lfunction (fk, result :: params, map_tail (map_return on_return) on_tail body)
      in
      main_binding :: List.map subfunction !recbodies
 
@@ -698,47 +781,12 @@ let introduce_trmc = function
   | binding -> [binding]
 
 
-let rec rewrite_trmc lam =
-  match lam with
-  (* FIXME *)
+let rewrite_trmc next lam =
+  match next lam with
   | Lletrec (lams,lam) ->
-     let lams = List.map rewrite_trmc_assoc lams in
-     let lams = List.concat (List.map introduce_trmc lams) in
-     Lletrec (lams, lam)
-  | Lvar _ | Lconst _ -> lam
-  | Lapply (lam, lams, loc) -> Lapply (rewrite_trmc lam, List.map rewrite_trmc lams, loc)
-  | Lfunction (fk, args, lam) -> Lfunction (fk, args, rewrite_trmc lam)
-  | Llet (lk, id, lam1, lam2) -> Llet (lk, id, rewrite_trmc lam1, rewrite_trmc lam2)
-  | Lprim (p, lams) -> Lprim (p, List.map rewrite_trmc lams)
-  | Lswitch (lam, sw) -> Lswitch (rewrite_trmc lam, rewrite_trmc_switch sw)
-  | Lstringswitch (lam, lams, lamo) ->
-    Lstringswitch (rewrite_trmc lam, List.map rewrite_trmc_assoc lams, rewrite_trmc_option lamo)
-  | Lstaticraise (i, lams) -> Lstaticraise (i, List.map rewrite_trmc lams)
-  | Lstaticcatch (lam1, ids, lam2) -> Lstaticcatch (rewrite_trmc lam1, ids, rewrite_trmc lam2)
-  | Ltrywith (lam1, id, lam2) -> Ltrywith (rewrite_trmc lam1, id, rewrite_trmc lam2)
-  | Lifthenelse (l1,l2,l3) -> Lifthenelse (rewrite_trmc l1, rewrite_trmc l2, rewrite_trmc l3)
-  | Lsequence (l1,l2) -> Lsequence (rewrite_trmc l1, rewrite_trmc l2)
-  | Lwhile (l1,l2) -> Lwhile (rewrite_trmc l1, rewrite_trmc l2)
-  | Lfor (id,l1,l2,f,l3) -> Lfor (id, rewrite_trmc l1, rewrite_trmc l2, f, rewrite_trmc l3)
-  | Lassign (id, lam) -> Lassign (id, rewrite_trmc lam)
-  | Lsend (mk, lam1, lam2, lams, loc) ->
-     Lsend (mk, rewrite_trmc lam1, rewrite_trmc lam2, List.map rewrite_trmc lams, loc)
-  | Levent (lambda, lev) -> Levent (rewrite_trmc lambda, lev)
-  | Lifused (id, lam) -> Lifused (id, rewrite_trmc lam)
+    let lams = List.concat (List.map introduce_trmc lams) in
+    Lletrec (lams, lam)
+  | lam -> lam
 
-and rewrite_trmc_switch sw =
-  { sw with
-    sw_consts = List.map rewrite_trmc_assoc sw.sw_consts;
-    sw_blocks = List.map rewrite_trmc_assoc sw.sw_blocks;
-    sw_failaction = rewrite_trmc_option sw.sw_failaction;
-  }
-
-and rewrite_trmc_option = function
-  | None -> None
-  | Some lam -> Some (rewrite_trmc lam)
-
-and rewrite_trmc_assoc : 'a . 'a * lambda -> 'a * lambda = fun (k, lam) ->
-  k, rewrite_trmc lam
-
-
+let rewrite_trmc lam = sub_map_lambda rewrite_trmc lam
 let simplify_lambda lam = rewrite_trmc (simplify_lambda lam)
