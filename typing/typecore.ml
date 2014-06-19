@@ -67,7 +67,11 @@ type error =
   | Invalid_interval
   | Invalid_for_loop_index
   | Extension of string
-  | Pending_implicit of Typeimplicit.pending_implicit
+
+  | No_instance_found of Typeimplicit.pending_implicit
+  | Ambiguous_implicit of Typeimplicit.pending_implicit * Path.t * Path.t
+  | Termination_fail of Typeimplicit.pending_implicit
+
 
 exception Error of Location.t * Env.t * error
 
@@ -4035,8 +4039,15 @@ let report_error env ppf = function
         "@[Invalid for-loop index: only variables and _ are allowed.@]"
   | Extension s ->
       fprintf ppf "Uninterpreted extension '%s'." s
-  | Pending_implicit inst ->
-      fprintf ppf "Cannot find instance for implicit %s."
+  | No_instance_found inst ->
+      fprintf ppf "No instance found for implicit %s."
+        (Ident.name inst.Typeimplicit.implicit_id)
+  | Ambiguous_implicit (inst, p1, p2) ->
+      fprintf ppf "Ambiguous implicit %s:@ %a@ and %a@ are both correct solutions."
+        (Ident.name inst.Typeimplicit.implicit_id)
+        path p1 path p2
+  | Termination_fail inst ->
+      fprintf ppf "Termination check failed when searching for implicit %s."
         (Ident.name inst.Typeimplicit.implicit_id)
 
 let report_error env ppf err =

@@ -109,7 +109,10 @@ type error =
   | Invalid_interval
   | Invalid_for_loop_index
   | Extension of string
-  | Pending_implicit of Typeimplicit.pending_implicit
+
+  | No_instance_found of Typeimplicit.pending_implicit
+  | Ambiguous_implicit of Typeimplicit.pending_implicit * Path.t * Path.t
+  | Termination_fail of Typeimplicit.pending_implicit
 
 exception Error of Location.t * Env.t * error
 
