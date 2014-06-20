@@ -190,6 +190,30 @@ void caml_oldify_one (value v, value *p)
   }
 }
 
+#define VAL_TRMC Val_int(0xdeadb0ff)
+#define PTR_TRMC ((value*)VAL_TRMC)
+
+static value * trmc_root_track = PTR_TRMC;
+
+void caml_register_trmc_roots (void)
+{
+  while (trmc_root_track != PTR_TRMC)
+  {
+    if (((value)trmc_root_track & 1) != 0) abort();
+    //puts ("REGISTERING ONE TRMC ROOT");
+    value *fp = trmc_root_track;
+    trmc_root_track = (value*)(*fp);
+    *fp = VAL_TRMC;
+
+    /* Add [fp] to remembered set */
+    if (caml_ref_table.ptr >= caml_ref_table.limit){
+      CAMLassert (caml_ref_table.ptr == caml_ref_table.limit);
+      caml_realloc_ref_table (&caml_ref_table);
+    }
+    *caml_ref_table.ptr++ = fp;
+  }
+}
+
 /* Finish the work that was put off by [caml_oldify_one].
    Note that [caml_oldify_one] itself is called by oldify_mopup, so we
    have to be careful to remove the first entry from the list before
@@ -214,7 +238,14 @@ void caml_oldify_mopup (void)
       if (Is_block (f) && Is_young (f)){
         caml_oldify_one (f, &Field (new_v, i));
       }else{
-        Field (new_v, i) = f;
+        if (f == VAL_TRMC)
+        {
+          value* fp = &Field(new_v, i);
+          *fp = (value)trmc_root_track;
+          trmc_root_track = fp;
+        }
+        else
+          Field (new_v, i) = f;
       }
     }
   }
@@ -263,6 +294,8 @@ void caml_empty_minor_heap (void)
     ++ minor_gc_counter;
   }
 #endif
+
+  caml_register_trmc_roots ();
 }
 
 /* Do a minor collection and a slice of major collection, call finalisation
@@ -277,6 +310,7 @@ CAMLexport void caml_minor_collection (void)
 
   caml_stat_promoted_words += caml_allocated_words - prev_alloc_words;
   ++ caml_stat_minor_collections;
+
   caml_major_collection_slice (0);
   caml_force_major_slice = 0;
 
