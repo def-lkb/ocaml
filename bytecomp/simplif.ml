@@ -716,6 +716,18 @@ let rec map_tail return_on tail =
   | Levent (lam, lev) -> Levent (on lam, lev)
   | Lifused _ -> assert false
 
+let trmc_const =
+  try ignore (Sys.getenv "TRMC_DEAD" : string);
+    let x = 0xdead in
+    let y = 0xb0ff in
+    x lsl 16 lor y
+  with Not_found -> 0
+
+let trmc_do =
+  try ignore (Sys.getenv "TRMC" : string);
+    true
+  with Not_found -> false
+
 let introduce_trmc = function
   (* Rewrite recursive functions *)
   | id, Lfunction (fk, params, body) ->
@@ -743,7 +755,7 @@ let introduce_trmc = function
      in
      let find_recall values =
        let pre, call, suf = find_reccall [] values in
-       let values' = List.rev_append pre (Lconst (Const_base (Const_int 0)) :: suf) in
+       let values' = List.rev_append pre (Lconst (Const_base (Const_int trmc_const)) :: suf) in
        let func = Lvar (need_recfunc (List.length pre)) in
        let args, loc, lev = match call with
          | Lapply (_, args, loc) -> args, loc, (fun x -> x)
@@ -764,14 +776,14 @@ let introduce_trmc = function
      let subfunction (offset, id') =
        let result = Ident.create "trmc_result" in
        let on_return lam =
-            Lprim (Psetfield (offset, true), [Lvar result; lam])
+            Lprim (Psetfield (offset, false), [Lvar result; lam])
        in
        let on_tail = function
          | Lprim (Pmakeblock (n,flag), values) when List.exists is_reccall values ->
             let func, args, loc, lev, values = find_recall values in
             let name = Ident.create "trmc_result" in
             Llet (Strict, name, Lprim (Pmakeblock (n,Mutable), values),
-                  Lsequence (Lprim (Psetfield (offset, true), [Lvar result; Lvar name]),
+                  Lsequence (Lprim (Psetfield (offset, false), [Lvar result; Lvar name]),
                              lev (Lapply (func, (Lvar name :: args), loc))))
          | lam -> on_return lam
        in
@@ -791,4 +803,8 @@ let rewrite_trmc next lam =
   | lam -> lam
 
 let rewrite_trmc lam = sub_map_lambda rewrite_trmc lam
-let simplify_lambda lam = rewrite_trmc (simplify_lambda lam)
+let simplify_lambda lam =
+  if trmc_do then
+    rewrite_trmc (simplify_lambda lam)
+  else
+    simplify_lambda lam
