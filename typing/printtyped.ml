@@ -689,7 +689,7 @@ and module_expr i ppf x =
       line i ppf "Pmod_constraint\n";
       module_expr i ppf me;
       module_type i ppf mt;
-  | Tmod_constraint (me, _, Tmodtype_implicit, _) -> assert false (* TODO *)
+  | Tmod_constraint (me, _, Tmodtype_implicit, _) -> ()
 (*      line i ppf "Pmod_constraint\n";
       module_expr i ppf me;
       module_type i ppf mt; *)
