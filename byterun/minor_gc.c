@@ -196,8 +196,10 @@ void caml_register_trmc_roots (void)
 {
   while (trmc_root_track != (value*)VAL_TRMC)
   {
+    if (((value)trmc_root_track & 1) != 0) abort();
+    //puts("REGISTER TRMC ROOT");
     value *fp = trmc_root_track;
-    trmc_root_track = (value*)(*fp);
+    trmc_root_track = *(value**)fp;
     *fp = VAL_TRMC;
 
     /* Add [fp] to remembered set */
@@ -210,6 +212,7 @@ void caml_register_trmc_roots (void)
 }
 
 /* Finish the work that was put off by [caml_oldify_one].
+
    Note that [caml_oldify_one] itself is called by oldify_mopup, so we
    have to be careful to remove the first entry from the list before
    oldifying its fields. */
@@ -235,6 +238,7 @@ void caml_oldify_mopup (void)
       }else{
         if (f == VAL_TRMC)
         {
+          //puts("FIND NEW TRMC ROOT");
           value* fp = &Field(new_v, i);
           *fp = (value)trmc_root_track;
           trmc_root_track = fp;
@@ -279,6 +283,7 @@ void caml_empty_minor_heap (void)
     caml_gc_message (0x02, ">", 0);
     caml_in_minor_collection = 0;
   }
+
   caml_final_empty_young ();
 #ifdef DEBUG
   {
