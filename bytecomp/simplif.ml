@@ -720,17 +720,16 @@ let trmc_do =
   try Sys.getenv "TRMC" = "1"
   with Not_found -> false
 
-let trmc_gc_hack =
-  try Sys.getenv "TRMC_CONST" = "1"
-  with Not_found -> false
+let trmc_no_gc_hack =
+  try Sys.getenv "TRMC_CONST" <> "1"
+  with Not_found -> true
 
 let trmc_const =
-  if trmc_gc_hack then
+  if trmc_no_gc_hack then 0
+  else
     let x = 0xdead in
     let y = 0xb0ff in
     x lsl 16 lor y
-  else
-    0
 
 let introduce_trmc = function
   (* Rewrite recursive functions *)
@@ -827,7 +826,7 @@ let introduce_trmc = function
      let subfunction (offset, id') =
        let caller_block = Ident.create "caller_block" in
        let on_return lam =
-            Lprim (Psetfield (offset, false), [Lvar caller_block; lam])
+            Lprim (Psetfield (offset, trmc_no_gc_hack), [Lvar caller_block; lam])
        in
        let on_tail lam =
          if has_trmc lam then
@@ -844,7 +843,7 @@ let introduce_trmc = function
            let new_app = map_app old_app in
            Llet (Strict, name_block, value_block,
              Lsequence (
-               Lprim (Psetfield (offset, false), [Lvar caller_block; value_result]),
+               Lprim (Psetfield (offset, trmc_no_gc_hack), [Lvar caller_block; value_result]),
                new_app))
          else on_return lam
        in
