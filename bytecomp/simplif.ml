@@ -745,53 +745,110 @@ let introduce_trmc = function
      in
      let arity = List.length params in
      (* Find recursive call to id in trmc position *)
-     let is_reccall = function
+     let rec is_reccall = function
        | Lapply (Lvar id', args, _)
-       | Levent (Lapply (Lvar id', args, _), _)
             when Ident.same id id' && List.length args = arity
          -> true
+       | Levent (lam,_) -> is_reccall lam
        | _ -> false
      in
-     let rec find_reccall acc = function
-       | arg :: args when is_reccall arg -> acc, arg, args
-       | arg :: args -> find_reccall (arg :: acc) args
+     let is_trmc = function
+       | Lprim (Pmakeblock _, values) -> List.exists is_reccall values
+       | _ -> false
+     in
+
+     let rec has_trmc lam =
+       is_trmc lam ||
+       match lam with
+       | Levent (lam,_) -> has_trmc lam
+       | Lprim (Pmakeblock _, values) -> List.exists has_trmc values
+       | _ -> false
+     in
+
+     let rec extract_reccall acc = function
+       | arg :: args when is_reccall arg ->
+         let offset = List.length acc in
+         need_recfunc offset, arg,
+         List.rev_append acc
+           (Lconst (Const_base (Const_int trmc_const)) :: args)
+       | arg :: args -> extract_reccall (arg :: acc) args
        | [] -> assert false
      in
-     let find_recall values =
-       let pre, call, suf = find_reccall [] values in
-       let values' = List.rev_append pre (Lconst (Const_base (Const_int trmc_const)) :: suf) in
-       let func = Lvar (need_recfunc (List.length pre)) in
-       let args, loc, lev = match call with
-         | Lapply (_, args, loc) -> args, loc, (fun x -> x)
-         | Levent (Lapply (_, args, loc), lev) -> args, loc, (fun x -> Levent (x,lev))
-         | _ -> assert false
-       in
-       func, args, loc, lev, values'
+
+     let extract_direct_trmc = function
+       | Lprim (Pmakeblock (tag,_flag), values) ->
+         let func, old_app, values' = extract_reccall [] values in
+         func, old_app, Lprim (Pmakeblock (tag, Mutable), values')
+       | _ -> assert false
      in
-     let on_trmc = function
-       | Lprim (Pmakeblock (n,flag), values) when List.exists is_reccall values ->
-          let func, args, loc, lev, values = find_recall values in
-          let name = Ident.create "trmc_result" in
-          Llet (Strict, name, Lprim (Pmakeblock (n,Mutable), values),
-                Lsequence (lev (Lapply (func, (Lvar name :: args), loc)), Lvar name))
-       | lam -> lam
+
+     let rec extract_trmc name lam =
+       if is_trmc lam then
+         let result = extract_direct_trmc lam in
+         result, Lvar name
+       else match lam with
+       | Levent (lam,lev) ->
+         let result, lam = extract_trmc name lam in
+         result, Levent (lam,lev)
+       | Lprim (Pmakeblock (tag,flag), values) ->
+         let result, values' = extract_trmc_list name [] values in
+         result, Lprim (Pmakeblock (tag,flag), values')
+       | _ -> assert false
+
+     and extract_trmc_list name acc = function
+       | arg :: args when has_trmc arg ->
+         let result, arg' = extract_trmc name arg in
+         result, List.rev_append acc (arg' :: args)
+       | arg :: args ->
+         extract_trmc_list name (arg :: acc) args
+       | [] -> assert false
+     in
+
+     let on_trmc lam =
+       if has_trmc lam then
+          let name_block = Ident.create "trmc_block" in
+          let name_result = Ident.create "trmc_result" in
+          let (func, old_app, value_block), value_result =
+            extract_trmc name_block lam
+          in
+          let rec map_app = function
+            | Levent (lam, lev) -> Levent (map_app lam, lev)
+            | Lapply (_, args, loc) ->
+              Lapply (Lvar func, (Lvar name_block :: args), loc)
+            | _ -> assert false
+          in
+          let new_app = map_app old_app in
+          Llet (Strict, name_block, value_block,
+            Llet (Strict, name_result, value_result,
+              Lsequence (new_app, Lvar name_result)))
+       else lam
      in
      let main_binding = (id, Lfunction (fk, params, map_tail (fun x -> x) on_trmc body)) in
      let subfunction (offset, id') =
-       let result = Ident.create "trmc_result" in
+       let caller_block = Ident.create "caller_block" in
        let on_return lam =
-            Lprim (Psetfield (offset, not trmc_gc_hack), [Lvar result; lam])
+            Lprim (Psetfield (offset, false), [Lvar caller_block; lam])
        in
-       let on_tail = function
-         | Lprim (Pmakeblock (n,flag), values) when List.exists is_reccall values ->
-            let func, args, loc, lev, values = find_recall values in
-            let name = Ident.create "trmc_result" in
-            Llet (Strict, name, Lprim (Pmakeblock (n,Mutable), values),
-                  Lsequence (Lprim (Psetfield (offset, not trmc_gc_hack), [Lvar result; Lvar name]),
-                             lev (Lapply (func, (Lvar name :: args), loc))))
-         | lam -> on_return lam
+       let on_tail lam =
+         if has_trmc lam then
+           let name_block = Ident.create "trmc_block" in
+           let (func, old_app, value_block), value_result =
+             extract_trmc name_block lam
+           in
+           let rec map_app = function
+             | Levent (lam, lev) -> Levent (map_app lam, lev)
+             | Lapply (_, args, loc) ->
+               Lapply (Lvar func, (Lvar name_block :: args), loc)
+             | _ -> assert false
+           in
+           let new_app = map_app old_app in
+           Llet (Strict, name_block, value_block,
+             Lsequence (
+               Lprim (Psetfield (offset, false), [Lvar caller_block; value_result]),
+               new_app))
+         else lam
        in
-       id', Lfunction (fk, result :: params, map_tail (map_return on_return) on_tail body)
+       id', Lfunction (fk, caller_block :: params, map_tail (map_return on_return) on_tail body)
      in
      main_binding :: List.map subfunction !recbodies
 
