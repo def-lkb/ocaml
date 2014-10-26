@@ -716,17 +716,21 @@ let rec map_tail return_on tail =
   | Levent (lam, lev) -> Levent (on lam, lev)
   | Lifused _ -> assert false
 
+let trmc_do =
+  try Sys.getenv "TRMC" = "1"
+  with Not_found -> false
+
+let trmc_gc_hack =
+  try Sys.getenv "TRMC_CONST" = "1"
+  with Not_found -> false
+
 let trmc_const =
-  try ignore (Sys.getenv "TRMC_DEAD" : string);
+  if trmc_gc_hack then
     let x = 0xdead in
     let y = 0xb0ff in
     x lsl 16 lor y
-  with Not_found -> 0
-
-let trmc_do =
-  try ignore (Sys.getenv "TRMC" : string);
-    true
-  with Not_found -> false
+  else
+    0
 
 let introduce_trmc = function
   (* Rewrite recursive functions *)
@@ -776,14 +780,14 @@ let introduce_trmc = function
      let subfunction (offset, id') =
        let result = Ident.create "trmc_result" in
        let on_return lam =
-            Lprim (Psetfield (offset, false), [Lvar result; lam])
+            Lprim (Psetfield (offset, not trmc_gc_hack), [Lvar result; lam])
        in
        let on_tail = function
          | Lprim (Pmakeblock (n,flag), values) when List.exists is_reccall values ->
             let func, args, loc, lev, values = find_recall values in
             let name = Ident.create "trmc_result" in
             Llet (Strict, name, Lprim (Pmakeblock (n,Mutable), values),
-                  Lsequence (Lprim (Psetfield (offset, false), [Lvar result; Lvar name]),
+                  Lsequence (Lprim (Psetfield (offset, not trmc_gc_hack), [Lvar result; Lvar name]),
                              lev (Lapply (func, (Lvar name :: args), loc))))
          | lam -> on_return lam
        in

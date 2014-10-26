@@ -190,17 +190,12 @@ void caml_oldify_one (value v, value *p)
   }
 }
 
-#define VAL_TRMC Val_int(0xdeadb0ff)
-#define PTR_TRMC ((value*)VAL_TRMC)
-
-static value * trmc_root_track = PTR_TRMC;
+static value * trmc_root_track = (value*)VAL_TRMC;
 
 void caml_register_trmc_roots (void)
 {
-  while (trmc_root_track != PTR_TRMC)
+  while (trmc_root_track != (value*)VAL_TRMC)
   {
-    if (((value)trmc_root_track & 1) != 0) abort();
-    //puts ("REGISTERING ONE TRMC ROOT");
     value *fp = trmc_root_track;
     trmc_root_track = (value*)(*fp);
     *fp = VAL_TRMC;
@@ -310,7 +305,6 @@ CAMLexport void caml_minor_collection (void)
 
   caml_stat_promoted_words += caml_allocated_words - prev_alloc_words;
   ++ caml_stat_minor_collections;
-
   caml_major_collection_slice (0);
   caml_force_major_slice = 0;
 

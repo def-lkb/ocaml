@@ -53,4 +53,7 @@
 #define Colornum_hd(hd) ((color_t) (((hd) >> 8) & 3))
 #define Coloredhd_hd(hd,colnum) (((hd) & ~Caml_black) | ((colnum) << 8))
 
+/* Hack to detect "set-once" block produced by TRMC */
+#define VAL_TRMC Val_int(0xdeadb0ff)
+
 #endif /* CAML_GC_H */
