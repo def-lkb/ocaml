@@ -846,7 +846,7 @@ let introduce_trmc = function
              Lsequence (
                Lprim (Psetfield (offset, false), [Lvar caller_block; value_result]),
                new_app))
-         else lam
+         else on_return lam
        in
        id', Lfunction (fk, caller_block :: params, map_tail (map_return on_return) on_tail body)
      in
