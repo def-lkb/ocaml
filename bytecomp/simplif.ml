@@ -591,3 +591,266 @@ let simplify_lambda lam =
   let res = simplify_lets (simplify_exits lam) in
   if !Clflags.annotations then emit_tail_infos true res;
   res
+
+let sub_map_lambda f lam =
+  let rec aux = function
+    | Lvar _ | Lconst _ as lam -> lam
+    | Lapply (lam, lams, loc) ->
+      Lapply (f aux lam, List.map f_aux lams, loc)
+    | Lfunction (fk, ids, body) ->
+      Lfunction (fk, ids, f aux body)
+    | Llet (lk, id, l1, l2) ->
+      Llet (lk, id, f aux l1, f aux l2)
+    | Lletrec (binds, lam) ->
+      Lletrec (List.map f_aux_assoc binds, f aux lam)
+    | Lprim (p, ls) ->
+      Lprim (p, List.map f_aux ls)
+    | Lswitch (l1, sw) ->
+      Lswitch (f aux l1,
+          {sw with
+            sw_consts = List.map f_aux_assoc sw.sw_consts;
+            sw_blocks = List.map f_aux_assoc sw.sw_blocks;
+            sw_failaction = f_aux_option sw.sw_failaction })
+    | Lstringswitch (l1, ls, lo) ->
+      Lstringswitch (f aux l1, List.map f_aux_assoc ls, f_aux_option lo)
+    | Lstaticraise (id, ls) ->
+      Lstaticraise (id, List.map f_aux ls)
+    | Lstaticcatch (l1, ids, l2) ->
+      Lstaticcatch (f aux l1, ids, f aux l2)
+    | Ltrywith (l1, id, l2) ->
+      Ltrywith (f aux l1, id, f aux l2)
+    | Lifthenelse (l1, l2, l3) ->
+      Lifthenelse (f aux l1, f aux l2, f aux l3)
+    | Lsequence (l1, l2) -> Lsequence (f aux l1, f aux l2)
+    | Lwhile (l1, l2) -> Lwhile (f aux l1, f aux l2)
+    | Lfor (id, l1, l2, fl, body) ->
+      Lfor (id, f aux l1, f aux l2, fl, f aux body)
+    | Lassign (id, lam) -> Lassign (id, f aux lam)
+    | Lsend (mk, l1, l2, lams, loc) ->
+      Lsend (mk, f aux l1, f aux l2, List.map f_aux lams, loc)
+    | Levent (lam, lev) -> Levent (f aux lam, lev)
+    | Lifused (id, lam) -> Lifused (id, f aux lam)
+
+  and f_aux_assoc : 'a. 'a * _ -> 'a * _ =
+    fun (k, v) -> k, f aux v
+
+  and f_aux_option = function
+    | None -> None
+    | Some lam -> Some (f aux lam)
+
+  and f_aux lam = f aux lam
+
+  in
+  f aux lam
+
+let is_returnpoint = function
+  | Lvar _ | Lconst _ | Lapply _ | Lfunction _ | Lprim _ | Lsend _ -> true
+  | _ -> false
+
+let rec map_return f =
+  let on_assoc (k,v) = k, map_return f v in
+  let on_option = function
+    | None -> None
+    | Some v -> Some (map_return f v)
+  in
+  function
+  | Lvar _ | Lconst _ | Lapply _ | Lfunction _ | Lprim _ | Lsend _
+  | Lassign _ | Lfor _ | Lwhile _
+    as lam -> f lam
+  | Llet (lk, id, l1, l2) ->
+    Llet (lk, id, l1, map_return f l2)
+  | Lletrec (binds, lam) ->
+    Lletrec (binds, map_return f lam)
+  | Lswitch (l1, sw) ->
+    Lswitch (l1,
+        {sw with
+          sw_consts = List.map on_assoc sw.sw_consts;
+          sw_blocks = List.map on_assoc sw.sw_blocks;
+          sw_failaction = on_option sw.sw_failaction })
+  | Lstringswitch (l1, ls, lo) ->
+    Lstringswitch (l1, List.map on_assoc ls, on_option lo)
+  | Lstaticraise (id, ls) ->
+    Lstaticraise (id, ls)
+  | Lstaticcatch (l1, ids, l2) ->
+    Lstaticcatch (map_return f l1, ids, map_return f l2)
+  | Ltrywith (l1, id, l2) ->
+    Ltrywith (map_return f l1, id, map_return f l2)
+  | Lifthenelse (l1, l2, l3) ->
+    Lifthenelse (l1, map_return f l2, map_return f l3)
+  | Lsequence (l1, l2) -> Lsequence (l1, map_return f l2)
+  | Levent (lam, lev) -> Levent (map_return f lam, lev)
+  | Lifused _ -> assert false
+
+let rec map_tail return_on tail =
+  let on lam = map_tail return_on tail lam in
+  let on_assoc (k,v) = k, on v in
+  let on_option = function
+    | None -> None
+    | Some v -> Some (on v)
+  in
+  function
+  | Lvar _ | Lconst _ | Lapply _ | Lfunction _ | Lprim _ | Lsend _
+  | Lassign _ | Lfor _ | Lwhile _
+    as lam -> tail lam
+  | Llet (lk, id, l1, l2) ->
+    Llet (lk, id, l1, on l2)
+  | Lletrec (binds, lam) ->
+    Lletrec (binds, on lam)
+  | Lswitch (l1, sw) ->
+    Lswitch (l1,
+        {sw with
+          sw_consts = List.map on_assoc sw.sw_consts;
+          sw_blocks = List.map on_assoc sw.sw_blocks;
+          sw_failaction = on_option sw.sw_failaction })
+  | Lstringswitch (l1, ls, lo) ->
+    Lstringswitch (l1, List.map on_assoc ls, on_option lo)
+  | Lstaticraise (id, ls) ->
+    Lstaticraise (id, ls)
+  | Lstaticcatch (l1, ids, l2) ->
+    Lstaticcatch (on l1, ids, on l2)
+  | Ltrywith (l1, id, l2) ->
+    Ltrywith (return_on l1, id, on l2)
+  | Lifthenelse (l1, l2, l3) ->
+    Lifthenelse (l1, on l2, on l3)
+  | Lsequence (l1, l2) -> Lsequence (l1, on l2)
+  | Levent (lam, lev) -> Levent (on lam, lev)
+  | Lifused _ -> assert false
+
+let trmc_placeholder = Lconst (Const_base (Const_int 0))
+
+let introduce_trmc = function
+  (* Rewrite recursive functions *)
+  | id, Lfunction (fk, params, body) ->
+     let recbodies = ref [] in
+     let need_recfunc offset =
+       try List.assoc offset !recbodies
+       with Not_found ->
+         let id' = Ident.create (Ident.name id ^ "_" ^ string_of_int offset) in
+         recbodies := (offset, id') :: !recbodies;
+         id'
+     in
+
+     let arity = List.length params in
+     (* Find recursive call to id in trmc position *)
+     let rec is_reccall = function
+       | Lapply (Lvar id', args, _)
+            when Ident.same id id' && List.length args = arity
+         -> true
+       | Levent (lam,_) -> is_reccall lam
+       | _ -> false
+     in
+
+     let is_trmc = function
+       | Lprim (Pmakeblock _, values) -> List.exists is_reccall values
+       | _ -> false
+     in
+
+     let rec has_trmc lam =
+       is_trmc lam ||
+       match lam with
+       | Levent (lam,_) -> has_trmc lam
+       | Lprim (Pmakeblock _, values) -> List.exists has_trmc values
+       | _ -> false
+     in
+
+     let rec extract_reccall acc = function
+       | arg :: args when is_reccall arg ->
+         let offset = List.length acc in
+         need_recfunc offset, arg,
+         List.rev_append acc (trmc_placeholder :: args)
+       | arg :: args -> extract_reccall (arg :: acc) args
+       | [] -> assert false
+     in
+
+     let extract_direct_trmc = function
+       | Lprim (Pmakeblock (tag,_flag), values) ->
+         let func, old_app, values' = extract_reccall [] values in
+         func, old_app, Lprim (Pmakeblock (tag, Mutable), values')
+       | _ -> assert false
+     in
+
+     let rec extract_trmc name lam =
+       if is_trmc lam then
+         let result = extract_direct_trmc lam in
+         result, Lvar name
+       else match lam with
+       | Levent (lam,lev) ->
+         let result, lam = extract_trmc name lam in
+         result, Levent (lam,lev)
+       | Lprim (Pmakeblock (tag,flag), values) ->
+         let result, values' = extract_trmc_list name [] values in
+         result, Lprim (Pmakeblock (tag,flag), values')
+       | _ -> assert false
+
+     and extract_trmc_list name acc = function
+       | arg :: args when has_trmc arg ->
+         let result, arg' = extract_trmc name arg in
+         result, List.rev_append acc (arg' :: args)
+       | arg :: args ->
+         extract_trmc_list name (arg :: acc) args
+       | [] -> assert false
+     in
+
+     let on_trmc lam =
+       if has_trmc lam then
+          let name_block = Ident.create "trmc_block" in
+          let name_result = Ident.create "trmc_result" in
+          let (func, old_app, value_block), value_result =
+            extract_trmc name_block lam
+          in
+          let rec map_app = function
+            | Levent (lam, lev) -> Levent (map_app lam, lev)
+            | Lapply (_, args, loc) ->
+              Lapply (Lvar func, (Lvar name_block :: args), loc)
+            | _ -> assert false
+          in
+          let new_app = map_app old_app in
+          Llet (Strict, name_block, value_block,
+            Llet (Strict, name_result, value_result,
+              Lsequence (new_app, Lvar name_result)))
+       else lam
+     in
+
+     let main_binding = (id, Lfunction (fk, params, map_tail (fun x -> x) on_trmc body)) in
+     let subfunction (offset, id') =
+       let caller_block = Ident.create "caller_block" in
+       let on_return lam =
+            Lprim (Psetfield (offset, true), [Lvar caller_block; lam])
+       in
+       let on_tail lam =
+         if has_trmc lam then
+           let name_block = Ident.create "trmc_block" in
+           let (func, old_app, value_block), value_result =
+             extract_trmc name_block lam
+           in
+           let rec map_app = function
+             | Levent (lam, lev) -> Levent (map_app lam, lev)
+             | Lapply (_, args, loc) ->
+               Lapply (Lvar func, (Lvar name_block :: args), loc)
+             | _ -> assert false
+           in
+           let new_app = map_app old_app in
+           Llet (Strict, name_block, value_block,
+             Lsequence (
+               Lprim (Psetfield (offset, true), [Lvar caller_block; value_result]),
+               new_app))
+         else on_return lam
+       in
+       id', Lfunction (fk, caller_block :: params, map_tail (map_return on_return) on_tail body)
+     in
+     main_binding :: List.map subfunction !recbodies
+
+  (* Don't touch other bindings *)
+  | binding -> [binding]
+
+let rewrite_trmc next lam =
+  match next lam with
+  | Lletrec (lams,lam) ->
+    let lams = List.concat (List.map introduce_trmc lams) in
+    Lletrec (lams, lam)
+  | lam -> lam
+
+let simplify_lambda lam =
+  let lam = simplify_lambda lam in
+  let lam = sub_map_lambda rewrite_trmc lam in
+  lam
