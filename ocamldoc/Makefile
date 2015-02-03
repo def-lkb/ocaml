@@ -70,7 +70,8 @@ GENERATORS_CMXS := $($(NATDYNLINK))
 # Compilation
 #############
 OCAMLSRCDIR=..
-INCLUDES_DEP=-I $(OCAMLSRCDIR)/parsing \
+INCLUDES_DEP=\
+        -I $(OCAMLSRCDIR)/parsing \
 	-I $(OCAMLSRCDIR)/utils \
 	-I $(OCAMLSRCDIR)/typing \
 	-I $(OCAMLSRCDIR)/driver \

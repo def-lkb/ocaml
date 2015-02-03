@@ -41,8 +41,9 @@ opt.opt: ocamldep.opt read_cmt.opt
 CAMLDEP_OBJ=depend.cmo ocamldep.cmo
 CAMLDEP_IMPORTS=timings.cmo misc.cmo config.cmo identifiable.cmo numbers.cmo \
   arg_helper.cmo clflags.cmo terminfo.cmo \
-  warnings.cmo location.cmo longident.cmo docstrings.cmo \
-  syntaxerr.cmo ast_helper.cmo parser.cmo lexer.cmo parse.cmo \
+  warnings.cmo location.cmo longident.cmo docstrings.cmo printast.cmo \
+  syntaxerr.cmo ast_helper.cmo parser.cmo \
+  menhirLib.cmo parser_menhir.cmo lexer.cmo parse.cmo \
   ccomp.cmo ast_mapper.cmo ast_iterator.cmo ast_invariants.cmo pparse.cmo \
   compenv.cmo \
   builtin_attributes.cmo
@@ -76,7 +77,8 @@ CSLPROF=ocamlprof.cmo
 CSLPROF_IMPORTS=misc.cmo config.cmo identifiable.cmo numbers.cmo \
   arg_helper.cmo clflags.cmo terminfo.cmo \
   warnings.cmo location.cmo longident.cmo docstrings.cmo \
-  syntaxerr.cmo ast_helper.cmo parser.cmo lexer.cmo parse.cmo
+  syntaxerr.cmo ast_helper.cmo parser.cmo \
+  menhirLib.cmo parser_menhir.cmo lexer.cmo parse.cmo
 
 ocamlprof: $(CSLPROF) profiling.cmo
 	$(CAMLC) $(LINKFLAGS) -o ocamlprof $(CSLPROF_IMPORTS) $(CSLPROF)

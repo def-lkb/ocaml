@@ -1,0 +1,32 @@
+MENHIR ?= menhir
+
+MENHIRFLAGS=--explain --ocamlc "$(CAMLC) $(COMPFLAGS)" --infer\
+	--table --external-tokens Parser
+MENHIRDEPFLAGS=--ocamldep "$(CAMLDEP) $(DEPFLAGS)" --depend
+
+# We use a dependency on parsing/parser_menhir.ml
+# as a way to depend on all the files that `menhir --depend`
+# recorded against parsing/parser_menhir.{ml,mli}.
+#
+# Those dependencies are necessary for --infer to work: the cmi of the
+# files on which the semantic actions depend must be built.
+promote-menhir: parsing/parser_menhir.mly parsing/parser_menhir.ml
+	$(MENHIR) $(MENHIRFLAGS) parsing/parser_menhir.mly
+	mv parsing/parser_menhir.{mli,ml} boot/menhir/
+	cp `$(MENHIR) --suggest-menhirLib`/menhirLib.{ml,mli} boot/menhir
+
+depend-menhir: parsing/parser_menhir.mly
+	$(MENHIR) $(MENHIRDEPFLAGS) parsing/parser_menhir.mly > .depend.menhir
+
+include .depend.menhir
+
+alldepend:: depend-menhir
+
+clean-menhir:
+	rm -f parsing/parser_menhir.{ml,mli,mly} parsing/menhirLib.{ml,mli}
+
+parsing/parser_menhir.mly: parsing/parser_menhir.mlyp
+	gcc -E -x c -P parsing/parser_menhir.mlyp > parsing/parser_menhir.mly
+
+partialclean::
+	rm -f parsing/parser_menhir.mly

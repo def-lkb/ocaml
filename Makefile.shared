@@ -49,6 +49,7 @@ UTILS=utils/config.cmo utils/misc.cmo \
 PARSING=parsing/location.cmo parsing/longident.cmo \
   parsing/docstrings.cmo parsing/ast_helper.cmo \
   parsing/syntaxerr.cmo parsing/parser.cmo \
+	parsing/menhirLib.cmo parsing/parser_menhir.cmo \
   parsing/lexer.cmo parsing/parse.cmo parsing/printast.cmo \
   parsing/pprintast.cmo \
   parsing/ast_mapper.cmo parsing/ast_iterator.cmo parsing/attr_helper.cmo \
@@ -219,6 +220,25 @@ compilerlibs/ocamlmiddleend.cma: $(MIDDLE_END)
 partialclean::
 	rm -f compilerlibs/ocamlmiddleend.cma
 
+# The Menhir-generated parser
+parsing/parser_menhir.ml: parsing/parser_menhir.cmi
+	cp boot/menhir/parser_menhir.ml parsing
+
+parsing/parser_menhir.mli:
+	cp boot/menhir/parser_menhir.mli parsing
+
+parsing/menhirLib.ml: parsing/menhirLib.cmi
+	cp boot/menhir/menhirLib.ml parsing
+
+parsing/menhirLib.mli:
+	cp boot/menhir/menhirLib.mli parsing
+
+partialclean::
+	rm -f parsing/parser_menhir.{mli,ml} parsing/menhirLib.{mli,ml}
+
+# exports a promote-menhir-parser rule that calls Menhir to
+# re-generate boot/menhir files
+include Makefile.menhir
 
 # Tools
 
