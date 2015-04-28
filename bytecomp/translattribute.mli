@@ -39,6 +39,10 @@ val add_specialise_attribute
   -> Parsetree.attributes
   -> Lambda.lambda
 
+val get_trmc_attribute
+   : Parsetree.attributes
+  -> bool
+
 val add_trmc_attribute
    : Lambda.lambda
   -> Location.t

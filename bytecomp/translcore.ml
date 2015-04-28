@@ -1217,9 +1217,10 @@ and transl_let rec_flag pat_expr_list body =
           let lam =
             Translattribute.add_specialise_attribute lam vb_loc attr
           in
-          let lam =
-            Translattribute.add_trmc_attribute lam vb_loc attr
-          in
+          if Translattribute.get_trmc_attribute attr then (
+            Location.prerr_warning vb_loc
+              (Warnings.Misplaced_attribute "trmc")
+          );
           Matching.for_let pat.pat_loc lam pat (transl rem)
       in transl pat_expr_list
   | Recursive ->
