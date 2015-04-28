@@ -419,6 +419,7 @@ let transl_primitive loc p env ty path =
       let parm = Ident.create "prim" in
       Lfunction{kind = Curried; params = [parm];
                 body = Matching.inline_lazy_force (Lvar parm) Location.none;
+                fun_loc = loc;
                 attr = default_function_attribute }
   | Ploc kind ->
     let lam = lam_of_loc kind loc in
@@ -428,6 +429,7 @@ let transl_primitive loc p env ty path =
         let param = Ident.create "prim" in
         Lfunction{kind = Curried; params = [param];
                   attr = default_function_attribute;
+                  fun_loc = loc;
                   body = Lprim(Pmakeblock(0, Immutable, None),
                                [lam; Lvar param])}
       | _ -> assert false
@@ -438,6 +440,7 @@ let transl_primitive loc p env ty path =
       let params = make_params p.prim_arity in
       Lfunction{ kind = Curried; params;
                  attr = default_function_attribute;
+                 fun_loc = loc;
                  body = Lprim(prim, List.map (fun id -> Lvar id) params) }
 
 let transl_primitive_application loc prim env ty path args =
@@ -693,12 +696,14 @@ and transl_exp0 e =
         let obj = Ident.create "obj" and meth = Ident.create "meth" in
         Lfunction{kind = Curried; params = [obj; meth];
                   attr = default_function_attribute;
+                  fun_loc = e.exp_loc;
                   body = Lsend(kind, Lvar meth, Lvar obj, [], e.exp_loc)}
       else if p.prim_name = "%sendcache" then
         let obj = Ident.create "obj" and meth = Ident.create "meth" in
         let cache = Ident.create "cache" and pos = Ident.create "pos" in
         Lfunction{kind = Curried; params = [obj; meth; cache; pos];
                   attr = default_function_attribute;
+                  fun_loc = e.exp_loc;
                   body = Lsend(Cached, Lvar meth, Lvar obj,
                                [Lvar cache; Lvar pos], e.exp_loc)}
       else
@@ -725,7 +730,7 @@ and transl_exp0 e =
         specialise = Translattribute.get_specialise_attribute e.exp_attributes;
       }
       in
-      Lfunction{kind; params; body; attr}
+      Lfunction{kind; params; body; attr; fun_loc = e.exp_loc}
   | Texp_apply({ exp_desc = Texp_ident(path, _, {val_kind = Val_prim p});
                 exp_type = prim_type } as funct, oargs)
     when List.length oargs >= p.prim_arity
@@ -1044,6 +1049,7 @@ and transl_exp0 e =
       | _ ->
          let fn = Lfunction {kind = Curried; params = [Ident.create "param"];
                              attr = default_function_attribute;
+                             fun_loc = e.exp_loc;
                              body = transl_exp e} in
           Lprim(Pmakeblock(Config.lazy_tag, Mutable, None), [fn])
       end
@@ -1148,12 +1154,15 @@ and transl_apply ?(should_be_tailcall=false) ?(inlined = Default_inline)
         let body =
           match build_apply handle ((Lvar id_arg, optional)::args') l with
             Lfunction{kind = Curried; params = ids; body = lam; attr} ->
-              Lfunction{kind = Curried; params = id_arg::ids; body = lam; attr}
+              Lfunction{kind = Curried; params = id_arg::ids; body = lam;
+                        fun_loc = loc; attr}
           | Levent(Lfunction{kind = Curried; params = ids;
                              body = lam; attr}, _) ->
-              Lfunction{kind = Curried; params = id_arg::ids; body = lam; attr}
+              Lfunction{kind = Curried; params = id_arg::ids; body = lam;
+                        fun_loc = loc; attr}
           | lam ->
               Lfunction{kind = Curried; params = [id_arg]; body = lam;
+                        fun_loc = loc;
                         attr = default_function_attribute}
         in
         List.fold_left

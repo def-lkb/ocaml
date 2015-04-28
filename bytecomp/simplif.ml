@@ -200,8 +200,8 @@ let simplify_exits lam =
   | Lapply ap ->
       Lapply{ap with ap_func = simplif ap.ap_func;
                      ap_args = List.map simplif ap.ap_args}
-  | Lfunction{kind; params; body = l; attr} ->
-     Lfunction{kind; params; body = simplif l; attr}
+  | Lfunction{kind; params; body = l; fun_loc; attr} ->
+      Lfunction{kind; params; body = simplif l; fun_loc; attr}
   | Llet(str, kind, v, l1, l2) -> Llet(str, kind, v, simplif l1, simplif l2)
   | Lletrec(bindings, body) ->
       Lletrec(List.map (fun (v, l) -> (v, simplif l)) bindings, simplif body)
@@ -457,13 +457,13 @@ let simplify_lets lam =
       simplif (beta_reduce params body args)
   | Lapply ap -> Lapply {ap with ap_func = simplif ap.ap_func;
                                  ap_args = List.map simplif ap.ap_args}
-  | Lfunction{kind; params; body = l; attr} ->
+  | Lfunction{kind; params; body = l; fun_loc; attr} ->
       begin match simplif l with
         Lfunction{kind=Curried; params=params'; body; attr}
         when kind = Curried && optimize ->
-          Lfunction{kind; params = params @ params'; body; attr}
+          Lfunction{kind; params = params @ params'; body; fun_loc; attr}
       | body ->
-          Lfunction{kind; params; body; attr}
+          Lfunction{kind; params; body; fun_loc; attr}
       end
   | Llet(_str, _k, v, Lvar w, l2) when optimize ->
       Hashtbl.add subst v (simplif (Lvar w));
@@ -670,16 +670,18 @@ let split_default_wrapper ?(create_wrapper_body = fun lam -> lam)
         in
         let body = Lambda.subst_lambda subst body in
         let inner_fun =
-          Lfunction { kind = Curried; params = new_ids; body; attr; }
+          Lfunction { kind = Curried; params = new_ids; body; attr;
+                      fun_loc = Location.none }
         in
         (wrapper_body, (inner_id, inner_fun))
   in
+  let fun_loc = Location.none in
   try
     let wrapper_body, inner = aux [] body in
-    [(fun_id, Lfunction{kind; params; body = create_wrapper_body wrapper_body;
-       attr}); inner]
+    let body = create_wrapper_body wrapper_body in
+    [(fun_id, Lfunction{kind; params; body; attr; fun_loc}); inner]
   with Exit ->
-    [(fun_id, Lfunction{kind; params; body; attr})]
+    [(fun_id, Lfunction{kind; params; body; attr; fun_loc})]
 
 (* trmc rewriting *)
 

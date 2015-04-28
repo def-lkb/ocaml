@@ -234,7 +234,8 @@ and lfunction =
   { kind: function_kind;
     params: Ident.t list;
     body: lambda;
-    attr: function_attribute; } (* specified with [@inline] attribute *)
+    attr: function_attribute; (* specified with [@inline] attribute *)
+    fun_loc: Location.t; }
 
 and lambda_apply =
   { ap_func : lambda;

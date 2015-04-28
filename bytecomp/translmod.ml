@@ -78,6 +78,7 @@ let rec apply_coercion strict restr arg =
         Lfunction{kind = Curried; params = [param];
                   attr = { default_function_attribute with
                            is_a_functor = true };
+                  fun_loc = Location.none;
                   body = apply_coercion
                            Strict cc_res
                            (Lapply{ap_should_be_tailcall=false;
@@ -366,6 +367,7 @@ let rec transl_module cc rootpath mexp =
                                      specialise = Default_specialise;
                                      is_a_functor = true;
                                      trmc_candidate = false };
+                            fun_loc = mexp.mod_loc;
                             body = transl_module Tcoerce_none bodypath body}
               | Tcoerce_functor(ccarg, ccres) ->
                   let param' = Ident.create "funarg" in
@@ -374,6 +376,7 @@ let rec transl_module cc rootpath mexp =
                                      specialise = Default_specialise;
                                      is_a_functor = true;
                                      trmc_candidate = false };
+                            fun_loc = mexp.mod_loc;
                             body = Llet(Alias, Pgenval, param,
                                         apply_coercion Alias ccarg
                                                        (Lvar param'),

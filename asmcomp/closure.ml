@@ -886,7 +886,8 @@ let rec close fenv cenv = function
                              ap_args=internal_args;
                              ap_inlined=Default_inline;
                              ap_specialised=Default_specialise};
-               attr = default_function_attribute})
+               attr = default_function_attribute;
+               fun_loc = Location.none})
         in
         let new_fun = iter first_args new_fun in
         warning_if_forced_inline ~loc ~attribute "Partial application";
