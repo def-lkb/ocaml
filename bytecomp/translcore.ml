@@ -1217,6 +1217,9 @@ and transl_let rec_flag pat_expr_list body =
           let lam =
             Translattribute.add_specialise_attribute lam vb_loc attr
           in
+          let lam =
+            Translattribute.add_trmc_attribute lam vb_loc attr
+          in
           Matching.for_let pat.pat_loc lam pat (transl rem)
       in transl pat_expr_list
   | Recursive ->
@@ -1227,15 +1230,16 @@ and transl_let rec_flag pat_expr_list body =
             | Tpat_alias ({pat_desc=Tpat_any}, id,_) -> id
             | _ -> raise(Error(pat.pat_loc, Illegal_letrec_pat)))
         pat_expr_list in
-      let transl_case {vb_expr=expr; vb_attributes; vb_loc} id =
+      let transl_case {vb_expr=expr; vb_attributes=attr; vb_loc} id =
         let lam = transl_exp expr in
         let lam =
-          Translattribute.add_inline_attribute lam vb_loc
-            vb_attributes
+          Translattribute.add_inline_attribute lam vb_loc attr
         in
         let lam =
-          Translattribute.add_specialise_attribute lam vb_loc
-            vb_attributes
+          Translattribute.add_specialise_attribute lam vb_loc attr
+        in
+        let lam =
+          Translattribute.add_trmc_attribute lam vb_loc attr
         in
         if not (check_recursive_lambda idlist lam) then
           raise(Error(expr.exp_loc, Illegal_letrec_expr));

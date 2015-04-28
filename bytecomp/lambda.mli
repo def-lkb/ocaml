@@ -221,6 +221,7 @@ type function_attribute = {
   inline : inline_attribute;
   specialise : specialise_attribute;
   is_a_functor: bool;
+  trmc_candidate: bool;
 }
 
 type lambda =

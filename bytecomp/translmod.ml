@@ -364,14 +364,16 @@ let rec transl_module cc rootpath mexp =
                   Lfunction{kind = Curried; params = [param];
                             attr = { inline = inline_attribute;
                                      specialise = Default_specialise;
-                                     is_a_functor = true };
+                                     is_a_functor = true;
+                                     trmc_candidate = false };
                             body = transl_module Tcoerce_none bodypath body}
               | Tcoerce_functor(ccarg, ccres) ->
                   let param' = Ident.create "funarg" in
                   Lfunction{kind = Curried; params = [param'];
                             attr = { inline = inline_attribute;
                                      specialise = Default_specialise;
-                                     is_a_functor = true };
+                                     is_a_functor = true;
+                                     trmc_candidate = false };
                             body = Llet(Alias, Pgenval, param,
                                         apply_coercion Alias ccarg
                                                        (Lvar param'),

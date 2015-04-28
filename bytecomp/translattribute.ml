@@ -34,6 +34,10 @@ let is_specialised_attribute = function
   | {txt=("specialised"|"ocaml.specialised")}, _ when Config.flambda -> true
   | _ -> false
 
+let is_trmc_attribute = function
+  | {txt=("trmc"|"ocaml.trmc")}, _ -> true
+  | _ -> false
+
 let find_attribute p attributes =
   let inline_attribute, other_attributes =
     List.partition p attributes
@@ -141,6 +145,9 @@ let get_specialise_attribute l =
   let attr, _ = find_attribute is_specialise_attribute l in
   parse_specialise_attribute attr
 
+let get_trmc_attribute l =
+  List.exists is_trmc_attribute l
+
 let add_inline_attribute expr loc attributes =
   match expr, get_inline_attribute attributes with
   | expr, Default_inline -> expr
@@ -174,6 +181,21 @@ let add_specialise_attribute expr loc attributes =
       Location.prerr_warning loc
         (Warnings.Misplaced_attribute "specialise");
       expr
+
+let add_trmc_attribute expr loc attributes =
+  if get_trmc_attribute attributes then
+    match expr with
+    | Lfunction({ attr } as funct) ->
+        if attr.trmc_candidate then
+          Location.prerr_warning loc
+            (Warnings.Duplicated_attribute "trmc");
+        let attr = { attr with trmc_candidate = true } in
+        Lfunction { funct with attr = attr }
+    | expr ->
+        Location.prerr_warning loc
+          (Warnings.Misplaced_attribute "trmc");
+        expr
+  else expr
 
 (* Get the [@inlined] attribute payload (or default if not present).
    It also returns the expression without this attribute. This is
