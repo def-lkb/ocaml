@@ -824,7 +824,7 @@ let rec is_reccall all_candidates = function
       begin match List.assoc id all_candidates with
       | exception Not_found -> None
       | stub ->
-        if stub.stub_body.attr.trmc_candidate &&
+        if (stub.stub_body.attr.trmc_candidate || !Clflags.force_trmc) &&
            stub.stub_arity = List.length ap_args
         then Some (id, stub)
         else None
@@ -923,7 +923,8 @@ let rec introduce_trmc all_candidates bindings =
   let candidates =
     let rec extract = function
       | [] -> []
-      | (id, Lfunction lfun) :: rest when lfun.attr.trmc_candidate ->
+      | (id, Lfunction lfun) :: rest when lfun.attr.trmc_candidate
+                                       || !Clflags.force_trmc ->
           let stub = {
             stub_arity = List.length lfun.params;
             stub_body = lfun;

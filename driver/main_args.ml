@@ -465,6 +465,10 @@ let mk_unbox_closures_factor f =
     Clflags.default_unbox_closures_factor
 ;;
 
+let mk_trmc f =
+  "-force-trmc", Arg.Unit f, " Rewrite all possible trmc calls"
+;;
+
 let mk_unsafe f =
   "-unsafe", Arg.Unit f,
   " Do not compile bounds checking on array and string access"
@@ -728,6 +732,7 @@ module type Common_options = sig
   val _no_strict_sequence : unit -> unit
   val _strict_formats : unit -> unit
   val _no_strict_formats : unit -> unit
+  val _trmc : unit -> unit
   val _unsafe : unit -> unit
   val _unsafe_string : unit -> unit
   val _version : unit -> unit
@@ -973,6 +978,7 @@ struct
     mk_strict_formats F._strict_formats;
     mk_no_strict_formats F._no_strict_formats;
     mk_thread F._thread;
+    mk_trmc F._trmc;
     mk_unsafe F._unsafe;
     mk_unsafe_string F._unsafe_string;
     mk_use_runtime F._use_runtime;
@@ -1031,6 +1037,7 @@ struct
     mk_no_strict_sequence F._no_strict_sequence;
     mk_strict_formats F._strict_formats;
     mk_no_strict_formats F._no_strict_formats;
+    mk_trmc F._trmc;
     mk_unsafe F._unsafe;
     mk_unsafe_string F._unsafe_string;
     mk_version F._version;
@@ -1134,6 +1141,7 @@ struct
     mk_unbox_closures F._unbox_closures;
     mk_unbox_closures_factor F._unbox_closures_factor;
     mk_inline_max_unroll F._inline_max_unroll;
+    mk_trmc F._trmc;
     mk_unsafe F._unsafe;
     mk_unsafe_string F._unsafe_string;
     mk_v F._v;

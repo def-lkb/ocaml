@@ -221,6 +221,7 @@ module Options = Main_args.Make_ocamldoc_options(struct
   let _strict_formats = set Clflags.strict_formats
   let _no_strict_formats = unset Clflags.strict_formats
   let _thread = set Clflags.use_threads
+  let _trmc = set Clflags.force_trmc
   let _vmthread = set Clflags.use_vmthreads
   let _unsafe () = assert false
   let _unsafe_string = set Clflags.unsafe_string

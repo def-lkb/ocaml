@@ -143,6 +143,7 @@ module Options = Main_args.Make_bytecomp_options (struct
   let _strict_formats = set strict_formats
   let _no_strict_formats = unset strict_formats
   let _thread = set use_threads
+  let _trmc = set force_trmc
   let _vmthread = set use_vmthreads
   let _unsafe = set fast
   let _unsafe_string = set unsafe_string
