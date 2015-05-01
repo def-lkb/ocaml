@@ -211,10 +211,10 @@ let restore x = current := x
 let is_active x = (!current).active.(number x);;
 let is_error x = (!current).error.(number x);;
 
-let parse_opt error active flags s =
+let parse_opt errors active flags s =
   let set i = flags.(i) <- true in
   let clear i = flags.(i) <- false in
-  let set_all i = active.(i) <- true; error.(i) <- true in
+  let set_all i = active.(i) <- true; errors.(i) <- true in
   let error () = raise (Arg.Bad "Ill-formed list of warnings") in
   let rec get_num n i =
     if i >= String.length s then i, n
@@ -259,7 +259,8 @@ let parse_opt error active flags s =
        loop (i+1)
     | _ -> error ()
   in
-  loop 0
+  loop 0;
+  errors.(61) <- false
 ;;
 
 let parse_options errflag s =
