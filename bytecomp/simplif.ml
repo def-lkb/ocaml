@@ -826,6 +826,12 @@ let rec is_reccall all_candidates = function
       begin match List.assoc id all_candidates with
       | exception Not_found -> None
       | stub ->
+        if not stub.stub_body.attr.trmc_candidate && not stub.stub_warned then
+          begin
+            Location.prerr_warning stub.stub_body.fun_loc
+              Warnings.Potential_trmc_call;
+            stub.stub_warned <- true;
+          end;
         if (stub.stub_body.attr.trmc_candidate || !Clflags.force_trmc) &&
            stub.stub_arity = List.length ap_args
         then Some (id, stub)
@@ -925,8 +931,11 @@ let rec introduce_trmc all_candidates bindings =
   let candidates =
     let rec extract = function
       | [] -> []
-      | (id, Lfunction lfun) :: rest when lfun.attr.trmc_candidate
-                                       || !Clflags.force_trmc ->
+      | (id, Lfunction lfun) :: rest
+        when lfun.attr.trmc_candidate
+          || !Clflags.force_trmc
+          || Warnings.is_active Warnings.Potential_trmc_call
+        ->
           let stub = {
             stub_arity = List.length lfun.params;
             stub_body = lfun;
@@ -1000,6 +1009,9 @@ let rec introduce_trmc all_candidates bindings =
     (* Freeze stub generation, generate all stubs *)
     List.iter (fun (_id, stub) ->
         stub.stub_frozen <- true;
+        if stub.stub_uses = [] && stub.stub_body.attr.trmc_candidate then
+          Location.prerr_warning stub.stub_body.fun_loc
+            (Warnings.Unused_attribute "trmc");
       ) candidates;
     let bindings' = List.concat (List.map bindings_of_stub candidates) in
     bindings' @ bindings

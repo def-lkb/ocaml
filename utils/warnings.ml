@@ -80,6 +80,8 @@ type t =
   | Ambiguous_pattern of string list        (* 57 *)
   | No_cmx_file of string                   (* 58 *)
   | Assignment_to_non_mutable_value         (* 59 *)
+  | Unused_attribute of string              (* 60 *)
+  | Potential_trmc_call                     (* 61 *)
 ;;
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
@@ -148,9 +150,11 @@ let number = function
   | Ambiguous_pattern _ -> 57
   | No_cmx_file _ -> 58
   | Assignment_to_non_mutable_value -> 59
+  | Unused_attribute _ -> 60
+  | Potential_trmc_call -> 61
 ;;
 
-let last_warning_number = 59
+let last_warning_number = 61
 ;;
 
 (* Must be the max number returned by the [number] function. *)
@@ -472,6 +476,10 @@ let message = function
       "A potential assignment to a non-mutable value was detected \n\
         in this source file.  Such assignments may generate incorrect code \n\
         when using Flambda."
+  | Unused_attribute attr_name ->
+      Printf.sprintf "the %S attribute has no effect in this context" attr_name
+  | Potential_trmc_call ->
+      "this function is applied in trmc position"
 ;;
 
 let nerrors = ref 0;;
@@ -571,6 +579,8 @@ let descriptions =
    57, "Ambiguous or-pattern variables under guard";
    58, "Missing cmx file";
    59, "Assignment to non-mutable value";
+   60, "Attribute has no effect in this context";
+   61, "This function would benefit from a @trmc attribute";
   ]
 ;;
 
