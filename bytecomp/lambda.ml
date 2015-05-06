@@ -430,7 +430,6 @@ let iter f = function
   | Lifused (_v, e) ->
       f e
 
-
 module IdentSet = Set.Make(Ident)
 
 let free_ids get l =
@@ -519,6 +518,54 @@ let rec make_sequence fn = function
   | x::rem ->
       let lam = fn x in Lsequence(lam, make_sequence fn rem)
 
+(* [map_lambda f lam] applies f on immediate sub-terms of [lam].
+   Only the first level is mapped, there is no recursion. *)
+
+let map_opt f = function
+  | None -> None
+  | Some e -> Some (f e)
+
+let map_assoc f (k, v) = (k, f v)
+
+let map_lambda f = function
+  | Lvar _ | Lconst _ as lam -> lam
+  | Lapply ap ->
+      Lapply{ap with ap_func = f ap.ap_func;
+                     ap_args = List.map f ap.ap_args}
+  | Lfunction fn ->
+      Lfunction{fn with body = f fn.body}
+  | Llet (str, k, id, l1, l2) ->
+    Llet (str, k, id, f l1, f l2)
+  | Lletrec (binds, lam) ->
+    Lletrec (List.map (map_assoc f) binds, f lam)
+  | Lprim (p, ls) ->
+    Lprim (p, List.map f ls)
+  | Lswitch (l1, sw) ->
+    Lswitch (f l1,
+        {sw with
+          sw_consts = List.map (map_assoc f) sw.sw_consts;
+          sw_blocks = List.map (map_assoc f) sw.sw_blocks;
+          sw_failaction = map_opt f sw.sw_failaction })
+  | Lstringswitch (l1, ls, lo) ->
+    Lstringswitch (f l1, List.map (map_assoc f) ls, map_opt f lo)
+  | Lstaticraise (id, ls) ->
+    Lstaticraise (id, List.map f ls)
+  | Lstaticcatch (l1, ids, l2) ->
+    Lstaticcatch (f l1, ids, f l2)
+  | Ltrywith (l1, id, l2) ->
+    Ltrywith (f l1, id, f l2)
+  | Lifthenelse (l1, l2, l3) ->
+    Lifthenelse (f l1, f l2, f l3)
+  | Lsequence (l1, l2) -> Lsequence (f l1, f l2)
+  | Lwhile (l1, l2) -> Lwhile (f l1, f l2)
+  | Lfor (id, l1, l2, fl, body) ->
+    Lfor (id, f l1, f l2, fl, f body)
+  | Lassign (id, lam) -> Lassign (id, f lam)
+  | Lsend (mk, l1, l2, lams, loc) ->
+    Lsend (mk, f l1, f l2, List.map f lams, loc)
+  | Levent (lam, lev) -> Levent (f lam, lev)
+  | Lifused (id, lam) -> Lifused (id, f lam)
+
 (* Apply a substitution to a lambda-term.
    Assumes that the bound variables of the lambda-term do not
    belong to the domain of the substitution.
@@ -526,106 +573,16 @@ let rec make_sequence fn = function
    of the bound variables of the lambda-term (no capture). *)
 
 let subst_lambda s lam =
-  let rec subst = function
-    Lvar id as l ->
-      begin try Ident.find_same id s with Not_found -> l end
-  | Lconst _ as l -> l
-  | Lapply ap ->
-      Lapply{ap with ap_func = subst ap.ap_func;
-                     ap_args = List.map subst ap.ap_args}
-  | Lfunction{kind; params; body; attr} ->
-      Lfunction{kind; params; body = subst body; attr}
-  | Llet(str, k, id, arg, body) -> Llet(str, k, id, subst arg, subst body)
-  | Lletrec(decl, body) -> Lletrec(List.map subst_decl decl, subst body)
-  | Lprim(p, args) -> Lprim(p, List.map subst args)
-  | Lswitch(arg, sw) ->
-      Lswitch(subst arg,
-              {sw with sw_consts = List.map subst_case sw.sw_consts;
-                       sw_blocks = List.map subst_case sw.sw_blocks;
-                       sw_failaction = subst_opt  sw.sw_failaction; })
-  | Lstringswitch (arg,cases,default) ->
-      Lstringswitch
-        (subst arg,List.map subst_strcase cases,subst_opt default)
-  | Lstaticraise (i,args) ->  Lstaticraise (i, List.map subst args)
-  | Lstaticcatch(e1, io, e2) -> Lstaticcatch(subst e1, io, subst e2)
-  | Ltrywith(e1, exn, e2) -> Ltrywith(subst e1, exn, subst e2)
-  | Lifthenelse(e1, e2, e3) -> Lifthenelse(subst e1, subst e2, subst e3)
-  | Lsequence(e1, e2) -> Lsequence(subst e1, subst e2)
-  | Lwhile(e1, e2) -> Lwhile(subst e1, subst e2)
-  | Lfor(v, e1, e2, dir, e3) -> Lfor(v, subst e1, subst e2, dir, subst e3)
-  | Lassign(id, e) -> Lassign(id, subst e)
-  | Lsend (k, met, obj, args, loc) ->
-      Lsend (k, subst met, subst obj, List.map subst args, loc)
-  | Levent (lam, evt) -> Levent (subst lam, evt)
-  | Lifused (v, e) -> Lifused (v, subst e)
-  and subst_decl (id, exp) = (id, subst exp)
-  and subst_case (key, case) = (key, subst case)
-  and subst_strcase (key, case) = (key, subst case)
-  and subst_opt = function
-    | None -> None
-    | Some e -> Some (subst e)
-  in subst lam
-
-let rec map f lam =
-  let lam =
-    match lam with
-    | Lvar _ -> lam
-    | Lconst _ -> lam
-    | Lapply { ap_func; ap_args; ap_loc; ap_should_be_tailcall;
-          ap_inlined; ap_specialised } ->
-        Lapply {
-          ap_func = map f ap_func;
-          ap_args = List.map (map f) ap_args;
-          ap_loc;
-          ap_should_be_tailcall;
-          ap_inlined;
-          ap_specialised;
-        }
-    | Lfunction { kind; params; body; attr; } ->
-        Lfunction { kind; params; body = map f body; attr; }
-    | Llet (str, k, v, e1, e2) ->
-        Llet (str, k, v, map f e1, map f e2)
-    | Lletrec (idel, e2) ->
-        Lletrec (List.map (fun (v, e) -> (v, map f e)) idel, map f e2)
-    | Lprim (p, el) ->
-        Lprim (p, List.map (map f) el)
-    | Lswitch (e, sw) ->
-        Lswitch (map f e,
-          { sw_numconsts = sw.sw_numconsts;
-            sw_consts = List.map (fun (n, e) -> (n, map f e)) sw.sw_consts;
-            sw_numblocks = sw.sw_numblocks;
-            sw_blocks = List.map (fun (n, e) -> (n, map f e)) sw.sw_blocks;
-            sw_failaction = Misc.may_map (map f) sw.sw_failaction;
-          })
-    | Lstringswitch (e, sw, default) ->
-        Lstringswitch (
-          map f e,
-          List.map (fun (s, e) -> (s, map f e)) sw,
-          Misc.may_map (map f) default)
-    | Lstaticraise (i, args) ->
-        Lstaticraise (i, List.map (map f) args)
-    | Lstaticcatch (body, id, handler) ->
-        Lstaticcatch (map f body, id, map f handler)
-    | Ltrywith (e1, v, e2) ->
-        Ltrywith (map f e1, v, map f e2)
-    | Lifthenelse (e1, e2, e3) ->
-        Lifthenelse (map f e1, map f e2, map f e3)
-    | Lsequence (e1, e2) ->
-        Lsequence (map f e1, map f e2)
-    | Lwhile (e1, e2) ->
-        Lwhile (map f e1, map f e2)
-    | Lfor (v, e1, e2, dir, e3) ->
-        Lfor (v, map f e1, map f e2, dir, map f e3)
-    | Lassign (v, e) ->
-        Lassign (v, map f e)
-    | Lsend (k, m, o, el, loc) ->
-        Lsend (k, map f m, map f o, List.map (map f) el, loc)
-    | Levent (l, ev) ->
-        Levent (map f l, ev)
-    | Lifused (v, e) ->
-        Lifused (v, map f e)
+  let rec aux = function
+    | Lvar id as l ->
+        begin try Ident.find_same id s with Not_found -> l end
+    | lam -> map_lambda aux lam
   in
-  f lam
+  aux lam
+
+let map f lam =
+  let rec sub lam = f (map_lambda sub lam) in
+  sub lam
 
 (* To let-bind expressions to variables *)
 

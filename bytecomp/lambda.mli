@@ -302,6 +302,7 @@ val transl_normal_path: Path.t -> lambda   (* Path.t is already normal *)
 val transl_path: ?loc:Location.t -> Env.t -> Path.t -> lambda
 val make_sequence: ('a -> lambda) -> 'a list -> lambda
 
+val map_lambda: (lambda -> lambda) -> lambda -> lambda
 val subst_lambda: lambda Ident.tbl -> lambda -> lambda
 val map : (lambda -> lambda) -> lambda -> lambda
 val bind : let_kind -> Ident.t -> lambda -> lambda -> lambda
