@@ -429,6 +429,8 @@ let rec unbox_float = function
   | Ctrywith(e1, id, e2) -> Ctrywith(unbox_float e1, id, unbox_float e2)
   | c -> Cop(Cload Double_u, [c])
 
+let ifloatoffloat c = Cop(Cifloatoffloat, [c])
+
 let rec floatofifloat = function
     Cop(Cifloatoffloat, [c]) -> c
   | Clet(id, exp, body) -> Clet(id, exp, floatofifloat body)
@@ -439,18 +441,6 @@ let rec floatofifloat = function
   | Ccatch(n, ids, e1, e2) -> Ccatch(n, ids, floatofifloat e1, floatofifloat e2)
   | Ctrywith(e1, id, e2) -> Ctrywith(floatofifloat e1, id, floatofifloat e2)
   | c -> Cop(Cfloatofifloat, [c])
-
-
-let rec ifloatoffloat = function
-    Cop(Cfloatofifloat, [c]) -> c
-  | Clet(id, exp, body) -> Clet(id, exp, ifloatoffloat body)
-  | Cifthenelse(cond, e1, e2) ->
-      Cifthenelse(cond, ifloatoffloat e1, ifloatoffloat e2)
-  | Csequence(e1, e2) -> Csequence(e1, ifloatoffloat e2)
-  | Cswitch(e, tbl, el) -> Cswitch(e, tbl, Array.map ifloatoffloat el)
-  | Ccatch(n, ids, e1, e2) -> Ccatch(n, ids, ifloatoffloat e1, ifloatoffloat e2)
-  | Ctrywith(e1, id, e2) -> Ctrywith(ifloatoffloat e1, id, ifloatoffloat e2)
-  | c -> Cop(Cifloatoffloat, [c])
 
 (* Complex *)
 
@@ -1216,6 +1206,7 @@ type unboxed_number_kind =
     No_unboxing
   | Boxed_float
   | Boxed_integer of boxed_integer
+  | Imm_float
 
 let rec is_unboxed_number = function
     Uconst(Uconst_ref(_, Uconst_float _)) ->
@@ -1226,6 +1217,7 @@ let rec is_unboxed_number = function
         | Pfloatfield _ -> Boxed_float
         | Pfloatofint -> Boxed_float
         | Pfloatofifloat -> Boxed_float
+        | Pifloatoffloat -> Imm_float
         | Pnegfloat -> Boxed_float
         | Pabsfloat -> Boxed_float
         | Paddfloat -> Boxed_float
@@ -1285,6 +1277,37 @@ let subst_boxed_number unbox_fn boxed_id unboxed_id box_chunk box_offset exp =
         if Ident.same id boxed_id && chunk = box_chunk && ofs = box_offset
         then Cvar unboxed_id
         else e
+    | Cop(op, argv) -> Cop(op, List.map subst argv)
+    | Csequence(e1, e2) -> Csequence(subst e1, subst e2)
+    | Cifthenelse(e1, e2, e3) -> Cifthenelse(subst e1, subst e2, subst e3)
+    | Cswitch(arg, index, cases) ->
+        Cswitch(subst arg, index, Array.map subst cases)
+    | Cloop e -> Cloop(subst e)
+    | Ccatch(nfail, ids, e1, e2) -> Ccatch(nfail, ids, subst e1, subst e2)
+    | Cexit (nfail, el) -> Cexit (nfail, List.map subst el)
+    | Ctrywith(e1, id, e2) -> Ctrywith(subst e1, id, subst e2)
+    | e -> e in
+  let res = subst exp in
+  (res, !need_boxed, !assigned)
+
+let subst_imm_float boxed_id unboxed_id exp =
+  let need_boxed = ref false in
+  let assigned = ref false in
+  let rec subst = function
+      Cvar id as e ->
+        if Ident.same id boxed_id then need_boxed := true; e
+    | Cop(Cfloatofifloat, [Cvar id]) as e ->
+        if Ident.same id boxed_id
+        then Cvar unboxed_id
+        else e
+    | Clet(id, arg, body) -> Clet(id, subst arg, subst body)
+    | Cassign(id, arg) ->
+        if Ident.same id boxed_id then begin
+          assigned := true;
+          Cassign(unboxed_id, subst(floatofifloat arg))
+        end else
+          Cassign(id, subst arg)
+    | Ctuple argv -> Ctuple(List.map subst argv)
     | Cop(op, argv) -> Cop(op, List.map subst argv)
     | Csequence(e1, e2) -> Csequence(subst e1, subst e2)
     | Cifthenelse(e1, e2, e3) -> Cifthenelse(subst e1, subst e2, subst e3)
@@ -1389,6 +1412,8 @@ let rec transl = function
                            (if bi = Pint32 then Thirtytwo_signed else Word)
                            size_addr
                            id exp body
+      | Imm_float ->
+          transl_ifloat_let id exp body
       end
   | Uletrec(bindings, body) ->
       transl_letrec bindings (transl body)
@@ -2040,6 +2065,9 @@ and transl_unbox_float = function
     Uconst(Uconst_ref(_, Uconst_float f)) -> Cconst_float f
   | exp -> unbox_float(transl exp)
 
+and transl_floatofifloat exp =
+    floatofifloat(transl exp)
+
 and transl_unbox_int bi = function
     Uconst(Uconst_ref(_, Uconst_int32 n)) ->
       Cconst_natint (Nativeint.of_int32 n)
@@ -2064,6 +2092,20 @@ and transl_unbox_let box_fn unbox_fn transl_unbox_fn box_chunk box_offset
          if need_boxed
          then Clet(id, box_fn(Cvar unboxed_id), trbody2)
          else trbody2)
+
+and transl_ifloat_let id exp body =
+  let unboxed_id = Ident.create (Ident.name id) in
+  let trbody1 = transl body in
+  let (trbody2, need_boxed, is_assigned) =
+    subst_imm_float id unboxed_id trbody1 in
+  if need_boxed && is_assigned then
+    Clet(id, transl exp, trbody1)
+  else
+    Clet(unboxed_id, transl_floatofifloat exp,
+         if need_boxed
+         then Clet(id, ifloatoffloat(Cvar unboxed_id), trbody2)
+         else trbody2)
+
 
 and make_catch ncatch body handler = match body with
 | Cexit (nexit,[]) when nexit=ncatch -> handler
