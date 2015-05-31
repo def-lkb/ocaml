@@ -61,6 +61,7 @@ type primitive =
   | Poffsetref of int
   (* Float operations *)
   | Pintoffloat | Pfloatofint
+  | Pfloatofifloat | Pifloatoffloat
   | Pnegfloat | Pabsfloat
   | Paddfloat | Psubfloat | Pmulfloat | Pdivfloat
   | Pfloatcomp of comparison

@@ -78,6 +78,7 @@ type operation =
   | Cnegf | Cabsf
   | Caddf | Csubf | Cmulf | Cdivf
   | Cfloatofint | Cintoffloat
+  | Cfloatofifloat | Cifloatoffloat
   | Ccmpf of comparison
   | Craise of Lambda.raise_kind * Debuginfo.t
   | Ccheckbound of Debuginfo.t

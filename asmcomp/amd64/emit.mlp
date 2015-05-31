@@ -540,6 +540,11 @@ let emit_instr fallthrough i =
         `	cvtsi2sdq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`
     | Lop(Iintoffloat) ->
         `	cvttsd2siq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`
+    | Lop(Ifloatofifloat) ->
+        `	psubw	{emit_symbol "caml_tagf_mask"}(%rip), {emit_reg i.res.(0)}\n`
+    | Lop(Iifloatoffloat) ->
+        `	paddw	{emit_symbol "caml_tagf_mask"}(%rip), {emit_reg i.arg.(0)}\n`;
+        `	movq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`
     | Lop(Ispecific(Ilea addr)) ->
         `	leaq	{emit_addressing addr i.arg 0}, {emit_reg i.res.(0)}\n`
     | Lop(Ispecific(Istore_int(n, addr, _))) ->
@@ -799,7 +804,9 @@ let begin_assembly() =
     emit_align 16;
     `{emit_symbol "caml_negf_mask"}:	.quad   0x8000000000000000, 0\n`;
     emit_align 16;
-    `{emit_symbol "caml_absf_mask"}:	.quad   0x7FFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF\n`
+    `{emit_symbol "caml_absf_mask"}:	.quad   0x7FFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF\n`;
+    emit_align 16;
+    `{emit_symbol "caml_tagf_mask"}:	.quad   0x0001000000000000, 0\n`
   end;
   let lbl_begin = Compilenv.make_symbol (Some "data_begin") in
   `	.data\n`;

@@ -181,6 +181,8 @@ let primitives_table = create_hashtable 57 [
   "%decr", Poffsetref(-1);
   "%intoffloat", Pintoffloat;
   "%floatofint", Pfloatofint;
+  "%ifloatoffloat", Pifloatoffloat;
+  "%floatofifloat", Pfloatofifloat;
   "%negfloat", Pnegfloat;
   "%absfloat", Pabsfloat;
   "%addfloat", Paddfloat;

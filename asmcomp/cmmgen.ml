@@ -429,6 +429,29 @@ let rec unbox_float = function
   | Ctrywith(e1, id, e2) -> Ctrywith(unbox_float e1, id, unbox_float e2)
   | c -> Cop(Cload Double_u, [c])
 
+let rec floatofifloat = function
+    Cop(Cifloatoffloat, [c]) -> c
+  | Clet(id, exp, body) -> Clet(id, exp, floatofifloat body)
+  | Cifthenelse(cond, e1, e2) ->
+      Cifthenelse(cond, floatofifloat e1, floatofifloat e2)
+  | Csequence(e1, e2) -> Csequence(e1, floatofifloat e2)
+  | Cswitch(e, tbl, el) -> Cswitch(e, tbl, Array.map floatofifloat el)
+  | Ccatch(n, ids, e1, e2) -> Ccatch(n, ids, floatofifloat e1, floatofifloat e2)
+  | Ctrywith(e1, id, e2) -> Ctrywith(floatofifloat e1, id, floatofifloat e2)
+  | c -> Cop(Cfloatofifloat, [c])
+
+
+let rec ifloatoffloat = function
+    Cop(Cfloatofifloat, [c]) -> c
+  | Clet(id, exp, body) -> Clet(id, exp, ifloatoffloat body)
+  | Cifthenelse(cond, e1, e2) ->
+      Cifthenelse(cond, ifloatoffloat e1, ifloatoffloat e2)
+  | Csequence(e1, e2) -> Csequence(e1, ifloatoffloat e2)
+  | Cswitch(e, tbl, el) -> Cswitch(e, tbl, Array.map ifloatoffloat el)
+  | Ccatch(n, ids, e1, e2) -> Ccatch(n, ids, ifloatoffloat e1, ifloatoffloat e2)
+  | Ctrywith(e1, id, e2) -> Ctrywith(ifloatoffloat e1, id, ifloatoffloat e2)
+  | c -> Cop(Cifloatoffloat, [c])
+
 (* Complex *)
 
 let box_complex c_re c_im =
@@ -1202,6 +1225,7 @@ let rec is_unboxed_number = function
           Pccall p -> if p.prim_native_float then Boxed_float else No_unboxing
         | Pfloatfield _ -> Boxed_float
         | Pfloatofint -> Boxed_float
+        | Pfloatofifloat -> Boxed_float
         | Pnegfloat -> Boxed_float
         | Pabsfloat -> Boxed_float
         | Paddfloat -> Boxed_float
@@ -1595,6 +1619,10 @@ and transl_prim_1 p arg dbg =
       box_float(Cop(Cnegf, [transl_unbox_float arg]))
   | Pabsfloat ->
       box_float(Cop(Cabsf, [transl_unbox_float arg]))
+  | Pfloatofifloat ->
+      box_float(floatofifloat (transl arg))
+  | Pifloatoffloat ->
+      ifloatoffloat (transl_unbox_float arg)
   (* String operations *)
   | Pstringlength ->
       tag_int(string_length (transl arg))

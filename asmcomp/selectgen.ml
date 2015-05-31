@@ -40,6 +40,8 @@ let oper_result_type = function
   | Cnegf | Cabsf | Caddf | Csubf | Cmulf | Cdivf -> typ_float
   | Cfloatofint -> typ_float
   | Cintoffloat -> typ_int
+  | Cfloatofifloat -> typ_float
+  | Cifloatoffloat -> typ_addr
   | Craise _ -> typ_void
   | Ccheckbound _ -> typ_void
 
@@ -287,6 +289,8 @@ method select_operation op args =
   | (Cdivf, _) -> (Idivf, args)
   | (Cfloatofint, _) -> (Ifloatofint, args)
   | (Cintoffloat, _) -> (Iintoffloat, args)
+  | (Cfloatofifloat, _) -> (Ifloatofifloat, args)
+  | (Cifloatoffloat, _) -> (Iifloatoffloat, args)
   | (Ccheckbound _, _) -> self#select_arith Icheckbound args
   | _ -> fatal_error "Selection.select_oper"
 

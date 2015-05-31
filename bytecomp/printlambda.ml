@@ -139,6 +139,8 @@ let primitive ppf = function
   | Poffsetref n -> fprintf ppf "+:=%i"n
   | Pintoffloat -> fprintf ppf "int_of_float"
   | Pfloatofint -> fprintf ppf "float_of_int"
+  | Pfloatofifloat -> fprintf ppf "float_of_ifloat"
+  | Pifloatoffloat -> fprintf ppf "ifloat_of_float"
   | Pnegfloat -> fprintf ppf "~."
   | Pabsfloat -> fprintf ppf "abs."
   | Paddfloat -> fprintf ppf "+."
