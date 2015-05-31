@@ -64,7 +64,14 @@ typedef uintnat mark_t;
 
 /* Longs vs blocks. */
 #define Is_long(x)   (((x) & 1) != 0)
+
+#ifdef ARCH_SIXTYFOUR
+#define Is_block(x)  (((x) & 0xFFFF000000000001) == 0)
+
+#else
 #define Is_block(x)  (((x) & 1) == 0)
+
+#endif
 
 /* Conversion macro names are always of the form  "to_from". */
 /* Example: Val_long as in "Val from long" or "Val of long". */
