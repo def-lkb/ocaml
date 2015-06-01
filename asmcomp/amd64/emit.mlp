@@ -541,16 +541,17 @@ let emit_instr fallthrough i =
     | Lop(Iintoffloat) ->
         `	cvttsd2siq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`
     | Lop(Ifloatofifloat) ->
+        `	movq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`;
         `	xorpd	{emit_symbol "caml_tagf_mask"}(%rip), {emit_reg i.res.(0)}\n`
     | Lop(Iifloatoffloat) ->
         `	xorpd	{emit_symbol "caml_tagf_mask"}(%rip), {emit_reg i.arg.(0)}\n`;
         `	movq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`
     | Lop(Ifloatofpfloat) ->
-        (*FIXME: properly allocate a free register *) 
-        `	movapd	{emit_reg i.res.(0)}, %xmm7\n`;
+        `	movq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`;
+        `	movq	{emit_reg i.res.(0)}, %xmm7\n`;
         `	psrad	$63, %xmm7\n`;
         `	pslld	$1, %xmm7\n`;
-        `	xorpd	%xmm7, {emit_reg i.res.(0)}\n`;
+        `	pxor	%xmm7, {emit_reg i.res.(0)}\n`;
         `	psubw	{emit_symbol "caml_tagf_shift"}(%rip), {emit_reg i.res.(0)}\n`
     | Lop(Ipfloatoffloat) ->
         `	movapd	{emit_reg i.arg.(0)}, %xmm7\n`;

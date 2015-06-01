@@ -487,6 +487,69 @@ CAMLprim value caml_classify_float(value vd)
 #endif
 }
 
+/* Slow but compatible */
+#ifdef ARCH_SIXTYFOUR
+
+#define NAN_TAGF_MASK  0xFFFF000000000000LL
+#define NAN_TAGF_SHIFT 0x0001000000000000LL
+
+union double_cast {
+  intnat n;
+  double d;
+};
+
+CAMLprim value caml_float_of_ifloat(value n)
+{
+  union double_cast cast;
+  cast.n = (intnat)n ^ NAN_TAGF_MASK;
+  return caml_copy_double(cast.d);
+}
+
+CAMLprim value caml_ifloat_of_float(value n)
+{
+  union double_cast cast;
+  cast.d = Double_val(n);
+  return (value)(cast.n ^ NAN_TAGF_MASK);
+}
+
+CAMLprim value caml_float_of_pfloat(value n)
+{
+  union double_cast cast;
+  cast.n = (intnat)n - NAN_TAGF_MASK;
+  return caml_copy_double(cast.d);
+}
+
+CAMLprim value caml_pfloat_of_float(value n)
+{
+  union double_cast cast;
+  cast.d = Double_val(n);
+  return (value)(cast.n + NAN_TAGF_SHIFT);
+}
+
+#else
+
+CAMLprim value caml_float_of_ifloat(value n)
+{
+  return n;
+}
+
+CAMLprim value caml_ifloat_of_float(value n)
+{
+  return n;
+}
+
+CAMLprim value caml_float_of_pfloat(value n)
+{
+  return n;
+}
+
+CAMLprim value caml_pfloat_of_float(value n)
+{
+  return n;
+}
+
+#endif
+
 /* The [caml_init_ieee_float] function should initialize floating-point hardware
    so that it behaves as much as possible like the IEEE standard.
    In particular, return special numbers like Infinity and NaN instead

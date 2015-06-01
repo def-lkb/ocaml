@@ -323,6 +323,10 @@ let comp_primitive p args =
   | Poffsetref n -> Koffsetref n
   | Pintoffloat -> Kccall("caml_int_of_float", 1)
   | Pfloatofint -> Kccall("caml_float_of_int", 1)
+  | Pfloatofifloat -> Kccall("caml_float_of_ifloat", 1)
+  | Pifloatoffloat -> Kccall("caml_ifloat_of_float", 1)
+  | Pfloatofpfloat -> Kccall("caml_float_of_pfloat", 1)
+  | Ppfloatoffloat -> Kccall("caml_pfloat_of_float", 1)
   | Pnegfloat -> Kccall("caml_neg_float", 1)
   | Pabsfloat -> Kccall("caml_abs_float", 1)
   | Paddfloat -> Kccall("caml_add_float", 2)
