@@ -109,6 +109,13 @@ let pseudoregs_for_operation op arg res =
       ([| rax; rcx |], [| rax |])
   | Iintop(Imod) ->
       ([| rax; rcx |], [| rdx |])
+
+  (* Pfloat instructions will clobber a register, force rax and rdx  *)
+  | Ifloatofpfloat ->
+      ([|rax|], [|res.(0); rdx|])
+  | Ipfloatoffloat ->
+      (arg, [|res.(0); rdx|])
+
   (* Other instructions are regular *)
   | _ -> raise Use_default
 

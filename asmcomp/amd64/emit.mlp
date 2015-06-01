@@ -547,19 +547,19 @@ let emit_instr fallthrough i =
         `	movq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`;
         `	xorq	{emit_symbol "caml_tagf_mask"}(%rip), {emit_reg i.res.(0)}\n`;
     | Lop(Ifloatofpfloat) ->
-        `	movq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`;
-        `	movq	{emit_reg i.res.(0)}, %xmm7\n`;
-        `	psrad	$63, %xmm7\n`;
-        `	pslld	$1, %xmm7\n`;
-        `	pxor	%xmm7, {emit_reg i.res.(0)}\n`;
-        `	psubw	{emit_symbol "caml_tagf_shift"}(%rip), {emit_reg i.res.(0)}\n`
+        `	movq	{emit_reg i.arg.(0)}, {emit_reg i.res.(1)}\n`;
+        `	sarq	$63, {emit_reg i.res.(1)}\n`;
+        `	shrq	$1, {emit_reg i.res.(1)}\n`;
+        `	xorq	{emit_reg i.arg.(0)}, {emit_reg i.res.(1)}\n`;
+        ` subq  {emit_symbol "caml_tagf_shift"}(%rip), {emit_reg i.res.(1)}\n`;
+        `	movq	{emit_reg i.res.(1)}, {emit_reg i.res.(0)}\n`
     | Lop(Ipfloatoffloat) ->
-        `	movapd	{emit_reg i.arg.(0)}, %xmm7\n`;
-        `	paddw	{emit_symbol "caml_tagf_shift"}(%rip), {emit_reg i.arg.(0)}\n`;
-        `	psrad	$63, %xmm7\n`;
-        `	pslld	$1, %xmm7\n`;
-        `	pxor	%xmm7, {emit_reg i.arg.(0)}\n`;
-        `	movq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`
+        `	movq	{emit_reg i.arg.(0)}, {emit_reg i.res.(1)}\n`;
+        `	addq	{emit_symbol "caml_tagf_shift"}(%rip), {emit_reg i.res.(1)}\n`;
+        `	movq	{emit_reg i.res.(1)}, {emit_reg i.res.(0)}\n`;
+        `	sarq	$63, {emit_reg i.res.(1)}\n`;
+        `	shrq	$1, {emit_reg i.res.(1)}\n`;
+        `	xorq	{emit_reg i.res.(1)}, {emit_reg i.res.(0)}\n`;
     | Lop(Ispecific(Ilea addr)) ->
         `	leaq	{emit_addressing addr i.arg 0}, {emit_reg i.res.(0)}\n`
     | Lop(Ispecific(Istore_int(n, addr, _))) ->
@@ -823,7 +823,7 @@ let begin_assembly() =
     emit_align 16;
     `{emit_symbol "caml_tagf_mask"}:	.quad   0xFFFF000000000000, 0\n`;
     emit_align 16;
-    `{emit_symbol "caml_tagf_shift"}:	.quad   0x0001000000000000, 0\n`
+    `{emit_symbol "caml_tagf_shift"}:	.quad   0x0007000000000000, 0\n`
   end;
   let lbl_begin = Compilenv.make_symbol (Some "data_begin") in
   `	.data\n`;
