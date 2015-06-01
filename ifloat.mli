@@ -1,4 +1,4 @@
-type ifloat and t = ifloat
+type ifloat = private int and t = ifloat
 
 external to_float : ifloat -> float = "%floatofifloat"
 external of_float : float -> ifloat = "%ifloatoffloat"

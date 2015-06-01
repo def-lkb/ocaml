@@ -1,5 +1,5 @@
 (* Make the compiler think its immediate *)
-type ifloat = private Ifloat
+type ifloat = private int
 type t = ifloat
 
 external to_float : ifloat -> float = "%floatofifloat"

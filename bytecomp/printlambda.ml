@@ -162,8 +162,14 @@ let primitive ppf = function
   | Pmakearray _ -> fprintf ppf "makearray "
   | Parrayrefu _ -> fprintf ppf "array.unsafe_get"
   | Parraysetu _ -> fprintf ppf "array.unsafe_set"
-  | Parrayrefs _ -> fprintf ppf "array.get"
-  | Parraysets _ -> fprintf ppf "array.set"
+  | Parrayrefs Pgenarray -> fprintf ppf "array.get[gen]"
+  | Parrayrefs Paddrarray -> fprintf ppf "array.get[addr]"
+  | Parrayrefs Pfloatarray -> fprintf ppf "array.get[float]"
+  | Parrayrefs Pintarray -> fprintf ppf "array.get[int]"
+  | Parraysets Pgenarray -> fprintf ppf "array.set[gen]"
+  | Parraysets Paddrarray -> fprintf ppf "array.set[addr]"
+  | Parraysets Pfloatarray -> fprintf ppf "array.set[float]"
+  | Parraysets Pintarray -> fprintf ppf "array.set[int]"
   | Pctconst c ->
      let const_name = match c with
        | Big_endian -> "big_endian"
