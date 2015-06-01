@@ -542,10 +542,10 @@ let emit_instr fallthrough i =
         `	cvttsd2siq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`
     | Lop(Ifloatofifloat) ->
         `	movq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`;
-        `	xorpd	{emit_symbol "caml_tagf_mask"}(%rip), {emit_reg i.res.(0)}\n`
+        `	pxor  {emit_symbol "caml_tagf_mask"}(%rip), {emit_reg i.res.(0)}\n`;
     | Lop(Iifloatoffloat) ->
-        `	xorpd	{emit_symbol "caml_tagf_mask"}(%rip), {emit_reg i.arg.(0)}\n`;
-        `	movq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`
+        `	movq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`;
+        `	xorq	{emit_symbol "caml_tagf_mask"}(%rip), {emit_reg i.res.(0)}\n`;
     | Lop(Ifloatofpfloat) ->
         `	movq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`;
         `	movq	{emit_reg i.res.(0)}, %xmm7\n`;
@@ -558,7 +558,7 @@ let emit_instr fallthrough i =
         `	paddw	{emit_symbol "caml_tagf_shift"}(%rip), {emit_reg i.arg.(0)}\n`;
         `	psrad	$63, %xmm7\n`;
         `	pslld	$1, %xmm7\n`;
-        `	xorpd	%xmm7, {emit_reg i.arg.(0)}\n`;
+        `	pxor	%xmm7, {emit_reg i.arg.(0)}\n`;
         `	movq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`
     | Lop(Ispecific(Ilea addr)) ->
         `	leaq	{emit_addressing addr i.arg 0}, {emit_reg i.res.(0)}\n`
