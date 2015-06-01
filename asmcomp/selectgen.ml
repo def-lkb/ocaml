@@ -41,7 +41,7 @@ let oper_result_type = function
   | Cfloatofint -> typ_float
   | Cintoffloat -> typ_int
   | Cfloatofifloat -> typ_float
-  | Cifloatoffloat -> typ_addr
+  | Cifloatoffloat -> typ_int
   | Craise _ -> typ_void
   | Ccheckbound _ -> typ_void
 
