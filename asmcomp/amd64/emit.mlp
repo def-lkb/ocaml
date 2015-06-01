@@ -551,7 +551,7 @@ let emit_instr fallthrough i =
         `	sarq	$63, {emit_reg i.res.(1)}\n`;
         `	shrq	$1, {emit_reg i.res.(1)}\n`;
         `	xorq	{emit_reg i.arg.(0)}, {emit_reg i.res.(1)}\n`;
-        ` subq  {emit_symbol "caml_tagf_shift"}(%rip), {emit_reg i.res.(1)}\n`;
+        `	subq	{emit_symbol "caml_tagf_shift"}(%rip), {emit_reg i.res.(1)}\n`;
         `	movq	{emit_reg i.res.(1)}, {emit_reg i.res.(0)}\n`
     | Lop(Ipfloatoffloat) ->
         `	movq	{emit_reg i.arg.(0)}, {emit_reg i.res.(1)}\n`;
