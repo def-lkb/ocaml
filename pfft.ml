@@ -9,7 +9,7 @@
 (*  under the terms of the Q Public License version 1.0.               *)
 (*                                                                     *)
 (***********************************************************************)
-open Ifloat
+open Pfloat
 
 let pi = of_float 3.14159265358979323846
 
