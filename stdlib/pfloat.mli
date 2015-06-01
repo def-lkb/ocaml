@@ -4,6 +4,8 @@ external to_float : pfloat -> float = "%floatofpfloat"
 external of_float : float -> pfloat = "%pfloatoffloat"
 val ( +. )    : pfloat -> pfloat -> pfloat
 val ( -. )    : pfloat -> pfloat -> pfloat
+val (~+. )    : pfloat -> pfloat
+val (~-. )    : pfloat -> pfloat
 val ( *. )    : pfloat -> pfloat -> pfloat
 val ( /. )    : pfloat -> pfloat -> pfloat
 val ( ** )    : pfloat -> pfloat -> pfloat

@@ -4,6 +4,8 @@ external to_float : ifloat -> float = "%floatofifloat"
 external of_float : float -> ifloat = "%ifloatoffloat"
 val ( +. )    : ifloat -> ifloat -> ifloat
 val ( -. )    : ifloat -> ifloat -> ifloat
+val (~+. )    : ifloat -> ifloat
+val (~-. )    : ifloat -> ifloat
 val ( *. )    : ifloat -> ifloat -> ifloat
 val ( /. )    : ifloat -> ifloat -> ifloat
 val ( ** )    : ifloat -> ifloat -> ifloat

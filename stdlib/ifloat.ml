@@ -7,6 +7,8 @@ external of_float : float -> ifloat = "%ifloatoffloat"
 
 let ( +. ) a b = of_float (to_float a +. to_float b)
 let ( -. ) a b = of_float (to_float a -. to_float b)
+let (~+. ) a   = of_float (~+. (to_float a))
+let (~-. ) a   = of_float (~-. (to_float a))
 let ( *. ) a b = of_float (to_float a *. to_float b)
 let ( /. ) a b = of_float (to_float a /. to_float b)
 let ( ** ) a b = of_float (to_float a ** to_float b)
