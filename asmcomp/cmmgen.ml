@@ -429,7 +429,9 @@ let rec unbox_float = function
   | Ctrywith(e1, id, e2) -> Ctrywith(unbox_float e1, id, unbox_float e2)
   | c -> Cop(Cload Double_u, [c])
 
-let ifloatoffloat c = Cop(Cifloatoffloat, [c])
+let ifloatoffloat = function
+  | Cop(Cfloatofifloat, [c]) -> c
+  | c -> Cop(Cifloatoffloat, [c])
 
 let rec floatofifloat = function
     Cop(Cifloatoffloat, [c]) -> c
@@ -442,7 +444,9 @@ let rec floatofifloat = function
   | Ctrywith(e1, id, e2) -> Ctrywith(floatofifloat e1, id, floatofifloat e2)
   | c -> Cop(Cfloatofifloat, [c])
 
-let pfloatoffloat c = Cop(Cpfloatoffloat, [c])
+let pfloatoffloat = function
+  | Cop(Cfloatofpfloat, [c]) -> c
+  | c -> Cop(Cpfloatoffloat, [c])
 
 let rec floatofpfloat = function
     Cop(Cpfloatoffloat, [c]) -> c
