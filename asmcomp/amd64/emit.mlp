@@ -545,6 +545,20 @@ let emit_instr fallthrough i =
     | Lop(Iifloatoffloat) ->
         `	xorpd	{emit_symbol "caml_tagf_mask"}(%rip), {emit_reg i.arg.(0)}\n`;
         `	movq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`
+    | Lop(Ifloatofpfloat) ->
+        (*FIXME: properly allocate a free register *) 
+        `	movapd	{emit_reg i.res.(0)}, %xmm7\n`;
+        `	psrad	$63, %xmm7\n`;
+        `	pslld	$1, %xmm7\n`;
+        `	xorpd	%xmm7, {emit_reg i.res.(0)}\n`;
+        `	psubw	{emit_symbol "caml_tagf_shift"}(%rip), {emit_reg i.res.(0)}\n`
+    | Lop(Ipfloatoffloat) ->
+        `	movapd	{emit_reg i.arg.(0)}, %xmm7\n`;
+        `	paddw	{emit_symbol "caml_tagf_shift"}(%rip), {emit_reg i.arg.(0)}\n`;
+        `	psrad	$63, %xmm7\n`;
+        `	pslld	$1, %xmm7\n`;
+        `	xorpd	%xmm7, {emit_reg i.arg.(0)}\n`;
+        `	movq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`
     | Lop(Ispecific(Ilea addr)) ->
         `	leaq	{emit_addressing addr i.arg 0}, {emit_reg i.res.(0)}\n`
     | Lop(Ispecific(Istore_int(n, addr, _))) ->
@@ -806,7 +820,9 @@ let begin_assembly() =
     emit_align 16;
     `{emit_symbol "caml_absf_mask"}:	.quad   0x7FFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF\n`;
     emit_align 16;
-    `{emit_symbol "caml_tagf_mask"}:	.quad   0xFFFF000000000000, 0\n`
+    `{emit_symbol "caml_tagf_mask"}:	.quad   0xFFFF000000000000, 0\n`;
+    emit_align 16;
+    `{emit_symbol "caml_tagf_shift"}:	.quad   0x0001000000000000, 0\n`
   end;
   let lbl_begin = Compilenv.make_symbol (Some "data_begin") in
   `	.data\n`;

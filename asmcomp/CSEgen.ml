@@ -199,6 +199,7 @@ method class_of_operation op =
   | Inegf | Iabsf | Iaddf | Isubf | Imulf | Idivf
   | Ifloatofint | Iintoffloat -> Op_pure
   | Ifloatofifloat | Iifloatoffloat -> Op_pure
+  | Ifloatofpfloat | Ipfloatoffloat -> Op_pure
   | Ispecific _ -> Op_other
 
 (* Operations that are so cheap that it isn't worth factoring them. *)

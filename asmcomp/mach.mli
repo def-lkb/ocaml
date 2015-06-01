@@ -54,6 +54,7 @@ type operation =
   | Inegf | Iabsf | Iaddf | Isubf | Imulf | Idivf
   | Ifloatofint | Iintoffloat
   | Ifloatofifloat | Iifloatoffloat
+  | Ifloatofpfloat | Ipfloatoffloat
   | Ispecific of Arch.specific_operation
 
 type instruction =

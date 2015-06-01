@@ -139,6 +139,8 @@ let operation op arg ppf res =
   | Iintoffloat -> fprintf ppf "intoffloat %a" reg arg.(0)
   | Ifloatofifloat -> fprintf ppf "floatofifloat %a" reg arg.(0)
   | Iifloatoffloat -> fprintf ppf "ifloatoffloat %a" reg arg.(0)
+  | Ifloatofpfloat -> fprintf ppf "floatofpfloat %a" reg arg.(0)
+  | Ipfloatoffloat -> fprintf ppf "pfloatoffloat %a" reg arg.(0)
   | Ispecific op ->
       Arch.print_specific_operation reg op ppf arg
 

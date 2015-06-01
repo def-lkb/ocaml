@@ -83,6 +83,8 @@ let operation = function
   | Cintoffloat -> "intoffloat"
   | Cfloatofifloat -> "floatofifloat"
   | Cifloatoffloat -> "ifloatoffloat"
+  | Cfloatofpfloat -> "floatofpfloat"
+  | Cpfloatoffloat -> "pfloatoffloat"
   | Ccmpf c -> Printf.sprintf "%sf" (comparison c)
   | Craise (k, d) -> Lambda.raise_kind k ^ Debuginfo.to_string d
   | Ccheckbound d -> "checkbound" ^ Debuginfo.to_string d

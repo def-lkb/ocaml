@@ -62,6 +62,7 @@ type primitive =
   (* Float operations *)
   | Pintoffloat | Pfloatofint
   | Pfloatofifloat | Pifloatoffloat
+  | Pfloatofpfloat | Ppfloatoffloat
   | Pnegfloat | Pabsfloat
   | Paddfloat | Psubfloat | Pmulfloat | Pdivfloat
   | Pfloatcomp of comparison

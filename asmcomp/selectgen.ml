@@ -42,6 +42,8 @@ let oper_result_type = function
   | Cintoffloat -> typ_int
   | Cfloatofifloat -> typ_float
   | Cifloatoffloat -> typ_int
+  | Cfloatofpfloat -> typ_float
+  | Cpfloatoffloat -> typ_int
   | Craise _ -> typ_void
   | Ccheckbound _ -> typ_void
 
@@ -291,6 +293,8 @@ method select_operation op args =
   | (Cintoffloat, _) -> (Iintoffloat, args)
   | (Cfloatofifloat, _) -> (Ifloatofifloat, args)
   | (Cifloatoffloat, _) -> (Iifloatoffloat, args)
+  | (Cfloatofpfloat, _) -> (Ifloatofpfloat, args)
+  | (Cpfloatoffloat, _) -> (Ipfloatoffloat, args)
   | (Ccheckbound _, _) -> self#select_arith Icheckbound args
   | _ -> fatal_error "Selection.select_oper"
 

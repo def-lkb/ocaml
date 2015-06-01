@@ -141,6 +141,8 @@ let primitive ppf = function
   | Pfloatofint -> fprintf ppf "float_of_int"
   | Pfloatofifloat -> fprintf ppf "float_of_ifloat"
   | Pifloatoffloat -> fprintf ppf "ifloat_of_float"
+  | Pfloatofpfloat -> fprintf ppf "float_of_pfloat"
+  | Ppfloatoffloat -> fprintf ppf "pfloat_of_float"
   | Pnegfloat -> fprintf ppf "~."
   | Pabsfloat -> fprintf ppf "abs."
   | Paddfloat -> fprintf ppf "+."
