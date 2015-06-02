@@ -687,6 +687,14 @@ G(caml_negf_mask):
         .align  SIXTEEN_ALIGN
 G(caml_absf_mask):
         .quad   0x7FFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF
+        .globl  G(caml_tagf_mask)
+        .align  SIXTEEN_ALIGN
+G(caml_tagf_mask):
+        .quad   0xFFFF000000000000, 0
+        .globl  G(caml_tagf_shift)
+        .align  SIXTEEN_ALIGN
+G(caml_tagf_shift):
+        .quad   0x0007000000000000, 0
 
 #if defined(SYS_linux)
     /* Mark stack as non-executable, PR#4564 */
