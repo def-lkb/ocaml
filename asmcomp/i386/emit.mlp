@@ -30,6 +30,8 @@ let fastcode_flag = ref true
 
 let stack_offset = ref 0
 
+let frame_offset = 4
+
 (* Layout of the stack frame *)
 
 let frame_size () =                     (* includes return address *)
@@ -682,6 +684,12 @@ let emit_instr fallthrough i =
         `	addl	$8, %esp\n`;
         cfi_adjust_cfa_offset (-8);
         stack_offset := !stack_offset + 8
+    | Lop(Iretaddr) ->
+        ` movl {emit_int (frame_size() - frame_offset)}(%esp), {emit_reg i.res.(0)}\n`
+    | Lop(Idebuginfo dbg) ->
+        emit_debug_info dbg;
+        let lbl = new_label() in
+        `{emit_label lbl}:	lea	{emit_label lbl}, {emit_reg i.res.(0)}\n`
     | Lop(Ispecific(Ilea addr)) ->
         `	lea	{emit_addressing addr i.arg 0}, {emit_reg i.res.(0)}\n`
     | Lop(Ispecific(Istore_int(n, addr, _))) ->
