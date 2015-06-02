@@ -242,6 +242,9 @@ val bind : let_kind -> Ident.t -> lambda -> lambda -> lambda
 val commute_comparison : comparison -> comparison
 val negate_comparison : comparison -> comparison
 
+val pack_field : Types.label_description -> lambda -> lambda
+val unpack_field : Types.label_description -> lambda -> lambda
+
 (***********************)
 (* For static failures *)
 (***********************)

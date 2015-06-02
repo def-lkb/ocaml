@@ -82,6 +82,8 @@ type error =
   | Bad_fixed_type of string
   | Unbound_type_var_ext of type_expr * extension_constructor
   | Varying_anonymous
+  | Cannot_pack_not_float of string
+  | Cannot_pack_float_record of string
 
 exception Error of Location.t * error
 

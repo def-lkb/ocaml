@@ -1634,7 +1634,7 @@ let make_record_matching all_labels def = function
             match lbl.lbl_mut with
               Immutable -> Alias
             | Mutable -> StrictOpt in
-          (Lprim(access, [arg]), str) :: make_args(pos + 1)
+          (unpack_field lbl (Lprim(access, [arg])), str) :: make_args(pos + 1)
         end in
       let nfields = Array.length all_labels in
       let def= make_default (matcher_record nfields) def in

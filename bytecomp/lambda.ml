@@ -520,6 +520,16 @@ and negate_comparison = function
 | Clt -> Cge | Cle -> Cgt
 | Cgt -> Cle | Cge -> Clt
 
+let unpack_field lbl exp =
+  if Datarepr.has_packed_attribute lbl.Types.lbl_attributes
+  then Lprim (Pfloatofifloat, [exp])
+  else exp
+
+let pack_field lbl exp =
+  if Datarepr.has_packed_attribute lbl.Types.lbl_attributes
+  then Lprim (Pifloatoffloat, [exp])
+  else exp
+
 let raise_kind = function
   | Raise_regular -> "raise"
   | Raise_reraise -> "reraise"

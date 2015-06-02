@@ -120,6 +120,7 @@ type type_mismatch =
   | Field_arity of Ident.t
   | Field_names of int * Ident.t * Ident.t
   | Field_missing of bool * Ident.t
+  | Field_representation of Ident.t
   | Record_representation of bool
 
 let report_type_mismatch0 first second decl ppf err =
@@ -143,6 +144,9 @@ let report_type_mismatch0 first second decl ppf err =
   | Field_missing (b, s) ->
       pr "The field %s is only present in %s %s"
         (Ident.name s) (if b then second else first) decl
+  | Field_representation s ->
+      pr "The representions of field %s differ"
+        (Ident.name s)
   | Record_representation b ->
       pr "Their internal representations differ:@ %s %s %s"
         (if b then second else first) decl
@@ -186,15 +190,18 @@ let rec compare_records env decl1 decl2 n labels1 labels2 =
     [], []           -> []
   | [], l::_ -> [Field_missing (true, l.ld_id)]
   | l::_, [] -> [Field_missing (false, l.ld_id)]
-  | {Types.ld_id=lab1; ld_mutable=mut1; ld_type=arg1}::rem1,
-    {Types.ld_id=lab2; ld_mutable=mut2; ld_type=arg2}::rem2 ->
+  | {Types.ld_id=lab1; ld_mutable=mut1; ld_type=arg1; ld_attributes=lat1}::rem1,
+    {Types.ld_id=lab2; ld_mutable=mut2; ld_type=arg2; ld_attributes=lat2}::rem2 ->
       if Ident.name lab1 <> Ident.name lab2
       then [Field_names (n, lab1, lab2)]
       else if mut1 <> mut2 then [Field_mutable lab1] else
-      if Ctype.equal env true (arg1::decl1.type_params)
-                              (arg2::decl2.type_params)
-      then compare_records env decl1 decl2 (n+1) rem1 rem2
-      else [Field_type lab1]
+      if not (Ctype.equal env true (arg1::decl1.type_params)
+                (arg2::decl2.type_params))
+      then [Field_type lab1]
+      else if Datarepr.has_packed_attribute lat1 <>
+              Datarepr.has_packed_attribute lat2
+      then [Field_representation lab1]
+      else compare_records env decl1 decl2 (n+1) rem1 rem2
 
 let type_declarations ?(equality = false) env name decl1 id decl2 =
   if decl1.type_arity <> decl2.type_arity then [Arity] else

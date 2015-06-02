@@ -31,3 +31,5 @@ exception Constr_not_found
 val find_constr_by_tag:
   constructor_tag -> constructor_declaration list ->
     constructor_declaration
+
+val has_packed_attribute: Parsetree.attributes -> bool

@@ -782,13 +782,13 @@ and transl_exp0 e =
         match lbl.lbl_repres with
           Record_regular -> Pfield lbl.lbl_pos
         | Record_float -> Pfloatfield lbl.lbl_pos in
-      Lprim(access, [transl_exp arg])
+      unpack_field lbl (Lprim(access, [transl_exp arg]))
   | Texp_setfield(arg, _, lbl, newval) ->
       let access =
         match lbl.lbl_repres with
           Record_regular -> Psetfield(lbl.lbl_pos, maybe_pointer newval)
         | Record_float -> Psetfloatfield lbl.lbl_pos in
-      Lprim(access, [transl_exp arg; transl_exp newval])
+      Lprim(access, [transl_exp arg; pack_field lbl (transl_exp newval)])
   | Texp_array expr_list ->
       let kind = array_kind e in
       let ll = transl_list expr_list in
@@ -1086,11 +1086,12 @@ and transl_record all_labels repres lbl_expr_list opt_init_expr =
             match all_labels.(i).lbl_repres with
               Record_regular -> Pfield i
             | Record_float -> Pfloatfield i in
+          (* packed attribute representation doesn't matter here *)
           lv.(i) <- Lprim(access, [Lvar init_id])
         done
     end;
     List.iter
-      (fun (_, lbl, expr) -> lv.(lbl.lbl_pos) <- transl_exp expr)
+      (fun (_, lbl, expr) -> lv.(lbl.lbl_pos) <- pack_field lbl (transl_exp expr))
       lbl_expr_list;
     let ll = Array.to_list lv in
     let mut =
@@ -1124,7 +1125,7 @@ and transl_record all_labels repres lbl_expr_list opt_init_expr =
         match lbl.lbl_repres with
           Record_regular -> Psetfield(lbl.lbl_pos, maybe_pointer expr)
         | Record_float -> Psetfloatfield lbl.lbl_pos in
-      Lsequence(Lprim(upd, [Lvar copy_id; transl_exp expr]), cont) in
+      Lsequence(Lprim(upd, [Lvar copy_id; pack_field lbl (transl_exp expr)]), cont) in
     begin match opt_init_expr with
       None -> assert false
     | Some init_expr ->

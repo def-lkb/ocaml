@@ -164,3 +164,11 @@ let rec find_constr tag num_const num_nonconst = function
 
 let find_constr_by_tag tag cstrlist =
   find_constr tag 0 0 cstrlist
+
+let has_packed_attribute attributes =
+  let is_packed = function
+    | "packed" | "ocaml.packed" -> true
+    | _ -> false
+  in
+  List.exists (fun (name,_payload) -> is_packed name.Location.txt)
+    attributes

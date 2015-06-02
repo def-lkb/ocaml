@@ -45,6 +45,8 @@ type error =
   | Bad_fixed_type of string
   | Unbound_type_var_ext of type_expr * extension_constructor
   | Varying_anonymous
+  | Cannot_pack_not_float of string
+  | Cannot_pack_float_record of string
 
 open Typedtree
 
@@ -263,6 +265,17 @@ let transl_declaration env sdecl id =
           if List.for_all (fun l -> is_float env l.Types.ld_type) lbls'
           then Record_float
           else Record_regular in
+        List.iter (fun l ->
+            if Datarepr.has_packed_attribute l.Types.ld_attributes then
+              begin
+                if rep = Record_float then
+                  raise(Error(sdecl.ptype_loc,
+                              Cannot_pack_float_record (Ident.name l.Types.ld_id)))
+                else if not (is_float env l.Types.ld_type) then
+                  raise(Error(sdecl.ptype_loc,
+                              Cannot_pack_not_float (Ident.name l.Types.ld_id)))
+              end
+          ) lbls';
         Ttype_record lbls, Type_record(lbls', rep)
       | Ptype_open -> Ttype_open, Type_open
       in
@@ -1647,6 +1660,12 @@ let report_error ppf = function
       fprintf ppf "@[%s@ %s@ %s@]"
         "In this GADT definition," "the variance of some parameter"
         "cannot be checked"
+  | Cannot_pack_float_record lbl ->
+      fprintf ppf "[@packed] can't apply to field %s, \
+                   record already has float representation" lbl
+  | Cannot_pack_not_float lbl ->
+      fprintf ppf "[@packed] can't apply to field %s, \
+                   it is not storing float values" lbl
 
 let () =
   Location.register_error_of_exn
