@@ -192,3 +192,39 @@ let parse_implementation ppf ~tool_name sourcefile =
 let parse_interface ppf ~tool_name sourcefile =
   parse_all ~tool_name Parse.interface
     Config.ast_intf_magic_number ppf sourcefile
+
+(* REMOVE ME, work around camlp4haaaaaahahhhhh *)
+let is_packed_type =
+  let open Parsetree in
+  function
+  | {ptyp_desc = Ptyp_constr ({Location. txt = Longident.Lident "__packed__"}, [typ])} ->
+      Some typ
+  | _ -> None
+
+
+let hack_mapper =
+  let open Parsetree in
+  let type_declaration mapper decl =
+    match decl.ptype_kind with
+    | Ptype_record lbls ->
+        let adjust_lbl lbl =
+          match is_packed_type lbl.pld_type with
+          | None -> lbl
+          | Some pld_type ->
+              {lbl with pld_type;
+                        pld_attributes = (Location.mknoloc "packed", PStr [])
+                                         :: lbl.pld_attributes}
+        in
+        {decl with ptype_kind = Ptype_record (List.map adjust_lbl lbls)}
+    | _ -> decl
+  in
+  {Ast_mapper.default_mapper with
+   Ast_mapper.type_declaration}
+
+let parse_implementation ppf ~tool_name sourcefile =
+  hack_mapper.Ast_mapper.structure hack_mapper
+    (parse_implementation ppf ~tool_name sourcefile)
+
+let parse_interface ppf ~tool_name sourcefile =
+  hack_mapper.Ast_mapper.signature hack_mapper
+    (parse_interface ppf ~tool_name sourcefile)
