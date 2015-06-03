@@ -222,6 +222,19 @@ method! select_operation op args =
   (* AMD64 does not support immediate operands for multiply high signed *)
   | Cmulhi ->
       (Iintop Imulh, args)
+  (* Don't put floats that are going to be (en/de)coded and stored into xmm registers *)
+  | Cifloatoffloat ->
+      begin match args with
+      | [Cop (Cload Double_u, args')] ->
+          (Iifloatoffloat, [Cop (Cload Word, args')])
+      | _ -> super#select_operation op args
+      end
+  | Cstore Double_u ->
+      begin match args with
+      | [Cop (Cfloatofifloat, _)] ->
+         self#select_operation (Cstore Word) args
+      | _ -> super#select_operation op args
+      end
   | _ -> super#select_operation op args
 
 (* Recognize float arithmetic with mem *)

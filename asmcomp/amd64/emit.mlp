@@ -541,11 +541,21 @@ let emit_instr fallthrough i =
     | Lop(Iintoffloat) ->
         `	cvttsd2siq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`
     | Lop(Ifloatofifloat) ->
-        `	movq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`;
-        `	pxor  {emit_symbol "caml_tagf_mask"}(%rip), {emit_reg i.res.(0)}\n`;
+        let src = i.arg.(0) and dst = i.res.(0) in
+        begin match dst.typ with
+        | Float ->
+          `	movq	{emit_reg src}, {emit_reg dst}\n`;
+          `	pxor  {emit_symbol "caml_tagf_mask"}(%rip), {emit_reg dst}\n`;
+        | _ ->
+          if src.loc <> dst.loc then
+            `	movq	{emit_reg src}, {emit_reg dst}\n`;
+          `	xorq  {emit_symbol "caml_tagf_mask"}(%rip), {emit_reg dst}\n`;
+        end
     | Lop(Iifloatoffloat) ->
-        `	movq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`;
-        `	xorq	{emit_symbol "caml_tagf_mask"}(%rip), {emit_reg i.res.(0)}\n`;
+        let src = i.arg.(0) and dst = i.res.(0) in
+        if src.loc <> dst.loc then
+          `	movq	{emit_reg src}, {emit_reg dst}\n`;
+        `	xorq	{emit_symbol "caml_tagf_mask"}(%rip), {emit_reg dst}\n`;
     | Lop(Ifloatofpfloat) ->
         `	movq	{emit_reg i.arg.(0)}, {emit_reg i.res.(1)}\n`;
         `	sarq	$63, {emit_reg i.res.(1)}\n`;
