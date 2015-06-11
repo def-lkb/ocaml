@@ -476,3 +476,47 @@ void caml_extract_location_info(backtrace_slot slot, /*out*/ struct caml_loc_inf
   li->loc_startchr = event->ev_startchr;
   li->loc_endchr = event->ev_endchr;
 }
+
+/* Turn encoded retaddr into eventual location information */
+CAMLprim value caml_decode_retaddr(value retaddr)
+{
+  CAMLparam1(retaddr);
+  CAMLlocal3(result, block, fname);
+  struct caml_loc_info li;
+
+  if (!caml_debug_info_available())
+    result = Val_unit;
+  else
+  {
+    caml_extract_location_info(caml_raw_backtrace_slot_val(retaddr), &li);
+
+    if (li.loc_valid) {
+      fname = caml_copy_string(li.loc_filename);
+
+      block = caml_alloc_small(3, 0);
+      Field(block, 0) = fname;
+      Field(block, 1) = Val_int(li.loc_lnum);
+      Field(block, 2) = Val_int(li.loc_startchr);
+
+      result = caml_alloc_small(1, 0);
+      Field(result, 0) = block;
+
+    } else {
+      result = Val_unit;
+    }
+  }
+  CAMLreturn(result);
+}
+
+/* Get return address */
+CAMLprim value caml_get_retaddr(value unit)
+{
+  CAMLparam1(unit);
+
+  /* caml_extern_sp is the immediate caller, go back one step */
+  value *sp = caml_extern_sp;
+  value *trsp = caml_trapsp;
+  code_t p = caml_next_frame_pointer(&sp, &trsp);
+
+  CAMLreturn(caml_val_raw_backtrace_slot(p));
+}
