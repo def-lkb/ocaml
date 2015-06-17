@@ -204,11 +204,21 @@ CAMLprim value caml_get_current_callstack(value max_frames_value) {
 
 /* Extract location information for the given frame descriptor */
 
+static void *deref_rel(int32 *ptr, int offset)
+{
+  ptr += offset;
+  if (*ptr == 0)
+    return NULL;
+  else
+    return (char*)ptr + *ptr;
+}
+
 CAMLexport void extract_location_info(frame_descr * d,
                                   /*out*/ struct caml_loc_info * li)
 {
   uintnat infoptr;
   uint32 info1, info2;
+  void *next_cell;
 
   /* If no debugging information available, print nothing.
      When everything is compiled with -g, this corresponds to
@@ -216,6 +226,7 @@ CAMLexport void extract_location_info(frame_descr * d,
   if ((d->frame_size & 1) == 0) {
     li->loc_valid = 0;
     li->loc_is_raise = 1;
+    li->loc_is_inlined = 0;
     return;
   }
   /* Recover debugging info */
@@ -236,7 +247,55 @@ CAMLexport void extract_location_info(frame_descr * d,
      b (10 bits): end of character range */
   li->loc_valid = 1;
   li->loc_is_raise = (info1 & 3) != 0;
-  li->loc_filename = (char *) infoptr + (info1 & 0x3FFFFFC);
+  li->loc_is_inlined = 0;
+
+  next_cell = (char *)infoptr + (info1 & 0x3FFFFFC);
+  if ((info1 & 2) == 2)
+  {
+    li->loc_filename = deref_rel(next_cell, 0);
+    li->loc_next     = deref_rel(next_cell, 1);
+  }
+  else
+  {
+    li->loc_filename = next_cell;
+    li->loc_next = NULL;
+  }
+
+  li->loc_lnum = info2 >> 12;
+  li->loc_startchr = (info2 >> 4) & 0xFF;
+  li->loc_endchr = ((info2 & 0xF) << 6) | (info1 >> 26);
+}
+
+CAMLexport void extract_next_location(/*inout*/ struct caml_loc_info * li)
+{
+  uintnat infoptr;
+  uint32 info1, info2;
+
+  if (li->loc_next == NULL) {
+    li->loc_valid = 0;
+    li->loc_is_raise = 1;
+    li->loc_is_inlined = 0;
+    return;
+  }
+
+  /* Recover debugging info */
+  infoptr = (uintnat)(li->loc_next);
+  info1 = ((uint32 *)infoptr)[0];
+  info2 = ((uint32 *)infoptr)[1];
+  /* Format of the two info words:
+       llllllllllllllllllll aaaaaaaa bbbbbbbbbb nnnnnnnnnnnnnnnnnnnnnnnn kk
+                          44       36         26                       2  0
+                       (32+12)    (32+4)
+     k ( 2 bits): 0 if it's a call, 1 if it's a raise
+     n (24 bits): offset (in 4-byte words) of file name relative to infoptr
+     l (20 bits): line number
+     a ( 8 bits): beginning of character range
+     b (10 bits): end of character range */
+  li->loc_valid = 1;
+  li->loc_is_raise = (info1 & 3) != 0;
+  li->loc_is_inlined = 1;
+  li->loc_filename = (char *)infoptr + (info1 & 0x3FFFFFC);
+  li->loc_next = deref_rel(infoptr, 2);
   li->loc_lnum = info2 >> 12;
   li->loc_startchr = (info2 >> 4) & 0xFF;
   li->loc_endchr = ((info2 & 0xF) << 6) | (info1 >> 26);
@@ -253,6 +312,7 @@ CAMLexport void extract_location_info(frame_descr * d,
 
 static void print_location(struct caml_loc_info * li, int index)
 {
+  char * inlined;
   char * info;
 
   /* Ignore compiler-inserted raise */
@@ -270,12 +330,19 @@ static void print_location(struct caml_loc_info * li, int index)
     else
       info = "Called from";
   }
-  if (! li->loc_valid) {
-    fprintf(stderr, "%s unknown location\n", info);
+
+  if (li->loc_is_inlined) {
+    inlined = " (inlined)";
   } else {
-    fprintf (stderr, "%s file \"%s\", line %d, characters %d-%d\n",
-             info, li->loc_filename, li->loc_lnum,
-             li->loc_startchr, li->loc_endchr);
+    inlined = "";
+  }
+
+  if (! li->loc_valid) {
+    fprintf(stderr, "%s unknown location%s\n", info, inlined);
+  } else {
+    fprintf (stderr, "%s file \"%s\"%s, line %d, characters %d-%d\n",
+             info, li->loc_filename, inlined,
+             li->loc_lnum, li->loc_startchr, li->loc_endchr);
   }
 }
 
@@ -283,12 +350,16 @@ static void print_location(struct caml_loc_info * li, int index)
 
 void caml_print_exception_backtrace(void)
 {
-  int i;
+  int i, index;
   struct caml_loc_info li;
 
-  for (i = 0; i < caml_backtrace_pos; i++) {
+  for (i = 0, index = 0; i < caml_backtrace_pos; i++) {
     extract_location_info((frame_descr *) (caml_backtrace_buffer[i]), &li);
-    print_location(&li, i);
+    do {
+      print_location(&li, index);
+      index++;
+      extract_next_location(&li);
+    } while (li.loc_next != NULL);
   }
 }
 

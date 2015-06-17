@@ -10,9 +10,9 @@
 (*                                                                     *)
 (***********************************************************************)
 
-type kind = Dinfo_call | Dinfo_raise
+type kind = Dinfo_call | Dinfo_raise | Dinfo_inline of t
 
-type t = private {
+and t = private {
   dinfo_kind: kind;
   dinfo_file: string;
   dinfo_line: int;
@@ -30,3 +30,6 @@ val from_location: kind -> Location.t -> t
 
 val from_call: Lambda.lambda_event -> t
 val from_raise: Lambda.lambda_event -> t
+val inline: Location.t -> t -> t
+
+val unroll_inline_chain: t -> t * t list
