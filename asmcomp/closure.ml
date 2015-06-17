@@ -547,10 +547,10 @@ let rec substitute loc fpc sb ulam =
       begin try Tbl.find v sb with Not_found -> ulam end
   | Uconst _ -> ulam
   | Udirect_apply(lbl, args, dbg) ->
-      Udirect_apply(lbl, List.map (substitute loc fpc sb) args, dbg)
+      Udirect_apply(lbl, List.map (substitute loc fpc sb) args, Debuginfo.inline loc dbg)
   | Ugeneric_apply(fn, args, dbg) ->
       Ugeneric_apply(substitute loc fpc sb fn,
-                     List.map (substitute loc fpc sb) args, dbg)
+                     List.map (substitute loc fpc sb) args, Debuginfo.inline loc dbg)
   | Uclosure(defs, env) ->
       (* Question: should we rename function labels as well?  Otherwise,
          there is a risk that function labels are not globally unique.
@@ -585,7 +585,8 @@ let rec substitute loc fpc sb ulam =
         | Pgetcaller None when loc <> Location.none -> Pgetcaller (Some loc)
         | p -> p in
       let (res, _) =
-        simplif_prim fpc p (sargs, List.map approx_ulam sargs) dbg in
+        simplif_prim fpc p (sargs, List.map approx_ulam sargs)
+          (Debuginfo.inline loc dbg) in
       res
   | Uswitch(arg, sw) ->
       let sarg = substitute loc fpc sb arg in
@@ -653,7 +654,7 @@ let rec substitute loc fpc sb ulam =
       Uassign(id', substitute loc fpc sb u)
   | Usend(k, u1, u2, ul, dbg) ->
       Usend(k, substitute loc fpc sb u1, substitute loc fpc sb u2,
-            List.map (substitute loc fpc sb) ul, dbg)
+            List.map (substitute loc fpc sb) ul, (Debuginfo.inline loc dbg))
 
 (* Perform an inline expansion *)
 
@@ -855,7 +856,7 @@ let rec close fenv cenv = function
         ((ufunct, Value_closure(fundesc, approx_res)),
          [Uprim(Pmakeblock(_, _), uargs, _)])
         when List.length uargs = - fundesc.fun_arity ->
-          let app = direct_apply loc fundesc funct ufunct uargs in
+        let app = direct_apply loc fundesc funct ufunct uargs in
           (app, strengthen_approx app approx_res)
       | ((ufunct, Value_closure(fundesc, approx_res)), uargs)
         when nargs = fundesc.fun_arity ->

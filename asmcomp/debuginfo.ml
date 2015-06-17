@@ -13,9 +13,9 @@
 open Lexing
 open Location
 
-type kind = Dinfo_call | Dinfo_raise
+type kind = Dinfo_call | Dinfo_raise | Dinfo_inline of t
 
-type t = {
+and t = {
   dinfo_kind: kind;
   dinfo_file: string;
   dinfo_line: int;
@@ -54,3 +54,16 @@ let from_location kind loc =
 
 let from_call ev = from_location Dinfo_call ev.Lambda.lev_loc
 let from_raise ev = from_location Dinfo_raise ev.Lambda.lev_loc
+
+let inline loc t =
+  if loc = Location.none
+  then t
+  else from_location (Dinfo_inline t) loc
+
+let unroll_inline_chain t =
+  let rec aux acc t = match t.dinfo_kind with
+    | Dinfo_inline t' ->
+        aux ({t with dinfo_kind = Dinfo_call} :: acc) t'
+    | _ -> t, acc
+  in
+  aux [] t
