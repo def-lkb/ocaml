@@ -266,7 +266,7 @@ CAMLexport void extract_location_info(frame_descr * d,
   li->loc_endchr = ((info2 & 0xF) << 6) | (info1 >> 26);
 }
 
-CAMLexport void extract_next_location(/*inout*/ struct caml_loc_info * li)
+CAMLexport int extract_next_location(/*inout*/ struct caml_loc_info * li)
 {
   uintnat infoptr;
   uint32 info1, info2;
@@ -275,7 +275,7 @@ CAMLexport void extract_next_location(/*inout*/ struct caml_loc_info * li)
     li->loc_valid = 0;
     li->loc_is_raise = 1;
     li->loc_is_inlined = 0;
-    return;
+    return 0;
   }
 
   /* Recover debugging info */
@@ -299,6 +299,8 @@ CAMLexport void extract_next_location(/*inout*/ struct caml_loc_info * li)
   li->loc_lnum = info2 >> 12;
   li->loc_startchr = (info2 >> 4) & 0xFF;
   li->loc_endchr = ((info2 & 0xF) << 6) | (info1 >> 26);
+
+  return 1;
 }
 
 /* Print location information -- same behavior as in Printexc
@@ -358,8 +360,7 @@ void caml_print_exception_backtrace(void)
     do {
       print_location(&li, index);
       index++;
-      extract_next_location(&li);
-    } while (li.loc_next != NULL);
+    } while (extract_next_location(&li));
   }
 }
 
