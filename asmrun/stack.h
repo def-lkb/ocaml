@@ -81,10 +81,12 @@ typedef struct {
 struct caml_loc_info {
   int loc_valid;
   int loc_is_raise;
+  int loc_is_inlined;
   char * loc_filename;
   int loc_lnum;
   int loc_startchr;
   int loc_endchr;
+  void * loc_next;
 };
 
 /* Hash table of frame descriptors */
