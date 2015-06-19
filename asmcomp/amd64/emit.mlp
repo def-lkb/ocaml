@@ -437,7 +437,8 @@ let emit_instr fallthrough i =
     | Lop(Iretaddr) ->
         `	movq {emit_int (frame_size() - frame_offset)}(%rsp), {emit_reg i.res.(0)}\n`
     | Lop(Idescriptor dbg) ->
-        let lbl = record_frame Reg.Set.empty dbg in
+        let lbl = record_frame_label Reg.Set.empty dbg in
+        `{emit_label lbl}:\n`;
         `	leaq {emit_label lbl}, {emit_reg i.res.(0)}\n`
     | Lop(Iload(chunk, addr)) ->
         let dest = i.res.(0) in

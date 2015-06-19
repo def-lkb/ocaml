@@ -166,7 +166,7 @@ let prim_size prim args =
   | Pbittest -> 3
   | Pbigarrayref(_, ndims, _, _) -> 4 + ndims * 6
   | Pbigarrayset(_, ndims, _, _) -> 4 + ndims * 6
-  | Pgetcaller _ -> 1
+  | Pget_caller _ -> 1
   | _ -> 2 (* arithmetic and comparisons *)
 
 (* Very raw approximation of switch cost *)

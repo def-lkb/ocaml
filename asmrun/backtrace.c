@@ -456,8 +456,8 @@ CAMLprim value caml_get_exception_backtrace(value unit)
   CAMLreturn(res);
 }
 
-/* Turn encoded retaddr into eventual location information */
-CAMLprim value caml_decode_retaddr(value retaddr)
+/* Turn encoded retaddr into a raw_backtrace_slot */
+CAMLprim value caml_caller_slot(value retaddr)
 {
   CAMLparam1(retaddr);
   CAMLlocal2(result, slot);
