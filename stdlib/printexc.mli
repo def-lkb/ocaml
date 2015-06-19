@@ -297,7 +297,7 @@ val exn_slot_name: exn -> string
 type caller
 (** An abstract type representing a source location *)
 
-external get_caller : unit -> caller = "%get_caller"
+external get_caller : unit -> caller = "%getcaller"
 (** The source location of the caller of the current function *)
 
 val caller_slot : caller -> raw_backtrace_slot option

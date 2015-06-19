@@ -295,5 +295,5 @@ let () =
     handle_uncaught_exception
 
 type caller
-external get_caller : unit -> caller = "%get_caller"
+external get_caller : unit -> caller = "%getcaller"
 external caller_slot : caller -> raw_backtrace_slot option = "caml_caller_slot"

@@ -1559,7 +1559,7 @@ and transl_prim_1 p arg dbg =
       transl arg
   | Pignore ->
       return_unit(remove_unit (transl arg))
-  | Pget_caller loc ->
+  | Pgetcaller loc ->
       let prim = match loc with
         | None -> Cretaddr
         | Some loc -> Cdescriptor (Debuginfo.from_location Debuginfo.Dinfo_call loc)
