@@ -31,8 +31,12 @@ val reset : unit -> unit
 val reset_debug_info: unit -> unit
 val emit_debug_info: Debuginfo.t -> unit
 
+type frame_label =
+  | Call_site of int
+  | Inlined_site of int
+
 type frame_descr =
-  { fd_lbl: int;                        (* Return address *)
+  { fd_lbl: frame_label;                (* Return address *)
     fd_frame_size: int;                 (* Size of stack frame *)
     fd_live_offset: int list;           (* Offsets/regs of live addresses *)
     fd_debuginfo: Debuginfo.t }         (* Location, if any *)

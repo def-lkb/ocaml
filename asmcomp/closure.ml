@@ -166,7 +166,7 @@ let prim_size prim args =
   | Pbittest -> 3
   | Pbigarrayref(_, ndims, _, _) -> 4 + ndims * 6
   | Pbigarrayset(_, ndims, _, _) -> 4 + ndims * 6
-  | Pretloc -> 1
+  | Pretloc _ -> 1
   | _ -> 2 (* arithmetic and comparisons *)
 
 (* Very raw approximation of switch cost *)
@@ -530,16 +530,15 @@ let approx_ulam = function
   | _ -> Value_unknown
 
 let rec substitute loc fpc sb ulam =
-  let subst_dinfo = Debuginfo.inline in
   match ulam with
     Uvar v ->
       begin try Tbl.find v sb with Not_found -> ulam end
   | Uconst _ -> ulam
   | Udirect_apply(lbl, args, dbg) ->
-      Udirect_apply(lbl, List.map (substitute loc fpc sb) args, subst_dinfo loc dbg)
+      Udirect_apply(lbl, List.map (substitute loc fpc sb) args, Debuginfo.inline loc dbg)
   | Ugeneric_apply(fn, args, dbg) ->
       Ugeneric_apply(substitute loc fpc sb fn,
-                     List.map (substitute loc fpc sb) args, subst_dinfo loc dbg)
+                     List.map (substitute loc fpc sb) args, Debuginfo.inline loc dbg)
   | Uclosure(defs, env) ->
       (* Question: should we rename function labels as well?  Otherwise,
          there is a risk that function labels are not globally unique.
@@ -567,19 +566,15 @@ let rec substitute loc fpc sb ulam =
            (fun (id, id', rhs) -> (id', substitute loc fpc sb' rhs))
            bindings1,
         substitute loc fpc sb' body)
-  | Uprim (Pretloc, _, _) when loc != Location.none ->
-      let {Lexing. pos_fname; pos_lnum; pos_cnum; pos_bol} = loc.Location.loc_start in
-      let const v = Uconst_ref (Compilenv.new_structured_constant ~shared:true v, v) in
-      Uconst (const (Uconst_block (0,  [const (Uconst_block (0, [
-          const (Uconst_string pos_fname);
-          Uconst_int pos_lnum;
-          Uconst_int (pos_cnum - pos_bol);
-        ]))])))
   | Uprim(p, args, dbg) ->
       let sargs =
         List.map (substitute loc fpc sb) args in
+      let p = match p with
+        | Pretloc None when loc <> Location.none -> Pretloc (Some loc)
+        | p -> p in
       let (res, _) =
-        simplif_prim fpc p (sargs, List.map approx_ulam sargs) (subst_dinfo loc dbg) in
+        simplif_prim fpc p (sargs, List.map approx_ulam sargs)
+          (Debuginfo.inline loc dbg) in
       res
   | Uswitch(arg, sw) ->
       Uswitch(substitute loc fpc sb arg,
@@ -628,7 +623,7 @@ let rec substitute loc fpc sb ulam =
       Uassign(id', substitute loc fpc sb u)
   | Usend(k, u1, u2, ul, dbg) ->
       Usend(k, substitute loc fpc sb u1, substitute loc fpc sb u2,
-            List.map (substitute loc fpc sb) ul, (subst_dinfo loc dbg))
+            List.map (substitute loc fpc sb) ul, (Debuginfo.inline loc dbg))
 
 (* Perform an inline expansion *)
 

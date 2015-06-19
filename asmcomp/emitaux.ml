@@ -104,8 +104,12 @@ let emit_float32_directive directive x =
 
 (* Record live pointers at call points *)
 
+type frame_label =
+  | Call_site of int
+  | Inlined_site of int
+
 type frame_descr =
-  { fd_lbl: int;                        (* Return address *)
+  { fd_lbl: frame_label;                (* Return address *)
     fd_frame_size: int;                 (* Size of stack frame *)
     fd_live_offset: int list;           (* Offsets/regs of live addresses *)
     fd_debuginfo: Debuginfo.t }         (* Location, if any *)
@@ -181,7 +185,12 @@ let emit_frames a =
     a.efa_32 (Int64.to_int32 (Int64.shift_right info 32))
   in
   let emit_frame fd =
-    a.efa_label fd.fd_lbl;
+    begin match fd.fd_lbl with
+    | Call_site lbl -> a.efa_label lbl
+    | Inlined_site lbl ->
+        a.efa_def_label lbl;
+        a.efa_label lbl
+    end;
     a.efa_16 (if Debuginfo.is_none fd.fd_debuginfo
               then fd.fd_frame_size
               else fd.fd_frame_size + 1);

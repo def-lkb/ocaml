@@ -190,7 +190,7 @@ let record_frame_label live dbg =
       | _ -> ())
     live;
   frame_descriptors :=
-    { fd_lbl = lbl;
+    { fd_lbl = Call_site lbl;
       fd_frame_size = frame_size();
       fd_live_offset = !live_offset;
       fd_debuginfo = dbg } :: !frame_descriptors;

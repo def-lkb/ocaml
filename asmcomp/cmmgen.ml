@@ -1559,8 +1559,13 @@ and transl_prim_1 p arg dbg =
       transl arg
   | Pignore ->
       return_unit(remove_unit (transl arg))
-  | Pretloc ->
-      Csequence (transl arg, Cop (Cor, [Cop (Cretaddr, []); Cconst_int 1]))
+  | Pretloc loc ->
+      let dbg = match loc with
+        | None -> None
+        | Some loc -> Some (Debuginfo.from_location Debuginfo.Dinfo_call loc)
+      in
+      Csequence (remove_unit (transl arg),
+                 Cop (Cor, [Cop (Cretaddr dbg, []); Cconst_int 1]))
 
   (* Heap operations *)
   | Pfield n ->
