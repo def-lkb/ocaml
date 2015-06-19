@@ -139,10 +139,10 @@ let operation op arg ppf res =
   | Iintoffloat -> fprintf ppf "intoffloat %a" reg arg.(0)
   | Ispecific op ->
       Arch.print_specific_operation reg op ppf arg
-  | Iretaddr None ->
+  | Iretaddr ->
       fprintf ppf "retaddr"
-  | Iretaddr (Some dbg) ->
-      fprintf ppf "inlined retaddr%s" (Debuginfo.to_string dbg)
+  | Idescriptor dbg ->
+      fprintf ppf "descriptor%s" (Debuginfo.to_string dbg)
 
 let rec instr ppf i =
   if !print_live then begin

@@ -53,7 +53,8 @@ type operation =
   | Inegf | Iabsf | Iaddf | Isubf | Imulf | Idivf
   | Ifloatofint | Iintoffloat
   | Ispecific of Arch.specific_operation
-  | Iretaddr of Debuginfo.t option
+  | Iretaddr
+  | Idescriptor of Debuginfo.t option
 
 type instruction =
   { desc: instruction_desc;

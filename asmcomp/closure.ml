@@ -166,7 +166,7 @@ let prim_size prim args =
   | Pbittest -> 3
   | Pbigarrayref(_, ndims, _, _) -> 4 + ndims * 6
   | Pbigarrayset(_, ndims, _, _) -> 4 + ndims * 6
-  | Pretloc _ -> 1
+  | Pgetcaller _ -> 1
   | _ -> 2 (* arithmetic and comparisons *)
 
 (* Very raw approximation of switch cost *)
@@ -570,7 +570,7 @@ let rec substitute loc fpc sb ulam =
       let sargs =
         List.map (substitute loc fpc sb) args in
       let p = match p with
-        | Pretloc None when loc <> Location.none -> Pretloc (Some loc)
+        | Pget_caller None when loc <> Location.none -> Pget_caller (Some loc)
         | p -> p in
       let (res, _) =
         simplif_prim fpc p (sargs, List.map approx_ulam sargs)

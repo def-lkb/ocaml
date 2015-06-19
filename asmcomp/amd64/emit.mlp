@@ -167,7 +167,7 @@ let emit_addressing addr r n =
 
 (* Record live pointers at call points -- see Emitaux *)
 
-let record_frame_label ?(inlined=false) live dbg =
+let record_frame_label live dbg =
   let lbl = new_label() in
   let live_offset = ref [] in
   Reg.Set.iter
@@ -179,7 +179,7 @@ let record_frame_label ?(inlined=false) live dbg =
       | _ -> ())
     live;
   frame_descriptors :=
-    { fd_lbl = (if inlined then Inlined_site lbl else Call_site lbl);
+    { fd_lbl = lbl;
       fd_frame_size = frame_size();
       fd_live_offset = !live_offset;
       fd_debuginfo = dbg } :: !frame_descriptors;
@@ -187,9 +187,6 @@ let record_frame_label ?(inlined=false) live dbg =
 
 let record_frame live dbg =
   let lbl = record_frame_label live dbg in `{emit_label lbl}:\n`
-
-let record_inlined_frame dbg =
-  record_frame_label ~inlined:true Reg.Set.empty dbg
 
 (* Record calls to the GC -- we've moved them out of the way *)
 
@@ -437,10 +434,10 @@ let emit_instr fallthrough i =
         else `	subq	${emit_int(n)}, %rsp\n`;
         cfi_adjust_cfa_offset n;
         stack_offset := !stack_offset + n
-    | Lop(Iretaddr None) ->
+    | Lop(Iretaddr) ->
         `	movq {emit_int (frame_size() - frame_offset)}(%rsp), {emit_reg i.res.(0)}\n`
-    | Lop(Iretaddr (Some dbg)) ->
-        let lbl = record_inlined_frame dbg in
+    | Lop(Idescriptor dbg) ->
+        let lbl = record_frame Reg.Set.empty dbg in
         `	leaq {emit_label lbl}, {emit_reg i.res.(0)}\n`
     | Lop(Iload(chunk, addr)) ->
         let dest = i.res.(0) in

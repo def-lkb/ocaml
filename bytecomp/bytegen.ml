@@ -408,10 +408,10 @@ let comp_primitive p args =
   | Pbswap16 -> Kccall("caml_bswap16", 1)
   | Pbbswap(bi) -> comp_bint_primitive bi "bswap" args
   | Pint_as_pointer -> Kccall("caml_int_as_pointer", 1)
-  | Pretloc None -> Kccall("caml_get_retaddr", 1)
-  | Pretloc (Some _) ->
+  | Pget_caller None -> Kccall("caml_get_caller", 1)
+  | Pget_caller (Some _) ->
       (* Only inliner can introduce an explicit location, this case can't happen. *)
-      fatal_error "Bytegen.comp_primitive: Pretloc (Some _)"
+      fatal_error "Bytegen.comp_primitive: Pget_caller (Some _)"
   | _ -> fatal_error "Bytegen.comp_primitive"
 
 let is_immed n = immed_min <= n && n <= immed_max

@@ -81,7 +81,7 @@ type operation =
   | Ccmpf of comparison
   | Craise of Lambda.raise_kind * Debuginfo.t
   | Ccheckbound of Debuginfo.t
-  | Cretaddr of Debuginfo.t option
+  | Cget_caller of Debuginfo.t option
 
 type expression =
     Cconst_int of int
