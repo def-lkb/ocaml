@@ -725,6 +725,10 @@ let emit_instr fallthrough i =
       stack_offset := !stack_offset + 8
   | Lop(Iretaddr) ->
       I.mov (mem32 DWORD (frame_size() - frame_offset) RSP) (reg i.res.(0))
+  | Lop(Idescriptor dbg) ->
+      let lbl = record_frame_label Reg.Set.empty dbg in
+      def_label lbl;
+      I.lea (mem_sym NONE (emit_label lbl)) (reg i.res.(0))
   | Lop(Ispecific(Ilea addr)) ->
       I.lea (addressing addr DWORD i 0) (reg i.res.(0))
   | Lop(Ispecific(Istore_int(n, addr, _))) ->
