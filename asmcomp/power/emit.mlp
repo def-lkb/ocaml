@@ -209,7 +209,7 @@ let emit_set_comp cmp res =
 
 (* Record live pointers at call points *)
 
-let record_frame live dbg =
+let record_frame_label live dbg =
   let lbl = new_label() in
   let live_offset = ref [] in
   Reg.Set.iter
@@ -225,7 +225,10 @@ let record_frame live dbg =
       fd_frame_size = frame_size();
       fd_live_offset = !live_offset;
       fd_debuginfo = dbg } :: !frame_descriptors;
-  `{emit_label lbl}:\n`
+  lbl
+
+let record_frame live dbg =
+  let lbl = record_frame_label live dbg in `{emit_label lbl}:\n`
 
 (* Record floating-point and large integer literals *)
 
@@ -501,6 +504,12 @@ let rec emit_instr i dslot =
         then let n = frame_size() in
              `	{emit_string lg}	{emit_reg i.res.(0)}, {emit_int(n - size_addr)}({emit_gpr 1})\n`
         else `	mflr	{emit_reg i.res.(0)}\n`
+    | Lop(Idescriptor dbg) ->
+        let lbl = record_frame_label Reg.Set.empty dbg in
+        let dst = i.res.(0) in
+        `{emit_label lbl}:\n`;
+        `	addis	{emit_reg dst}, 0, {emit_upper emit_label lbl}\n`;
+        `	addi	{emit_reg dst}, {emit_reg dst}, {emit_lower emit_label lbl}\n`
     | Lop(Iload(chunk, addr)) ->
         let loadinstr =
           match chunk with

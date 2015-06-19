@@ -600,6 +600,10 @@ let emit_instr i =
         stack_offset := !stack_offset + n
     | Lop(Iretaddr) ->
         `	mov {emit_reg i.res.(0)}, lr\n`
+    | Lop(Idescriptor dbg) ->
+        let lbl = record_frame_label Reg.Set.empty dbg in
+        `{emit_label lbl}:\n`;
+        `	mov {emit_reg i.res.(0)}, {emit_label lbl}\n`
     | Lop(Iload(size, addr)) ->
         let dst = i.res.(0) in
         let base =

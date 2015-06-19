@@ -425,6 +425,10 @@ let emit_instr fallthrough i =
     | Lop(Iretaddr) ->
         let ofs = frame_size() - frame_offset in
         `	movq {emit_reg i.res.(0)}, QWORD PTR {emit_int ofs}[rsp]\n`
+    | Lop(Idescriptor dbg) ->
+        let lbl = record_frame_label Reg.Set.empty dbg in
+        `{emit_label lbl}:\n`
+        `	lea {emit_reg i.res.(0)}, {emit_label lbl}\n`
     | Lop(Iload(chunk, addr)) ->
         let dest = i.res.(0) in
         begin match chunk with
