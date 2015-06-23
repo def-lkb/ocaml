@@ -488,6 +488,191 @@ let emit_instr fallthrough i =
       if s = !function_name then
         I.jmp (label !tailrec_entry_point)
       else begin
+=======
+          `	movsd	{emit_label lbl}(%rip), {emit_reg i.res.(0)}\n`
+        end
+    | Lop(Iconst_symbol s) ->
+        `	{load_symbol_addr s}, {emit_reg i.res.(0)}\n`
+    | Lop(Icall_ind) ->
+        `	call	*{emit_reg i.arg.(0)}\n`;
+        record_frame i.live i.dbg
+    | Lop(Icall_imm(s)) ->
+        `	{emit_call s}\n`;
+        record_frame i.live i.dbg
+    | Lop(Itailcall_ind) ->
+        output_epilogue begin fun () ->
+        `	jmp	*{emit_reg i.arg.(0)}\n`
+        end
+    | Lop(Itailcall_imm s) ->
+        if s = !function_name then
+          `	jmp	{emit_label !tailrec_entry_point}\n`
+        else begin
+          output_epilogue begin fun () ->
+          `	{emit_jump s}\n`
+          end
+        end
+    | Lop(Iextcall(s, alloc)) ->
+        if alloc then begin
+          `	{load_symbol_addr s}, %rax\n`;
+          `	{emit_call "caml_c_call"}\n`;
+          record_frame i.live i.dbg;
+          `	{load_symbol_addr "caml_young_ptr"}, %r11\n`;
+          `	movq    (%r11), %r15\n`;
+        end else begin
+          `	{emit_call s}\n`
+        end
+    | Lop(Istackoffset n) ->
+        if n < 0
+        then `	addq	${emit_int(-n)}, %rsp\n`
+        else `	subq	${emit_int(n)}, %rsp\n`;
+        cfi_adjust_cfa_offset n;
+        stack_offset := !stack_offset + n
+    | Lop(Iretaddr) ->
+        `	movq {emit_int (frame_size() - frame_offset)}(%rsp), {emit_reg i.res.(0)}\n`
+    | Lop(Iload(chunk, addr)) ->
+        let dest = i.res.(0) in
+        begin match chunk with
+          | Word ->
+              `	movq	{emit_addressing addr i.arg 0}, {emit_reg dest}\n`
+          | Byte_unsigned ->
+              `	movzbq	{emit_addressing addr i.arg 0}, {emit_reg dest}\n`
+          | Byte_signed ->
+              `	movsbq	{emit_addressing addr i.arg 0}, {emit_reg dest}\n`
+          | Sixteen_unsigned ->
+              `	movzwq	{emit_addressing addr i.arg 0}, {emit_reg dest}\n`
+          | Sixteen_signed ->
+              `	movswq	{emit_addressing addr i.arg 0}, {emit_reg dest}\n`
+          | Thirtytwo_unsigned ->
+              `	movl	{emit_addressing addr i.arg 0}, {emit_reg32 dest}\n`
+          | Thirtytwo_signed ->
+              `	movslq	{emit_addressing addr i.arg 0}, {emit_reg dest}\n`
+          | Single ->
+            `	cvtss2sd {emit_addressing addr i.arg 0}, {emit_reg dest}\n`
+          | Double | Double_u ->
+            `	movsd	{emit_addressing addr i.arg 0}, {emit_reg dest}\n`
+        end
+    | Lop(Istore(chunk, addr, _)) ->
+        begin match chunk with
+          | Word ->
+            `	movq	{emit_reg i.arg.(0)}, {emit_addressing addr i.arg 1}\n`
+          | Byte_unsigned | Byte_signed ->
+            `	movb	{emit_reg8 i.arg.(0)}, {emit_addressing addr i.arg 1}\n`
+          | Sixteen_unsigned | Sixteen_signed ->
+            `	movw	{emit_reg16 i.arg.(0)}, {emit_addressing addr i.arg 1}\n`
+          | Thirtytwo_signed | Thirtytwo_unsigned ->
+            `	movl	{emit_reg32 i.arg.(0)}, {emit_addressing addr i.arg 1}\n`
+          | Single ->
+            `	cvtsd2ss {emit_reg i.arg.(0)}, %xmm15\n`;
+            `	movss	%xmm15, {emit_addressing addr i.arg 1}\n`
+          | Double | Double_u ->
+            `	movsd	{emit_reg i.arg.(0)}, {emit_addressing addr i.arg 1}\n`
+        end
+    | Lop(Ialloc n) ->
+        if !fastcode_flag then begin
+          let lbl_redo = new_label() in
+          `{emit_label lbl_redo}:	subq	${emit_int n}, %r15\n`;
+          if !Clflags.dlcode then begin
+            `	{load_symbol_addr "caml_young_limit"}, %rax\n`;
+            `	cmpq	(%rax), %r15\n`;
+          end else
+            `	cmpq	{emit_symbol "caml_young_limit"}(%rip), %r15\n`;
+          let lbl_call_gc = new_label() in
+          let lbl_frame = record_frame_label i.live Debuginfo.none in
+          `	jb	{emit_label lbl_call_gc}\n`;
+          `	leaq	8(%r15), {emit_reg i.res.(0)}\n`;
+          call_gc_sites :=
+            { gc_lbl = lbl_call_gc;
+              gc_return_lbl = lbl_redo;
+              gc_frame = lbl_frame } :: !call_gc_sites
+        end else begin
+          begin match n with
+            16  -> `	{emit_call "caml_alloc1"}\n`
+          | 24 -> `	{emit_call "caml_alloc2"}\n`
+          | 32 -> `	{emit_call "caml_alloc3"}\n`
+          | _  -> `	movq	${emit_int n}, %rax\n`;
+                  `	{emit_call "caml_allocN"}\n`
+          end;
+          `{record_frame i.live Debuginfo.none}	leaq	8(%r15), {emit_reg i.res.(0)}\n`
+        end
+    | Lop(Iintop(Icomp cmp)) ->
+        `	cmpq	{emit_reg i.arg.(1)}, {emit_reg i.arg.(0)}\n`;
+        let b = name_for_cond_branch cmp in
+        `	set{emit_string b}	%al\n`;
+        `	movzbq	%al, {emit_reg i.res.(0)}\n`
+    | Lop(Iintop_imm(Icomp cmp, n)) ->
+        `	cmpq	${emit_int n}, {emit_reg i.arg.(0)}\n`;
+        let b = name_for_cond_branch cmp in
+        `	set{emit_string b}	%al\n`;
+        `	movzbq	%al, {emit_reg i.res.(0)}\n`
+    | Lop(Iintop Icheckbound) ->
+        let lbl = bound_error_label i.dbg in
+        `	cmpq	{emit_reg i.arg.(1)}, {emit_reg i.arg.(0)}\n`;
+        `	jbe	{emit_label lbl}\n`
+    | Lop(Iintop_imm(Icheckbound, n)) ->
+        let lbl = bound_error_label i.dbg in
+        `	cmpq	${emit_int n}, {emit_reg i.arg.(0)}\n`;
+        `	jbe	{emit_label lbl}\n`
+    | Lop(Iintop(Idiv | Imod)) ->
+        `	cqto\n`;
+        `	idivq	{emit_reg i.arg.(1)}\n`
+    | Lop(Iintop(Ilsl | Ilsr | Iasr as op)) ->
+        (* We have i.arg.(0) = i.res.(0) and i.arg.(1) = %rcx *)
+        `	{emit_string(instr_for_intop op)}	%cl, {emit_reg i.res.(0)}\n`
+    | Lop(Iintop Imulh) ->
+        `	imulq	{emit_reg i.arg.(1)}\n`
+    | Lop(Iintop op) ->
+        (* We have i.arg.(0) = i.res.(0) *)
+        `	{emit_string(instr_for_intop op)}	{emit_reg i.arg.(1)}, {emit_reg i.res.(0)}\n`
+    | Lop(Iintop_imm(Iadd, n)) when i.arg.(0).loc <> i.res.(0).loc ->
+        `	leaq	{emit_int n}({emit_reg i.arg.(0)}), {emit_reg i.res.(0)}\n`
+    | Lop(Iintop_imm(Iadd, 1) | Iintop_imm(Isub, -1)) ->
+        `	incq	{emit_reg i.res.(0)}\n`
+    | Lop(Iintop_imm(Iadd, -1) | Iintop_imm(Isub, 1)) ->
+        `	decq	{emit_reg i.res.(0)}\n`
+    | Lop(Iintop_imm(op, n)) ->
+        (* We have i.arg.(0) = i.res.(0) *)
+        `	{emit_string(instr_for_intop op)}	${emit_int n}, {emit_reg i.res.(0)}\n`
+    | Lop(Inegf) ->
+        `	xorpd	{emit_symbol "caml_negf_mask"}(%rip), {emit_reg i.res.(0)}\n`
+    | Lop(Iabsf) ->
+        `	andpd	{emit_symbol "caml_absf_mask"}(%rip), {emit_reg i.res.(0)}\n`
+    | Lop(Iaddf | Isubf | Imulf | Idivf as floatop) ->
+        `	{emit_string(instr_for_floatop floatop)}	{emit_reg i.arg.(1)}, {emit_reg i.res.(0)}\n`
+    | Lop(Ifloatofint) ->
+        `	cvtsi2sdq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`
+    | Lop(Iintoffloat) ->
+        `	cvttsd2siq	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`
+    | Lop(Ispecific(Ilea addr)) ->
+        `	leaq	{emit_addressing addr i.arg 0}, {emit_reg i.res.(0)}\n`
+    | Lop(Ispecific(Istore_int(n, addr, _))) ->
+        `	movq	${emit_nativeint n}, {emit_addressing addr i.arg 0}\n`
+    | Lop(Ispecific(Istore_symbol(s, addr, _))) ->
+        assert (not !pic_code && not !Clflags.dlcode);
+        `	movq	${emit_symbol s}, {emit_addressing addr i.arg 0}\n`
+    | Lop(Ispecific(Ioffset_loc(n, addr))) ->
+        `	addq	${emit_int n}, {emit_addressing addr i.arg 0}\n`
+    | Lop(Ispecific(Ifloatarithmem(op, addr))) ->
+        `	{emit_string(instr_for_floatarithmem op)}	{emit_addressing addr i.arg 1}, {emit_reg i.res.(0)}\n`
+    | Lop(Ispecific(Ibswap size)) ->
+       begin match size with
+       | 16 ->
+        `	xchg	%ah, %al\n`;
+        `	movzwq	{emit_reg16 i.res.(0)}, {emit_reg i.res.(0)}\n`
+       | 32 ->
+        `	bswap	{emit_reg32 i.res.(0)}\n`;
+        `	movslq	{emit_reg32 i.res.(0)}, {emit_reg i.res.(0)}\n`
+       | 64 ->
+        `	bswap	{emit_reg i.res.(0)}\n`
+       | _ -> assert false
+       end
+    | Lop(Ispecific Isqrtf) ->
+        `	sqrtsd	{emit_reg i.arg.(0)}, {emit_reg i.res.(0)}\n`
+    | Lop(Ispecific(Ifloatsqrtf addr)) ->
+        `	sqrtsd	{emit_addressing addr i.arg 0}, {emit_reg i.res.(0)}\n`
+    | Lreloadretaddr ->
+        ()
+    | Lreturn ->
+>>>>>>> c613912... retloc -> getcaller
         output_epilogue begin fun () ->
           add_used_symbol s;
           emit_jump s
@@ -636,6 +821,10 @@ let emit_instr fallthrough i =
       I.cvttsd2si (arg i 0) (res i 0)
   | Lop(Iretaddr) ->
       I.mov (mem64 QWORD (frame_size() - frame_offset) RSP) (res i 0)
+  | Lop(Idescriptor dbg) ->
+      let lbl = record_frame_label Reg.Set.empty dbg in
+      def_label lbl;
+      I.lea (mem64_rip NONE lbl) (res i 0)
   | Lop(Ispecific(Ilea addr)) ->
       I.lea (addressing addr NONE i 0) (res i 0)
   | Lop(Ispecific(Istore_int(n, addr, _))) ->
