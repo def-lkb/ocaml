@@ -48,6 +48,11 @@ void caml_extract_location_info(backtrace_slot pc, /*out*/ struct caml_loc_info 
 value caml_val_raw_backtrace_slot(backtrace_slot pc);
 backtrace_slot caml_raw_backtrace_slot_val(value slot);
 
+/* Follow linked list of inlined slots, until reaching NULL */
+#define Is_backtrace_slot_valid(v) ((v) != NULL)
+backtrace_slot caml_backtrace_next_inlined(backtrace_slot pc);
+int caml_backtrace_count_inlined(backtrace_slot pc);
+
 #define BACKTRACE_BUFFER_SIZE 1024
 
 /* Besides decoding backtrace info, [backtrace_prim] has two other responsibilities:

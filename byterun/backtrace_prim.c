@@ -478,6 +478,17 @@ void caml_extract_location_info(backtrace_slot slot, /*out*/ struct caml_loc_inf
   li->loc_endchr = event->ev_endchr;
 }
 
+/* No inlining in bytecode, always return NULL */
+backtrace_slot caml_backtrace_next_inlined(backtrace_slot pc)
+{
+  return NULL;
+}
+
+int caml_backtrace_count_inlined(backtrace_slot pc)
+{
+  return 0;
+}
+
 /* Get return address */
 CAMLprim value caml_get_caller(value unit)
 {

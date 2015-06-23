@@ -64,6 +64,7 @@ CAMLprim value caml_backtrace_status(value vunit)
    implementation. */
 static void print_location(struct caml_loc_info * li, int index)
 {
+  char * inlined;
   char * info;
 
   /* Ignore compiler-inserted raise */
@@ -81,19 +82,26 @@ static void print_location(struct caml_loc_info * li, int index)
     else
       info = "Called from";
   }
-  if (! li->loc_valid) {
-    fprintf(stderr, "%s unknown location\n", info);
+
+  if (li->loc_is_inlined) {
+    inlined = " (inlined)";
   } else {
-    fprintf (stderr, "%s file \"%s\", line %d, characters %d-%d\n",
-             info, li->loc_filename, li->loc_lnum,
-             li->loc_startchr, li->loc_endchr);
+    inlined = "";
+  }
+
+  if (! li->loc_valid) {
+    fprintf(stderr, "%s unknown location%s\n", info, inlined);
+  } else {
+    fprintf (stderr, "%s file \"%s\"%s, line %d, characters %d-%d\n",
+             info, li->loc_filename, inlined,
+             li->loc_lnum, li->loc_startchr, li->loc_endchr);
   }
 }
 
 /* Print a backtrace */
 CAMLexport void caml_print_exception_backtrace(void)
 {
-  int i;
+  int i, index;
   struct caml_loc_info li;
 
   if (!caml_debug_info_available()) {
@@ -101,9 +109,14 @@ CAMLexport void caml_print_exception_backtrace(void)
     return;
   }
 
-  for (i = 0; i < caml_backtrace_pos; i++) {
-    caml_extract_location_info(caml_backtrace_buffer[i], &li);
-    print_location(&li, i);
+  for (i = 0, index = 0; i < caml_backtrace_pos; i++) {
+    backtrace_slot slot = caml_backtrace_buffer[i];
+    do {
+      caml_extract_location_info(slot, &li);
+      print_location(&li, index);
+      index += 1;
+      slot = caml_backtrace_next_inlined(slot);
+    } while (Is_backtrace_slot_valid(slot));
   }
 }
 
@@ -125,8 +138,8 @@ CAMLprim value caml_get_exception_raw_backtrace(value unit)
   }
   else {
     backtrace_slot saved_caml_backtrace_buffer[BACKTRACE_BUFFER_SIZE];
-    int saved_caml_backtrace_pos;
-    intnat i;
+    int saved_caml_backtrace_pos, words;
+    intnat i, index;
 
     saved_caml_backtrace_pos = caml_backtrace_pos;
 
@@ -134,12 +147,20 @@ CAMLprim value caml_get_exception_raw_backtrace(value unit)
       saved_caml_backtrace_pos = BACKTRACE_BUFFER_SIZE;
     }
 
-    memcpy(saved_caml_backtrace_buffer, caml_backtrace_buffer,
-           saved_caml_backtrace_pos * sizeof(backtrace_slot));
+    for (i = 0, words = saved_caml_backtrace_pos; i < saved_caml_backtrace_pos; ++i) {
+      backtrace_slot slot = caml_backtrace_buffer[i];
+      saved_caml_backtrace_buffer[i] = slot;
+      words += caml_backtrace_count_inlined(slot);
+    }
 
-    res = caml_alloc(saved_caml_backtrace_pos, 0);
-    for (i = 0; i < saved_caml_backtrace_pos; i++) {
-      Store_field(res, i, caml_val_raw_backtrace_slot(saved_caml_backtrace_buffer[i]));
+    res = caml_alloc(words, 0);
+    for (i = 0, index = 0; i < saved_caml_backtrace_pos; ++i) {
+      backtrace_slot slot = saved_caml_backtrace_buffer[i];
+      do {
+        Store_field(res, index, caml_val_raw_backtrace_slot(slot));
+        index += 1;
+        slot = caml_backtrace_next_inlined(slot);
+      } while (Is_backtrace_slot_valid(slot));
     }
   }
 
@@ -160,12 +181,13 @@ CAMLprim value caml_convert_raw_backtrace_slot(value backtrace_slot)
 
   if (li.loc_valid) {
     fname = caml_copy_string(li.loc_filename);
-    p = caml_alloc_small(5, 0);
+    p = caml_alloc_small(6, 0);
     Field(p, 0) = Val_bool(li.loc_is_raise);
     Field(p, 1) = fname;
     Field(p, 2) = Val_int(li.loc_lnum);
     Field(p, 3) = Val_int(li.loc_startchr);
     Field(p, 4) = Val_int(li.loc_endchr);
+    Field(p, 5) = Val_bool(li.loc_is_inlined);
   } else {
     p = caml_alloc_small(1, 1);
     Field(p, 0) = Val_bool(li.loc_is_raise);
