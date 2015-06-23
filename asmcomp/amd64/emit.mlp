@@ -636,6 +636,10 @@ let emit_instr fallthrough i =
       I.cvttsd2si (arg i 0) (res i 0)
   | Lop(Iretaddr) ->
       I.mov (mem64 QWORD (frame_size() - frame_offset) RSP) (res i 0)
+  | Lop(Idescriptor dbg) ->
+      let lbl = record_frame_label Reg.Set.empty dbg in
+      def_label lbl;
+      I.lea (mem64_rip NONE (emit_label lbl)) (res i 0)
   | Lop(Ispecific(Ilea addr)) ->
       I.lea (addressing addr NONE i 0) (res i 0)
   | Lop(Ispecific(Istore_int(n, addr, _))) ->
