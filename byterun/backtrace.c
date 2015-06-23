@@ -435,12 +435,13 @@ CAMLprim value caml_convert_raw_backtrace_slot(value backtrace_slot) {
 
   if (li.loc_valid) {
     fname = caml_copy_string(li.loc_filename);
-    p = caml_alloc_small(5, 0);
+    p = caml_alloc_small(6, 0);
     Field(p, 0) = Val_bool(li.loc_is_raise);
     Field(p, 1) = fname;
     Field(p, 2) = Val_int(li.loc_lnum);
     Field(p, 3) = Val_int(li.loc_startchr);
     Field(p, 4) = Val_int(li.loc_endchr);
+    Field(p, 5) = Val_bool(0); /* is_inline is always false in bytecode */
   } else {
     p = caml_alloc_small(1, 1);
     Field(p, 0) = Val_bool(li.loc_is_raise);
@@ -501,36 +502,13 @@ CAMLprim value caml_get_exception_backtrace(value unit)
   CAMLreturn(res);
 }
 
-/* Turn encoded retaddr into eventual location information */
+/* Turn encoded retaddr into raw_backtrace_slot */
 CAMLprim value caml_caller_slot(value retaddr)
 {
-  CAMLparam1(retaddr);
-  CAMLlocal3(result, block, fname);
-  struct loc_info li;
-
-  read_debug_info();
-  if (events == NULL)
-    result = Val_unit;
-  else
-  {
-    extract_location_info(Codet_Val(retaddr), &li);
-
-    if (li.loc_valid) {
-      fname = caml_copy_string(li.loc_filename);
-
-      block = caml_alloc_small(3, 0);
-      Field(block, 0) = fname;
-      Field(block, 1) = Val_int(li.loc_lnum);
-      Field(block, 2) = Val_int(li.loc_startchr);
-
-      result = caml_alloc_small(1, 0);
-      Field(result, 0) = block;
-
-    } else {
-      result = Val_unit;
-    }
-  }
-  CAMLreturn(result);
+  /* "retaddr" is a code pointer.
+   * In bytecode, a raw_backtrace_slot is already a code pointer, not a frame
+   * descriptor as in native. */
+  return retaddr;
 }
 
 /* Get return address */

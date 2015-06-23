@@ -86,7 +86,6 @@ struct caml_loc_info {
   int loc_lnum;
   int loc_startchr;
   int loc_endchr;
-  void * loc_next;
 };
 
 /* Hash table of frame descriptors */
