@@ -309,7 +309,7 @@ static void parse_camlrunparam(void)
     while (*opt != '\0'){
       switch (*opt++){
       case 'a': scanmult (opt, &p); caml_set_allocation_policy (p); break;
-      case 'b': caml_record_backtrace(Val_true); break;
+      case 'b': caml_backtrace_active = 1; break;
       case 'h': scanmult (opt, &heap_size_init); break;
       case 'i': scanmult (opt, &heap_chunk_init); break;
       case 'l': scanmult (opt, &max_stack_init); break;
@@ -404,6 +404,10 @@ CAMLexport void caml_main(char **argv)
                 percent_free_init, max_percent_free_init);
   caml_init_stack (max_stack_init);
   init_atoms();
+  if (caml_backtrace_active) {
+    caml_backtrace_active = 0;
+    caml_record_backtrace(Val_true);
+  }
   /* Initialize the interpreter */
   caml_interprete(NULL, 0);
   /* Initialize the debugger, if needed */

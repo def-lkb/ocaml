@@ -336,12 +336,11 @@ static void print_location(struct caml_loc_info * li, int index, value exn)
 
 void caml_print_exception_backtrace(void)
 {
-  int i;
-  int exn_pos;
+  int i, exn_pos;
   struct caml_loc_info li;
   value exn = Val_unit;
 
-  for (i = 0; i < caml_backtrace_pos; i++) {
+  for (i = 0, exn_pos = 0; i < caml_backtrace_pos; i++) {
     extract_location_info((frame_descr *) (caml_backtrace_buffer[i]), &li);
     if (exn_pos < caml_backtrace_exns_cur && caml_backtrace_exns_pos[exn_pos] == i) {
       exn = Field(caml_backtrace_exns, exn_pos);
@@ -444,7 +443,7 @@ CAMLprim value caml_get_exception_raw_backtrace(value unit)
         pair = caml_alloc_small(2, 0);
         Field(pair, 0) = Val_Descrptr(saved_caml_backtrace_buffer[i]);
         Field(pair, 1) = Field(caml_backtrace_exns, exn_pos);
-        exn_pos++;
+        exn_pos += 1;
         Store_field(res, i, pair);
       } else {
         /* [Val_Descrptr] always returns an immediate. */
