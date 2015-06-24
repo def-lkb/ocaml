@@ -32,6 +32,11 @@ int caml_backtrace_last_exns_pos = 0;
 #define BACKTRACE_EXN_LENGTH 16
 #define BACKTRACE_BUFFER_SIZE 1024
 
+/*
+ * REALLY NEED STATICALLY ALLOCATED exception array
+ * caml_alloc in caml_stash_backtrace is wrong.
+ */
+
 /* In order to prevent the GC from walking through the debug information
    (which have no headers), we transform frame_descr pointers into
    31/63 bits ocaml integers by shifting them by 1 to the right. We do
@@ -113,22 +118,6 @@ frame_descr * caml_next_frame_descriptor(uintnat * pc, char ** sp)
   }
 }
 
-static int frame_descr_is_raise(frame_descr * d)
-{
-  uintnat infoptr;
-  uint32 info1;
-  if ((d->frame_size & 1) == 0)
-    return 1;
-
-  infoptr = ((uintnat) d +
-             sizeof(char *) + sizeof(short) + sizeof(short) +
-             sizeof(short) * d->num_live + sizeof(frame_descr *) - 1)
-            & -sizeof(frame_descr *);
-  info1 = ((uint32*)infoptr)[0];
-
-  return ((info1 & 3) != 0);
-}
-
 /* Stores the return addresses contained in the given stack fragment
    into the backtrace array ; this version is performance-sensitive as
    it is called at each [raise] in a program compiled with [-g], so we
@@ -139,6 +128,8 @@ static int frame_descr_is_raise(frame_descr * d)
 void caml_stash_backtrace(value exn, uintnat pc, char * sp, char * trapsp)
 {
   Assert (caml_backtrace_active != 0);
+  printf("exception: 0x%08X(%s), caml_backtrace_pos: %d, caml_backtrace_last_exns_pos: %d\n",
+      exn, ((char**)exn)[1], caml_backtrace_pos, caml_backtrace_last_exns_pos);
 
   if (caml_backtrace_buffer == NULL) {
     Assert(caml_backtrace_pos == 0);
@@ -148,15 +139,16 @@ void caml_stash_backtrace(value exn, uintnat pc, char * sp, char * trapsp)
 
   if (caml_backtrace_pos == 0) {
     int i;
+    caml_backtrace_last_exns_pos = 0;
     if (caml_backtrace_last_exns == Val_unit) {
       caml_backtrace_last_exns = caml_alloc((mlsize_t) BACKTRACE_EXN_LENGTH, 0);
-    } else {
-      for (i = 0; i < caml_backtrace_last_exns_pos; ++i) {
-        Store_field(caml_backtrace_last_exns, i, Val_unit);
-      }
     }
-    caml_backtrace_last_exns_pos = 0;
   }
+  if (caml_backtrace_last_exns_pos < BACKTRACE_EXN_LENGTH) {
+    Store_field(caml_backtrace_last_exns, caml_backtrace_last_exns_pos, exn);
+    caml_backtrace_last_exns_pos += 1;
+  }
+
 
   /* iterate on each frame  */
   while (1) {
@@ -165,13 +157,6 @@ void caml_stash_backtrace(value exn, uintnat pc, char * sp, char * trapsp)
     /* store its descriptor in the backtrace buffer */
     if (caml_backtrace_pos >= BACKTRACE_BUFFER_SIZE) return;
     caml_backtrace_buffer[caml_backtrace_pos++] = (code_t) descr;
-
-    /* store exception value if raise-site */
-    if (caml_backtrace_last_exns_pos < BACKTRACE_EXN_LENGTH &&
-        frame_descr_is_raise(descr)) {
-      Store_field(caml_backtrace_last_exns, caml_backtrace_last_exns_pos, exn);
-      caml_backtrace_last_exns_pos++;
-    }
 
     /* Stop when we reach the current exception handler */
 #ifndef Stack_grows_upwards
@@ -365,6 +350,22 @@ CAMLprim value caml_convert_raw_backtrace_slot(value backtrace_slot) {
   CAMLreturn(p);
 }
 
+static int frame_descr_is_raise(frame_descr * d)
+{
+  uintnat infoptr;
+  uint32 info1;
+  if ((d->frame_size & 1) == 0)
+    return 1;
+
+  infoptr = ((uintnat) d +
+             sizeof(char *) + sizeof(short) + sizeof(short) +
+             sizeof(short) * d->num_live + sizeof(frame_descr *) - 1)
+            & -sizeof(frame_descr *);
+  info1 = ((uint32*)infoptr)[0];
+
+  return ((info1 & 3) != 0);
+}
+
 /* Get a copy of the latest backtrace */
 
 CAMLprim value caml_get_exception_raw_backtrace(value unit)
@@ -401,7 +402,8 @@ CAMLprim value caml_get_exception_raw_backtrace(value unit)
 
       if (exn_pos < caml_backtrace_last_exns_pos &&
           frame_descr_is_raise(d) &&
-          Field(caml_backtrace_last_exns, exn_pos) != Val_unit) {
+          //Field(caml_backtrace_last_exns, exn_pos) != Val_unit &&
+          1) {
         pair = caml_alloc_small(2, 0);
         Field(pair, 0) = Val_Descrptr(saved_caml_backtrace_buffer[i]);
         Field(pair, 1) = Field(caml_backtrace_last_exns, exn_pos);
