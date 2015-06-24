@@ -27,7 +27,9 @@
 int caml_backtrace_active = 0;
 int caml_backtrace_pos = 0;
 code_t * caml_backtrace_buffer = NULL;
-value caml_backtrace_last_exn = Val_unit;
+value caml_backtrace_last_exns = Val_unit;
+int caml_backtrace_last_exns_pos = 0;
+#define BACKTRACE_EXN_LENGTH 16
 #define BACKTRACE_BUFFER_SIZE 1024
 
 /* In order to prevent the GC from walking through the debug information
@@ -51,10 +53,11 @@ CAMLprim value caml_record_backtrace(value vflag)
     caml_backtrace_active = flag;
     caml_backtrace_pos = 0;
     if (flag) {
-      caml_backtrace_last_exn = Val_unit;
-      caml_register_global_root(&caml_backtrace_last_exn);
+      caml_backtrace_last_exns_pos = 0;
+      caml_backtrace_last_exns = Val_unit;
+      caml_register_global_root(&caml_backtrace_last_exns);
     } else {
-      caml_remove_global_root(&caml_backtrace_last_exn);
+      caml_remove_global_root(&caml_backtrace_last_exns);
     }
   }
   return Val_unit;
@@ -110,6 +113,22 @@ frame_descr * caml_next_frame_descriptor(uintnat * pc, char ** sp)
   }
 }
 
+static int frame_descr_is_raise(frame_descr * d)
+{
+  uintnat infoptr;
+  uint32 info1;
+  if ((d->frame_size & 1) == 0)
+    return 1;
+
+  infoptr = ((uintnat) d +
+             sizeof(char *) + sizeof(short) + sizeof(short) +
+             sizeof(short) * d->num_live + sizeof(frame_descr *) - 1)
+            & -sizeof(frame_descr *);
+  info1 = ((uint32*)infoptr)[0];
+
+  return ((info1 & 3) != 0);
+}
+
 /* Stores the return addresses contained in the given stack fragment
    into the backtrace array ; this version is performance-sensitive as
    it is called at each [raise] in a program compiled with [-g], so we
@@ -119,14 +138,24 @@ frame_descr * caml_next_frame_descriptor(uintnat * pc, char ** sp)
 
 void caml_stash_backtrace(value exn, uintnat pc, char * sp, char * trapsp)
 {
-  if (exn != caml_backtrace_last_exn) {
-    caml_backtrace_pos = 0;
-    caml_backtrace_last_exn = exn;
-  }
+  Assert (caml_backtrace_active != 0);
+
   if (caml_backtrace_buffer == NULL) {
     Assert(caml_backtrace_pos == 0);
     caml_backtrace_buffer = malloc(BACKTRACE_BUFFER_SIZE * sizeof(code_t));
     if (caml_backtrace_buffer == NULL) return;
+  }
+
+  if (caml_backtrace_pos == 0) {
+    int i;
+    if (caml_backtrace_last_exns == Val_unit) {
+      caml_backtrace_last_exns = caml_alloc((mlsize_t) BACKTRACE_EXN_LENGTH, 0);
+    } else {
+      for (i = 0; i < caml_backtrace_last_exns_pos; ++i) {
+        Store_field(caml_backtrace_last_exns, i, Val_unit);
+      }
+    }
+    caml_backtrace_last_exns_pos = 0;
   }
 
   /* iterate on each frame  */
@@ -136,6 +165,13 @@ void caml_stash_backtrace(value exn, uintnat pc, char * sp, char * trapsp)
     /* store its descriptor in the backtrace buffer */
     if (caml_backtrace_pos >= BACKTRACE_BUFFER_SIZE) return;
     caml_backtrace_buffer[caml_backtrace_pos++] = (code_t) descr;
+
+    /* store exception value if raise-site */
+    if (caml_backtrace_last_exns_pos < BACKTRACE_EXN_LENGTH &&
+        frame_descr_is_raise(descr)) {
+      Store_field(caml_backtrace_last_exns, caml_backtrace_last_exns_pos, exn);
+      caml_backtrace_last_exns_pos++;
+    }
 
     /* Stop when we reach the current exception handler */
 #ifndef Stack_grows_upwards
@@ -297,22 +333,33 @@ void caml_print_exception_backtrace(void)
 
 CAMLprim value caml_convert_raw_backtrace_slot(value backtrace_slot) {
   CAMLparam1(backtrace_slot);
-  CAMLlocal2(p, fname);
+  CAMLlocal4(p, fname, descrptr, exn);
   struct caml_loc_info li;
 
-  extract_location_info(Descrptr_Val(backtrace_slot), &li);
+  if (Is_long(backtrace_slot)) {
+    descrptr = backtrace_slot;
+    exn = Val_unit; /* None */
+  } else {
+    descrptr = Field(backtrace_slot, 0);
+    exn = caml_alloc_small(1, 0); /* Some */
+    Store_field(exn, 0, Field(backtrace_slot, 1));
+  }
+
+  extract_location_info(Descrptr_Val(descrptr), &li);
 
   if (li.loc_valid) {
     fname = caml_copy_string(li.loc_filename);
-    p = caml_alloc_small(5, 0);
+    p = caml_alloc_small(6, 0);
     Field(p, 0) = Val_bool(li.loc_is_raise);
     Field(p, 1) = fname;
     Field(p, 2) = Val_int(li.loc_lnum);
     Field(p, 3) = Val_int(li.loc_startchr);
     Field(p, 4) = Val_int(li.loc_endchr);
+    Field(p, 5) = exn;
   } else {
-    p = caml_alloc_small(1, 1);
+    p = caml_alloc_small(2, 1);
     Field(p, 0) = Val_bool(li.loc_is_raise);
+    Field(p, 1) = exn;
   }
 
   CAMLreturn(p);
@@ -323,7 +370,7 @@ CAMLprim value caml_convert_raw_backtrace_slot(value backtrace_slot) {
 CAMLprim value caml_get_exception_raw_backtrace(value unit)
 {
   CAMLparam0();
-  CAMLlocal1(res);
+  CAMLlocal2(res, pair);
   const int tag = 0;
 
   /* Beware: the allocations below may cause finalizers to be run, and another
@@ -337,7 +384,7 @@ CAMLprim value caml_get_exception_raw_backtrace(value unit)
   else {
     code_t saved_caml_backtrace_buffer[BACKTRACE_BUFFER_SIZE];
     int saved_caml_backtrace_pos;
-    intnat i;
+    intnat i, exn_pos;
 
     saved_caml_backtrace_pos = caml_backtrace_pos;
 
@@ -349,9 +396,21 @@ CAMLprim value caml_get_exception_raw_backtrace(value unit)
            saved_caml_backtrace_pos * sizeof(code_t));
 
     res = caml_alloc(saved_caml_backtrace_pos, tag);
-    for (i = 0; i < saved_caml_backtrace_pos; i++) {
-      /* [Val_Descrptr] always returns an immediate. */
-      Field(res, i) = Val_Descrptr(saved_caml_backtrace_buffer[i]);
+    for (i = 0, exn_pos = 0; i < saved_caml_backtrace_pos; i++) {
+      frame_descr * d = (frame_descr *)(saved_caml_backtrace_buffer[i]);
+
+      if (exn_pos < caml_backtrace_last_exns_pos &&
+          frame_descr_is_raise(d) &&
+          Field(caml_backtrace_last_exns, exn_pos) != Val_unit) {
+        pair = caml_alloc_small(2, 0);
+        Field(pair, 0) = Val_Descrptr(saved_caml_backtrace_buffer[i]);
+        Field(pair, 1) = Field(caml_backtrace_last_exns, exn_pos);
+        exn_pos++;
+        Store_field(res, i, pair);
+      } else {
+        /* [Val_Descrptr] always returns an immediate. */
+        Field(res, i) = Val_Descrptr(saved_caml_backtrace_buffer[i]);
+      }
     }
   }
 

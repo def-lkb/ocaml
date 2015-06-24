@@ -99,7 +99,7 @@ void caml_stash_backtrace(value exn, code_t pc, value * sp, int reraise)
 {
   code_t end_code = (code_t) ((char *) caml_start_code + caml_code_size);
   if (pc != NULL) pc = pc - 1;
-  if (exn != caml_backtrace_last_exn || !reraise) {
+  if (!reraise) {
     caml_backtrace_pos = 0;
     caml_backtrace_last_exn = exn;
   }
