@@ -131,7 +131,7 @@ static void parse_camlrunparam(void)
       case 'o': scanmult (opt, &percent_free_init); break;
       case 'O': scanmult (opt, &max_percent_free_init); break;
       case 'v': scanmult (opt, &caml_verb_gc); break;
-      case 'b': caml_record_backtrace(Val_true); break;
+      case 'b': caml_backtrace_active = 1; break;
       case 'p': caml_parser_trace = 1; break;
       case 'a': scanmult (opt, &p); caml_set_allocation_policy (p); break;
       }
@@ -174,6 +174,10 @@ void caml_main(char **argv)
   parse_camlrunparam();
   caml_init_gc (minor_heap_init, heap_size_init, heap_chunk_init,
                 percent_free_init, max_percent_free_init);
+  if (caml_backtrace_active) {
+    caml_backtrace_active = 0;
+    caml_record_backtrace(Val_true);
+  }
   init_atoms();
   caml_init_signals();
   caml_debugger_init (); /* force debugger.o stub to be linked */
