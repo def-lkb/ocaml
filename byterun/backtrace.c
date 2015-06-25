@@ -48,15 +48,19 @@ CAMLexport char * caml_cds_file = NULL;
 #define BACKTRACE_EXN_LENGTH 16
 
 /* Location of fields in the Instruct.debug_event record */
-enum { EV_POS = 0,
-       EV_MODULE = 1,
-       EV_LOC = 2,
-       EV_KIND = 3 };
+enum {
+  EV_POS = 0,
+  EV_MODULE = 1,
+  EV_LOC = 2,
+  EV_KIND = 3
+};
 
 /* Location of fields in the Location.t record. */
-enum { LOC_START = 0,
-       LOC_END = 1,
-       LOC_GHOST = 2 };
+enum {
+  LOC_START = 0,
+  LOC_END = 1,
+  LOC_GHOST = 2
+};
 
 /* Location of fields in the Lexing.position record. */
 enum {
@@ -105,7 +109,6 @@ void caml_stash_backtrace(value exn, code_t pc, value * sp, int reraise)
   if (pc != NULL) pc = pc - 1;
   if (!reraise) {
     caml_backtrace_pos = 0;
-    caml_backtrace_last_exn = exn;
   }
   if (caml_backtrace_buffer == NULL) {
     Assert(caml_backtrace_pos == 0);
@@ -488,10 +491,11 @@ CAMLprim value caml_convert_raw_backtrace_slot(value backtrace_slot) {
     Field(p, 4) = Val_int(li.loc_endchr);
     Field(p, 5) = exn;
   } else {
-    p = caml_alloc_small(1, 1);
+    p = caml_alloc_small(2, 1);
     Field(p, 0) = Val_bool(li.loc_is_raise);
     Field(p, 1) = exn;
   }
+
   CAMLreturn(p);
 }
 
@@ -500,25 +504,48 @@ CAMLprim value caml_convert_raw_backtrace_slot(value backtrace_slot) {
 CAMLprim value caml_get_exception_raw_backtrace(value unit)
 {
   CAMLparam0();
-  CAMLlocal1(res, pair);
+  CAMLlocal2(res, pair);
+  CAMLlocalN(saved_exns, BACKTRACE_EXN_LENGTH);
 
-  res = caml_alloc(caml_backtrace_pos, 0);
-  if(caml_backtrace_buffer != NULL) {
-    int exn_pos;
-    intnat i;
-    for(i = 0, exn_pos = 0; i < caml_backtrace_pos; i++) {
-      if (exn_pos < caml_backtrace_exns_cur &&
-          caml_backtrace_exns_pos[exn_pos] == i) {
-        pair = caml_alloc_small(2, 0);
-        Field(pair, 0) = Val_Codet(caml_backtrace_buffer[i]);
-        Field(pair, 1) = Field(caml_backtrace_exns, exn_pos);
-        exn_pos += 1;
-        Store_field(res, i, pair);
-      } else {
-        Field(res, i) = Val_Codet(caml_backtrace_buffer[i]);
-      }
+  int i, saved_pos, saved_exns_cur, exn_pos;
+  code_t saved_buffer[BACKTRACE_BUFFER_SIZE];
+  int saved_exns_pos[BACKTRACE_EXN_LENGTH];
+
+  /* Beware: the allocations below may cause finalizers to be run, and another
+     backtrace---possibly of a different length---to be stashed (for example
+     if the finalizer raises then catches an exception).  We choose to ignore
+     any such finalizer backtraces and return the original one. */
+  saved_pos = caml_backtrace_pos;
+  if (saved_pos > BACKTRACE_BUFFER_SIZE) {
+    saved_pos = BACKTRACE_BUFFER_SIZE;
+  }
+
+  /* exceptions are ocaml values: if backtrace is no longer active, they may have get
+   * GCed (while code pointers are still valid).
+   */
+  saved_exns_cur = caml_backtrace_active ? caml_backtrace_exns_cur : 0;
+
+  for (i = 0; i < saved_pos; i++) {
+    saved_buffer[i] = caml_backtrace_buffer[i];
+  }
+  for (i = 0; i < saved_exns_cur; i++) {
+    saved_exns_pos[i] = caml_backtrace_exns_pos[i];
+    saved_exns[i] = Field(caml_backtrace_exns, i);
+  }
+
+  res = caml_alloc(saved_pos, 0);
+  for(i = 0, exn_pos = 0; i < saved_pos; i++) {
+    if (exn_pos < saved_exns_cur && saved_exns_pos[exn_pos] == i) {
+      pair = caml_alloc_small(2, 0);
+      Field(pair, 0) = Val_Codet(saved_buffer[i]);
+      Field(pair, 1) = Field(saved_exns, exn_pos);
+      exn_pos += 1;
+      Store_field(res, i, pair);
+    } else {
+      Field(res, i) = Val_Codet(saved_buffer[i]);
     }
   }
+
   CAMLreturn(res);
 }
 
@@ -554,7 +581,8 @@ CAMLprim value caml_get_exception_backtrace(value unit)
               caml_modify(&Field(arr, i), slot);
           }
       }
-      res = caml_alloc_small(1, 0); Field(res, 0) = arr; /* Some */
+      res = caml_alloc_small(1, 0);
+      Field(res, 0) = arr; /* Some */
   }
   CAMLreturn(res);
 }
