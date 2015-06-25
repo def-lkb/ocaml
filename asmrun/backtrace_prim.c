@@ -33,14 +33,14 @@
    In particular, we do not need to use [caml_modify] when setting
    an array element with such a value.
 */
-value caml_raw_backtrace_slot_of_code(code_t pc)
+value caml_val_raw_backtrace_slot(backtrace_slot pc)
 {
   return Val_long((uintnat)pc>>1);
 }
 
-code_t caml_raw_backtrace_slot_code(value v)
+backtrace_slot caml_raw_backtrace_slot_val(value v)
 {
-  return ((code_t)(Long_val(v)<<1));
+  return ((backtrace_slot)(Long_val(v)<<1));
 }
 
 /* returns the next frame descriptor (or NULL if none is available),
@@ -101,7 +101,7 @@ void caml_stash_backtrace(value exn, uintnat pc, char * sp, char * trapsp)
   }
   if (caml_backtrace_buffer == NULL) {
     Assert(caml_backtrace_pos == 0);
-    caml_backtrace_buffer = malloc(BACKTRACE_BUFFER_SIZE * sizeof(code_t));
+    caml_backtrace_buffer = malloc(BACKTRACE_BUFFER_SIZE * sizeof(backtrace_slot));
     if (caml_backtrace_buffer == NULL) return;
   }
 
@@ -111,7 +111,7 @@ void caml_stash_backtrace(value exn, uintnat pc, char * sp, char * trapsp)
     if (descr == NULL) return;
     /* store its descriptor in the backtrace buffer */
     if (caml_backtrace_pos >= BACKTRACE_BUFFER_SIZE) return;
-    caml_backtrace_buffer[caml_backtrace_pos++] = (code_t) descr;
+    caml_backtrace_buffer[caml_backtrace_pos++] = (backtrace_slot) descr;
 
     /* Stop when we reach the current exception handler */
 #ifndef Stack_grows_upwards
@@ -172,7 +172,7 @@ CAMLprim value caml_get_current_callstack(value max_frames_value) {
     for (trace_pos = 0; trace_pos < trace_size; trace_pos++) {
       frame_descr * descr = caml_next_frame_descriptor(&pc, &sp);
       Assert(descr != NULL);
-      Field(trace, trace_pos) = caml_raw_backtrace_slot_of_code((code_t) descr);
+      Field(trace, trace_pos) = caml_val_raw_backtrace_slot((backtrace_slot) descr);
     }
   }
 
@@ -181,7 +181,7 @@ CAMLprim value caml_get_current_callstack(value max_frames_value) {
 
 /* Extract location information for the given frame descriptor */
 
-void caml_extract_location_info(code_t slot, /*out*/ struct caml_loc_info * li)
+void caml_extract_location_info(backtrace_slot slot, /*out*/ struct caml_loc_info * li)
 {
   uintnat infoptr;
   uint32_t info1, info2;
@@ -256,12 +256,12 @@ static void print_location(struct caml_loc_info * li, int index)
   }
 }
 
-CAMLprim value caml_add_debug_info(code_t start, value size, value events)
+CAMLprim value caml_add_debug_info(backtrace_slot start, value size, value events)
 {
   return Val_unit;
 }
 
-CAMLprim value caml_remove_debug_info(code_t start)
+CAMLprim value caml_remove_debug_info(backtrace_slot start)
 {
   return Val_unit;
 }
