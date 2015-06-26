@@ -163,7 +163,12 @@ let main argv =
   let ppf = Format.err_formatter in
   try
     readenv ppf Before_args;
-    Arg.parse_argv argv (Arch.command_line_options @ Options.list) anonymous usage;
+    begin try
+      Arg.parse_argv argv (Arch.command_line_options @ Options.list) anonymous usage;
+    with
+    | Arg.Bad msg  -> Printf.eprintf "%s" msg; exit 2;
+    | Arg.Help msg -> Printf.printf "%s" msg; exit 0;
+    end;
     readenv ppf Before_link;
     if
       List.length (List.filter (fun x -> !x)
@@ -248,22 +253,57 @@ let server_main command =
       Unix.listen socket 0;
       at_exit (fun () -> if Unix.getpid () = pid then Unix.unlink socket_path)
 
-    let handle_client fd =
+    let stat_fds = ref []
+    let process_stats updated =
+      let todo, stat_fds' = List.partition (fun x -> List.mem x updated) !stat_fds in
+      stat_fds := stat_fds';
+      List.iter (fun fd ->
+          let ic = Unix.in_channel_of_descr fd in
+          match input_value ic with
+          | exception End_of_file -> ()
+          | (read_cmi_files : string list) ->
+              Unix.close fd;
+              List.iter prerr_endline read_cmi_files
+        ) todo
+
+    let impersonate pid =
+      let fd x = "/proc/" ^ string_of_int pid ^ "/fd/" ^ string_of_int x in
+      let stdin  = Unix.openfile (fd 0) [Unix.O_RDONLY] 0 in
+      let stdout = Unix.openfile (fd 1) [Unix.O_WRONLY] 0 in
+      let stderr = Unix.openfile (fd 2) [Unix.O_WRONLY] 0 in
+      Unix.dup2 stdin  Unix.stdin ; Unix.close stdin ;
+      Unix.dup2 stdout Unix.stdout; Unix.close stdout;
+      Unix.dup2 stderr Unix.stderr; Unix.close stderr;
+      ()
+
+    let handle_client w fd =
       let ic = Unix.in_channel_of_descr fd in
-      let argv = input_value ic in
+      let (pid, argv) : int * string array = input_value ic in
+      impersonate pid;
+      at_exit (fun () ->
+          let oc = Unix.out_channel_of_descr w in
+          output_value oc !Cmi_format.read_cmi_files;
+          flush oc
+        );
       main argv
 
     let accept () =
       let fd, _ = Unix.accept socket in
+      let r, w = Unix.pipe () in
       let pid = Unix.fork () in
-      if pid = 0 then
-        handle_client fd
-      else
+      stat_fds := r :: !stat_fds;
+      if pid = 0 then begin
+        List.iter Unix.close (socket :: !stat_fds);
+        handle_client w fd
+      end
+      else begin
+        Unix.close w;
         add_child pid (fun status ->
             let oc = Unix.out_channel_of_descr fd in
             output_value oc status;
             flush oc;
             Unix.close fd)
+      end
   end
   in
   let final_status = ref None in
@@ -279,11 +319,12 @@ let server_main command =
       Server.exec_child pid status
     done;
     if !Server.childs <> [] then
-      match Unix.select [Server.socket] [] [] 1. with
+      match Unix.select (Server.socket :: !Server.stat_fds) [] [] 1. with
       | exception (Unix.Unix_error (Unix.EINTR, _, _)) -> loop ()
       | r, w, e ->
           assert (w = [] && e = []);
           if List.mem Server.socket r then Server.accept ();
+          Server.process_stats r;
           loop ()
   in
   loop ()
@@ -304,7 +345,7 @@ let client_main argv =
       in
       let ic = Unix.in_channel_of_descr Client.socket in
       let oc = Unix.out_channel_of_descr Client.socket in
-      output_value oc argv;
+      output_value oc (Unix.getpid (), argv);
       flush oc;
       let status : Unix.process_status = input_value ic in
       begin match status with

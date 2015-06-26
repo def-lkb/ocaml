@@ -66,6 +66,13 @@ let read_cmi filename =
       close_in ic;
       raise (Error e)
 
+let read_cmi_files : string list ref = ref []
+
+let read_cmi filename =
+  let cmi = read_cmi filename in
+  read_cmi_files := filename :: !read_cmi_files;
+  cmi
+
 let output_cmi filename oc cmi =
 (* beware: the provided signature must have been substituted for saving *)
   output_string oc Config.cmi_magic_number;
