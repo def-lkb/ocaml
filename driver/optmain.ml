@@ -263,7 +263,9 @@ let server_main command =
           | exception End_of_file -> ()
           | (read_cmi_files : string list) ->
               Unix.close fd;
-              List.iter prerr_endline read_cmi_files
+              List.iter (fun name -> ignore (Cmi_format.read_cmi name))
+                read_cmi_files;
+              Cmi_format.read_cmi_files := []
         ) todo
 
     let impersonate pid =

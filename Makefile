@@ -105,7 +105,7 @@ TOPLEVEL=toplevel/genprintval.cmo toplevel/toploop.cmo \
 
 BYTESTART=driver/main.cmo
 
-OPTSTART=otherlibs/unix/unix.cma driver/optmain.cmo
+OPTSTART=driver/optmain.cmo
 
 TOPLEVELSTART=toplevel/topstart.cmo
 
@@ -405,6 +405,7 @@ partialclean::
 
 ocamlopt: compilerlibs/ocamlcommon.cma compilerlibs/ocamloptcomp.cma $(OPTSTART)
 	$(CAMLC) $(LINKFLAGS) -o ocamlopt \
+		otherlibs/unix/unix.cma \
 	  compilerlibs/ocamlcommon.cma compilerlibs/ocamloptcomp.cma $(OPTSTART)
 
 partialclean::
@@ -529,7 +530,7 @@ partialclean::
 
 ocamlopt.opt: compilerlibs/ocamlcommon.cmxa compilerlibs/ocamloptcomp.cmxa \
               $(OPTSTART:.cmo=.cmx)
-	$(CAMLOPT) $(LINKFLAGS) -o ocamlopt.opt \
+	$(CAMLOPT) $(LINKFLAGS) -o ocamlopt.opt otherlibs/unix/unix.cmxa \
 	   compilerlibs/ocamlcommon.cmxa compilerlibs/ocamloptcomp.cmxa \
 	   $(OPTSTART:.cmo=.cmx)
 

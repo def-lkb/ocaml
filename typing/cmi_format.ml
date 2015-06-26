@@ -66,12 +66,36 @@ let read_cmi filename =
       close_in ic;
       raise (Error e)
 
+let cache : (string, Unix.stats * cmi_infos) Hashtbl.t = Hashtbl.create 7
+
+let is_uptodate s0 s1 =
+  Unix.(s0.st_mtime = s1.st_mtime &&
+        s0.st_ino   = s1.st_ino   &&
+        s0.st_dev   = s1.st_dev   )
+
 let read_cmi_files : string list ref = ref []
 
 let read_cmi filename =
-  let cmi = read_cmi filename in
-  read_cmi_files := filename :: !read_cmi_files;
-  cmi
+  match Unix.stat filename with
+  | exception _ -> read_cmi filename
+  | stats ->
+      let cached =
+        match Hashtbl.find cache filename with
+        | exception Not_found -> None
+        | (stats', cached) when is_uptodate stats stats' -> Some cached
+        | _ ->
+            prerr_endline ("Out-of-date " ^ filename);
+            None
+      in
+      match cached with
+      | None ->
+          let cmi = read_cmi filename in
+          read_cmi_files := filename :: !read_cmi_files;
+          Hashtbl.add cache filename (stats, cmi);
+          cmi
+      | Some cmi ->
+          prerr_endline ("Reused cached " ^ filename);
+          cmi
 
 let output_cmi filename oc cmi =
 (* beware: the provided signature must have been substituted for saving *)
