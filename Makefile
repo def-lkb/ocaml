@@ -21,7 +21,7 @@ CAMLC=$(CAMLRUN) boot/ocamlc -nostdlib -I boot
 CAMLOPT=$(CAMLRUN) ./ocamlopt -nostdlib -I stdlib -I otherlibs/dynlink
 COMPFLAGS=-strict-sequence -w +33..39+48+50 -warn-error A -bin-annot \
           -safe-string $(INCLUDES)
-LINKFLAGS=
+LINKFLAGS=-I otherlibs/unix
 
 YACCFLAGS=-v
 CAMLLEX=$(CAMLRUN) boot/ocamllex
@@ -36,7 +36,7 @@ OCAMLBUILDNATIVE=$(WITH_OCAMLBUILD:=.native)
 OCAMLDOC_OPT=$(WITH_OCAMLDOC:=.opt)
 
 INCLUDES=-I utils -I parsing -I typing -I bytecomp -I asmcomp -I driver \
-	 -I toplevel
+	 -I toplevel -I otherlibs/unix
 
 UTILS=utils/misc.cmo utils/tbl.cmo utils/config.cmo \
   utils/clflags.cmo utils/terminfo.cmo utils/ccomp.cmo utils/warnings.cmo \
@@ -105,7 +105,7 @@ TOPLEVEL=toplevel/genprintval.cmo toplevel/toploop.cmo \
 
 BYTESTART=driver/main.cmo
 
-OPTSTART=driver/optmain.cmo
+OPTSTART=otherlibs/unix/unix.cma driver/optmain.cmo
 
 TOPLEVELSTART=toplevel/topstart.cmo
 

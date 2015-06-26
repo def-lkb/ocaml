@@ -158,12 +158,12 @@ module Options = Main_args.Make_optcomp_options (struct
   let anonymous = anonymous
 end);;
 
-let main () =
+let main argv =
   native_code := true;
   let ppf = Format.err_formatter in
   try
     readenv ppf Before_args;
-    Arg.parse (Arch.command_line_options @ Options.list) anonymous usage;
+    Arg.parse_argv argv (Arch.command_line_options @ Options.list) anonymous usage;
     readenv ppf Before_link;
     if
       List.length (List.filter (fun x -> !x)
@@ -217,4 +217,106 @@ let main () =
       Location.report_exception ppf x;
       exit 2
 
-let _ = main ()
+let server_main command =
+  if Array.length command = 0 then begin
+    prerr_endline ("Usage: " ^ Sys.argv.(0) ^ " -server <unix-command>");
+    exit 1
+  end;
+  let module Server = struct
+    let pid = Unix.getpid ()
+
+    let childs : (int * (Unix.process_status -> unit)) list ref = ref []
+    let add_child pid f = childs := (pid, f) :: !childs
+    let exec_child pid arg =
+      let rec aux = function
+        | [] -> prerr_endline ("Unknown child PID=" ^ string_of_int pid); []
+        | (x, f) :: xs when x = pid -> f arg; xs
+        | x :: xs -> x :: aux xs
+      in
+      childs := aux !childs
+
+    let socket_path = Filename.temp_file "ocamlserver" "socket"
+    let () =
+      Unix.unlink socket_path;
+      Unix.putenv "OCAMLSERVER" socket_path;
+      prerr_endline ("OCaml server listening on " ^ socket_path)
+
+    let socket = Unix.socket Unix.PF_UNIX Unix.SOCK_STREAM 0
+    let () =
+      Unix.set_close_on_exec socket;
+      Unix.bind socket (Unix.ADDR_UNIX socket_path);
+      Unix.listen socket 0;
+      at_exit (fun () -> if Unix.getpid () = pid then Unix.unlink socket_path)
+
+    let handle_client fd =
+      let ic = Unix.in_channel_of_descr fd in
+      let argv = input_value ic in
+      main argv
+
+    let accept () =
+      let fd, _ = Unix.accept socket in
+      let pid = Unix.fork () in
+      if pid = 0 then
+        handle_client fd
+      else
+        add_child pid (fun status ->
+            let oc = Unix.out_channel_of_descr fd in
+            output_value oc status;
+            flush oc;
+            Unix.close fd)
+  end
+  in
+  let final_status = ref None in
+  let dead_childs = ref 0 in
+  Server.add_child
+    (Unix.create_process command.(0) command Unix.stdin Unix.stdout Unix.stderr)
+    (fun status -> final_status := Some status);
+  Sys.set_signal Sys.sigchld (Sys.Signal_handle (fun _ -> incr dead_childs));
+  let rec loop () =
+    while !dead_childs > 0 do
+      decr dead_childs;
+      let pid, status = Unix.wait () in
+      Server.exec_child pid status
+    done;
+    if !Server.childs <> [] then
+      match Unix.select [Server.socket] [] [] 1. with
+      | exception (Unix.Unix_error (Unix.EINTR, _, _)) -> loop ()
+      | r, w, e ->
+          assert (w = [] && e = []);
+          if List.mem Server.socket r then Server.accept ();
+          loop ()
+  in
+  loop ()
+
+let client_main argv =
+  match Sys.getenv "OCAMLSERVER" with
+  | socket_path ->
+      let module Client = struct
+        let socket_path = socket_path
+        let () =
+          prerr_endline ("Found OCaml server listening on " ^ socket_path)
+
+        let socket = Unix.socket Unix.PF_UNIX Unix.SOCK_STREAM 0
+        let () =
+          Unix.set_close_on_exec socket;
+          Unix.connect socket (Unix.ADDR_UNIX socket_path)
+      end
+      in
+      let ic = Unix.in_channel_of_descr Client.socket in
+      let oc = Unix.out_channel_of_descr Client.socket in
+      output_value oc argv;
+      flush oc;
+      let status : Unix.process_status = input_value ic in
+      begin match status with
+      | Unix.WEXITED n -> exit n
+      | Unix.WSIGNALED n | Unix.WSTOPPED n ->
+          (* Suicide *)
+          Unix.kill (Unix.getpid ()) n;
+          exit 1
+      end
+  | exception Not_found -> main argv
+let () =
+  if Array.length Sys.argv > 1 && List.mem Sys.argv.(1) ["-server"; "--server"] then
+    server_main (Array.sub Sys.argv 2 (Array.length Sys.argv - 2))
+  else
+    client_main Sys.argv
