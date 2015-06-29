@@ -393,7 +393,7 @@ partialclean::
 	rm -f compilerlibs/ocamlbytecomp.cma
 
 ocamlc: compilerlibs/ocamlcommon.cma compilerlibs/ocamlbytecomp.cma $(BYTESTART)
-	$(CAMLC) $(LINKFLAGS) -compat-32 -o ocamlc \
+	$(CAMLC) $(LINKFLAGS) -compat-32 -o ocamlc otherlibs/unix/unix.cma \
 	   compilerlibs/ocamlcommon.cma compilerlibs/ocamlbytecomp.cma $(BYTESTART)
 
 # The native-code compiler
@@ -404,8 +404,7 @@ partialclean::
 	rm -f compilerlibs/ocamloptcomp.cma
 
 ocamlopt: compilerlibs/ocamlcommon.cma compilerlibs/ocamloptcomp.cma $(OPTSTART)
-	$(CAMLC) $(LINKFLAGS) -o ocamlopt \
-		otherlibs/unix/unix.cma \
+	$(CAMLC) $(LINKFLAGS) -o ocamlopt otherlibs/unix/unix.cma \
 	  compilerlibs/ocamlcommon.cma compilerlibs/ocamloptcomp.cma $(OPTSTART)
 
 partialclean::

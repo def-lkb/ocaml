@@ -84,6 +84,7 @@ let read_cmi filename =
         | exception Not_found -> None
         | (stats', cached) when is_uptodate stats stats' -> Some cached
         | _ ->
+            Hashtbl.remove cache filename;
             prerr_endline ("Out-of-date " ^ filename);
             None
       in

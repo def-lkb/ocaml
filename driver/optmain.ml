@@ -265,7 +265,6 @@ let server_main command =
               Unix.close fd;
               List.iter (fun name -> ignore (Cmi_format.read_cmi name))
                 read_cmi_files;
-              Cmi_format.read_cmi_files := []
         ) todo
 
     let impersonate pid =
@@ -327,6 +326,8 @@ let server_main command =
           assert (w = [] && e = []);
           if List.mem Server.socket r then Server.accept ();
           Server.process_stats r;
+          if !Cmi_format.read_cmi_files <> [] then
+            (Cmi_format.read_cmi_files := []; Gc.minor ());
           loop ()
   in
   loop ()
