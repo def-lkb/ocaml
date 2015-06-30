@@ -33,7 +33,6 @@ void caml_init_backtrace(void)
 }
 
 /* Start or stop the backtrace machinery */
-
 CAMLprim value caml_record_backtrace(value vflag)
 {
   int flag = Int_val(vflag);
@@ -50,7 +49,6 @@ CAMLprim value caml_record_backtrace(value vflag)
 }
 
 /* Return the status of the backtrace machinery */
-
 CAMLprim value caml_backtrace_status(value vunit)
 {
   return Val_bool(caml_backtrace_active);
@@ -64,7 +62,6 @@ CAMLprim value caml_backtrace_status(value vunit)
    0, then li->loc_is_raise is always 1, so the latter test is
    useless. We kept it to keep code identical to the byterun/
    implementation. */
-
 static void print_location(struct caml_loc_info * li, int index)
 {
   char * info;
@@ -94,7 +91,6 @@ static void print_location(struct caml_loc_info * li, int index)
 }
 
 /* Print a backtrace */
-
 CAMLexport void caml_print_exception_backtrace(void)
 {
   int i;
@@ -112,7 +108,6 @@ CAMLexport void caml_print_exception_backtrace(void)
 }
 
 /* Get a copy of the latest backtrace */
-
 CAMLprim value caml_get_exception_raw_backtrace(value unit)
 {
   CAMLparam0();
@@ -152,7 +147,6 @@ CAMLprim value caml_get_exception_raw_backtrace(value unit)
 }
 
 /* Convert the raw backtrace to a data structure usable from OCaml */
-
 CAMLprim value caml_convert_raw_backtrace_slot(value backtrace_slot)
 {
   CAMLparam1(backtrace_slot);
@@ -187,9 +181,7 @@ CAMLprim value caml_convert_raw_backtrace_slot(value backtrace_slot)
 
    It is not used by the Printexc library anymore, or anywhere else in
    the compiler, but we have kept it in case some user still depends
-   on it as an external.
-*/
-
+   on it as an external.  */
 CAMLprim value caml_get_exception_backtrace(value unit)
 {
   CAMLparam0();

@@ -92,13 +92,13 @@ static void caml_finalize_debug_info(value di)
 }
 
 static struct custom_operations caml_debug_info_ops = {
-    "_debug",
-    caml_finalize_debug_info,
-    custom_compare_default,
-    custom_hash_default,
-    custom_serialize_default,
-    custom_deserialize_default,
-    custom_compare_ext_default
+  "_debug",
+  caml_finalize_debug_info,
+  custom_compare_default,
+  custom_hash_default,
+  custom_serialize_default,
+  custom_deserialize_default,
+  custom_compare_ext_default
 };
 
 static value caml_alloc_debug_info()
@@ -160,8 +160,8 @@ struct ev_info *process_debug_events(code_t code_start, value events_heap, mlsiz
         if(events[j].ev_filename == NULL)
           caml_fatal_error ("caml_add_debug_info: out of memory");
         memcpy(events[j].ev_filename,
-               String_val(Field(ev_start, POS_FNAME)),
-               fnsz);
+            String_val(Field(ev_start, POS_FNAME)),
+            fnsz);
       }
 
       events[j].ev_lnum = Int_val(Field(ev_start, POS_LNUM));
@@ -346,7 +346,7 @@ CAMLprim value caml_get_current_callstack(value max_frames_value)
     for (trace_pos = 0; trace_pos < trace_size; trace_pos++) {
       code_t p = caml_next_frame_pointer(&sp, &trapsp);
       Assert(p != NULL);
-      Field(trace, trace_pos) = caml_val_raw_backtrace_slot(p);
+      Store_field(trace, trace_pos, caml_val_raw_backtrace_slot(p));
     }
   }
 
@@ -435,18 +435,18 @@ static struct ev_info *event_for_location(code_t pc)
 
   low = 0;
   high = di->num_events;
-  while(low+1 < high) {
+  while (low+1 < high) {
     uintnat m = (low+high)/2;
     if(pc < di->events[m].ev_pc) high = m;
     else low = m;
   }
-  if(di->events[low].ev_pc == pc)
+  if (di->events[low].ev_pc == pc)
     return &di->events[low];
   /* ocamlc sometimes moves an event past a following PUSH instruction;
      allow mismatch by 1 instruction. */
-  if(di->events[low].ev_pc == pc + 1)
+  if (di->events[low].ev_pc == pc + 1)
     return &di->events[low];
-  if(low+1 < di->num_events && di->events[low+1].ev_pc == pc + 1)
+  if (low+1 < di->num_events && di->events[low+1].ev_pc == pc + 1)
     return &di->events[low+1];
 
   return NULL;
@@ -463,7 +463,8 @@ void caml_extract_location_info(backtrace_slot slot, /*out*/ struct caml_loc_inf
 {
   code_t pc = slot;
   struct ev_info *event = event_for_location(pc);
-  li->loc_is_raise = caml_is_instruction(*pc, RAISE) ||
+  li->loc_is_raise =
+    caml_is_instruction(*pc, RAISE) ||
     caml_is_instruction(*pc, RERAISE);
   if (event == NULL) {
     li->loc_valid = 0;
