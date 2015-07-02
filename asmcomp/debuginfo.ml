@@ -63,7 +63,7 @@ let inline loc t =
 let unroll_inline_chain t =
   let rec aux acc t = match t.dinfo_kind with
     | Dinfo_inline t' ->
-        aux ({t with dinfo_kind = Dinfo_call} :: acc) t'
+        aux ({t with dinfo_kind = Dinfo_inline none} :: acc) t'
     | _ -> t, acc
   in
   aux [] t
