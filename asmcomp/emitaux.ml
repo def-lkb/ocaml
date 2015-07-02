@@ -123,10 +123,7 @@ type emit_frame_actions =
     efa_string: string -> unit }
 
 let emit_frames a =
-  let filenames = Hashtbl.create 7
-  and chain_entries = Hashtbl.create 7
-  and inline_chains = Hashtbl.create 7
-  in
+  let filenames = Hashtbl.create 7 in
   let label_filename name =
     try Hashtbl.find filenames name
     with Not_found ->
@@ -134,51 +131,20 @@ let emit_frames a =
       Hashtbl.add filenames name lbl;
       lbl
   in
-  let rec label_inline_chain = function
-    | [] -> None
-    | (d :: ds) ->
-        let key = d, ds in
-        try Some (fst (Hashtbl.find inline_chains key))
-        with Not_found ->
-          let lbl = Linearize.new_label () in
-          let next = label_inline_chain ds in
-          Hashtbl.add inline_chains key (lbl, next);
-          Some lbl
+  let debuginfos = Hashtbl.create 7 in
+  let rec label_debuginfos (d, ds as key) =
+    try fst (Hashtbl.find debuginfos key)
+    with Not_found ->
+      let lbl = Linearize.new_label () in
+      let next = match ds with
+        | d' :: ds' -> Some (label_debuginfos (d',ds'))
+        | [] -> None
+      in
+      Hashtbl.add debuginfos key (lbl, next);
+      lbl
   in
-  let label_chain_entry filename chain =
-    match label_inline_chain chain with
-    | None -> label_filename filename
-    | Some lbl_chain ->
-        let key = (filename, chain) in
-        try fst (Hashtbl.find chain_entries key)
-        with Not_found ->
-          let lbl = Linearize.new_label () in
-          Hashtbl.add chain_entries key
-            (lbl, (label_filename filename, lbl_chain));
-          lbl
-  in
-  let pack_info d ~inlined =
-    let line = min 0xFFFFF d.dinfo_line
-    and char_start = min 0xFF d.dinfo_char_start
-    and char_end = min 0x3FF d.dinfo_char_end
-    and kind = match d.dinfo_kind with
-      | Dinfo_call   -> 0
-      | Dinfo_raise  -> 1
-      | _ -> assert false
-    and inlined = if inlined then 2 else 0
-    in
-    Int64.(add (shift_left (of_int line) 44)       @@
-           add (shift_left (of_int char_start) 36) @@
-           add (shift_left (of_int char_end) 26)   @@
-           add (of_int kind) (of_int inlined))
-  in
-  let emit_debuginfo d =
-    let d, ds = Debuginfo.unroll_inline_chain d in
-    let info = pack_info d ~inlined:(ds <> []) in
-    a.efa_label_rel
-      (label_chain_entry d.dinfo_file ds)
-      (Int64.to_int32 info);
-    a.efa_32 (Int64.to_int32 (Int64.shift_right info 32))
+  let emit_debuginfo_label d =
+    a.efa_label (label_debuginfos (Debuginfo.unroll_inline_chain d))
   in
   let emit_frame fd =
     a.efa_label fd.fd_lbl;
@@ -189,32 +155,43 @@ let emit_frames a =
     List.iter a.efa_16 fd.fd_live_offset;
     a.efa_align Arch.size_addr;
     if not (Debuginfo.is_none fd.fd_debuginfo) then
-      emit_debuginfo fd.fd_debuginfo
+      emit_debuginfo_label fd.fd_debuginfo
   in
   let emit_filename name lbl =
     a.efa_def_label lbl;
     a.efa_string name;
     a.efa_align Arch.size_addr
   in
-  let emit_inline_chain (d,_) (lbl,next) =
-    a.efa_align Arch.size_addr;
-    a.efa_def_label lbl;
-    emit_debuginfo d;
-    begin match next with
-    | Some next -> a.efa_label_rel next 0l
-    | None -> a.efa_32 0l
-    end;
+  let pack_info d =
+    let line = min 0xFFFFF d.dinfo_line
+    and char_start = min 0xFF d.dinfo_char_start
+    and char_end = min 0x3FF d.dinfo_char_end
+    and kind = match d.dinfo_kind with
+      | Dinfo_call   -> 0
+      | Dinfo_raise  -> 1
+      | Dinfo_inline _ -> 2
+    in
+    Int64.(add (shift_left (of_int line) 44)       @@
+           add (shift_left (of_int char_start) 36) @@
+           add (shift_left (of_int char_end) 26)   @@
+           of_int kind)
   in
-  let emit_chain_entry _ (lbl, (lbl_filename, lbl_chain)) =
+  let emit_debuginfo (d,_) (lbl,next) =
     a.efa_align Arch.size_addr;
     a.efa_def_label lbl;
-    a.efa_label_rel lbl_filename 0l;
-    a.efa_label_rel lbl_chain 0l;
+    let info = pack_info d in
+    a.efa_label_rel
+      (label_filename d.dinfo_file)
+      (Int64.to_int32 info);
+    a.efa_32 (Int64.to_int32 (Int64.shift_right info 32));
+    begin match next with
+    | Some next -> a.efa_label next
+    | None -> a.efa_word 0
+    end
   in
   a.efa_word (List.length !frame_descriptors);
   List.iter emit_frame !frame_descriptors;
-  Hashtbl.iter emit_chain_entry chain_entries;
-  Hashtbl.iter emit_inline_chain inline_chains;
+  Hashtbl.iter emit_debuginfo debuginfos;
   Hashtbl.iter emit_filename filenames;
   frame_descriptors := []
 

@@ -38,13 +38,8 @@ value caml_backtrace_last_exn = Val_unit;
    In particular, we do not need to use [caml_initialize] when setting
    an array element with such a value.
 */
-#define Val_Descrptr(descr) Val_long((uintnat)descr>>1 & ~1)
-#define Val_Inlinedescrptr(descr) Val_long((uintnat)descr>>1 | 1)
-
-#define is_Inlinedescrptr(v) ((frame_descr *) (Long_val(v)<<1 & 1))
-#define is_Descrptr(v) ((frame_descr *) (Long_val(v)<<1 & 1))
-#define Descrptr_Val(v) ((frame_descr *) (Long_val(v)<<1 & ~1))
-#define Inlinedescrptr_Val(v) ((frame_descr *) (Long_val(v)<<1 & ~1))
+#define Val_Debuginfo(descr) Val_long((uintnat)descr>>1 & ~1)
+#define Debuginfo_val(v) ((frame_descr *) (Long_val(v)<<1 & ~1))
 
 /* Start or stop the backtrace machinery */
 
@@ -116,34 +111,43 @@ frame_descr * caml_next_frame_descriptor(uintnat * pc, char ** sp)
 
 /* Extract location information for the given frame descriptor */
 
-static void *deref_rel(int32 *ptr, int offset)
+static void *extract_debuginfo(frame_descr * d)
 {
-  ptr += offset;
-  if (*ptr == 0)
-    return NULL;
-  else
-    return (char*)ptr + *ptr;
-}
-
-static void *extract_infoptr(frame_descr * d)
-{
-  uintnat infoptr;
+  uintnat debuginfo;
   if ((d->frame_size & 1) == 0) {
     return NULL;
   }
 
-  infoptr = ((uintnat) d +
-             sizeof(char *) + sizeof(short) + sizeof(short) +
-             sizeof(short) * d->num_live + sizeof(frame_descr *) - 1)
-            & -sizeof(frame_descr *);
+  debuginfo = ((uintnat) d +
+               sizeof(char *) + sizeof(short) + sizeof(short) +
+               sizeof(short) * d->num_live + sizeof(frame_descr *) - 1)
+              & -sizeof(frame_descr *);
 
-  return (void*)infoptr;
+  return *(void**)debuginfo;
 }
 
-static void extract_location_packed_info(uint32 *infoptr, int is_inlined,
-                                  /*out*/ struct caml_loc_info * li)
+static void *extract_debuginfo_next(void *debuginfo)
 {
+  uint32 *infoptr = debuginfo;
+
+  if (debuginfo == NULL)
+    return NULL;
+
+  return *(void**)(infoptr + 2);
+}
+
+static void unpack_location_info(void * debuginfo, /*out*/ struct caml_loc_info * li)
+{
+  uint32 *infoptr = debuginfo;
   uint32 info1, info2;
+
+  if (infoptr == NULL) {
+    li->loc_valid = 0;
+    li->loc_is_raise = 1;
+    li->loc_is_inlined = 0;
+    return;
+  }
+
   info1 = infoptr[0];
   info2 = infoptr[1];
 
@@ -152,7 +156,7 @@ static void extract_location_packed_info(uint32 *infoptr, int is_inlined,
                           44       36         26                       2 1 0
                        (32+12)    (32+4)
      k ( 1 bit ): 0 if it's a call, 1 if it's a raise
-     i ( 1 bit ): 1 iff call is the entry of an inline chain
+     i ( 1 bit ): 1 if the site is inlined
      n (24 bits):
       if i == 0, offset (in 4-byte words) of file name relative to infoptr
       else if i == 1, offset (in 4-byte words) of chain entry relative to infoptr
@@ -161,95 +165,31 @@ static void extract_location_packed_info(uint32 *infoptr, int is_inlined,
      b (10 bits): end of character range */
   li->loc_valid = 1;
   li->loc_is_raise = (info1 & 1) != 0;
-  li->loc_is_inlined = is_inlined;
+  li->loc_is_inlined = (info1 & 2) != 0;
   li->loc_lnum = info2 >> 12;
   li->loc_startchr = (info2 >> 4) & 0xFF;
   li->loc_endchr = ((info2 & 0xF) << 6) | (info1 >> 26);
-
-  if ((info1 & 2) == 0) {
-    li->loc_filename = (char *)infoptr + (info1 & 0x3FFFFFC);
-  } else
-  {
-    /* Entry to an inline chain cannot be an inlined site itself. */
-    Assert (is_inlined == 0);
-    void * inline_entry = (char *)infoptr + (info1 & 0x3FFFFFC);
-    li->loc_filename = deref_rel(inline_entry, 0);
-  }
+  li->loc_filename = (char *)infoptr + (info1 & 0x3FFFFFC);
 }
 
 CAMLexport void extract_location_info(frame_descr * d,
                                   /*out*/ struct caml_loc_info * li)
 {
-  uint32 * infoptr;
-  infoptr = extract_infoptr(d);
-
-  /* If no debugging information available, print nothing.
-     When everything is compiled with -g, this corresponds to
-     compiler-inserted re-raise operations. */
-  if (infoptr == NULL) {
-    li->loc_valid = 0;
-    li->loc_is_raise = 1;
-    li->loc_is_inlined = 0;
-    return;
-  }
-
-  /* Recover debugging info */
-  extract_location_packed_info(infoptr, 0, li);
+  unpack_location_info(extract_debuginfo(d), li);
 }
 
-static void *extract_inline_entry(frame_descr * d)
-{
-  uint32 * infoptr;
-  uint32 info1;
-  void * inline_entry;
-
-  infoptr = extract_infoptr(d);
-
-  if (infoptr == NULL) {
-    return NULL;
-  }
-
-  info1 = infoptr[0];
-  if ((info1 & 2) == 0) {
-    return NULL;
-  }
-
-  inline_entry = ((char *)infoptr + (info1 & 0x3FFFFFC));
-  return deref_rel(inline_entry, 1);
-}
-
-static void *extract_inline_next(void * d)
-{
-  if (d == NULL)
-    return NULL;
-  else
-    return deref_rel(d, 2);
-}
-
-static void extract_inline_location(void * d,
-                                  /*out*/ struct caml_loc_info * li)
-{
-  /* Reached end of inline chain */
-  if (d == NULL) {
-    li->loc_valid = 0;
-    li->loc_is_raise = 1;
-    li->loc_is_inlined = 0;
-    return;
-  }
-
-  /* Recover debugging info */
-  extract_location_packed_info(d, 1, li);
-}
-
-static int count_inline_entries(frame_descr * d)
+static int count_entries(frame_descr * d)
 {
   int i = 0;
-  void * iter = extract_inline_entry(d);
-  while (iter != NULL) {
+  void * iter;
+
+  for (iter = extract_debuginfo(d); iter != NULL; iter = extract_debuginfo_next(iter))
     i += 1;
-    iter = extract_inline_next(iter);
-  }
-  return i;
+
+  if (i == 0)
+    return 1; /* One entry for "compiler inserted reraise" */
+  else
+    return i;
 }
 
 /* Stores the return addresses contained in the given stack fragment
@@ -317,7 +257,7 @@ CAMLprim value caml_get_current_callstack(value max_frames_value) {
       frame_descr * descr = caml_next_frame_descriptor(&pc, &sp);
       if (descr == NULL) break;
       if (trace_size >= max_frames) break;
-      trace_size += 1 + count_inline_entries(descr);
+      trace_size += count_entries(descr);
 
 #ifndef Stack_grows_upwards
       if (sp > limitsp) break;
@@ -337,18 +277,23 @@ CAMLprim value caml_get_current_callstack(value max_frames_value) {
     uintnat pc = caml_last_return_address;
     char * sp = caml_bottom_of_stack;
     intnat trace_pos;
-    void * inlined = NULL;
+    void * debuginfo = NULL;
 
     for (trace_pos = 0; trace_pos < trace_size; trace_pos++) {
-      if (inlined != NULL) {
-        Field(trace, trace_pos) = Val_Inlinedescrptr(inlined);
-        inlined = extract_inline_next(inlined);
+      if (debuginfo != NULL) {
+        /* Inlined entry */
+        Field(trace, trace_pos) = Val_Debuginfo(debuginfo);
+        debuginfo = extract_debuginfo_next(debuginfo);
+
       } else {
+        /* Normal entry */
         frame_descr * descr = caml_next_frame_descriptor(&pc, &sp);
         Assert(descr != NULL);
-        Field(trace, trace_pos) = Val_Descrptr(descr);
 
-        inlined = extract_inline_entry(descr);
+        debuginfo = extract_debuginfo(descr);
+        Field(trace, trace_pos) = Val_Debuginfo(debuginfo);
+
+        debuginfo = extract_debuginfo_next(debuginfo);
       }
     }
   }
@@ -409,17 +354,17 @@ void caml_print_exception_backtrace(void)
   struct caml_loc_info li;
 
   for (i = 0, index = 0; i < caml_backtrace_pos; i++) {
-    frame_descr * descr = (frame_descr*)(caml_backtrace_buffer[i]);
-    extract_location_info(descr, &li);
+    void * debuginfo = extract_debuginfo((frame_descr*)(caml_backtrace_buffer[i]));
+    unpack_location_info(debuginfo, &li);
     print_location(&li, index);
 
-    void * iter = extract_inline_entry(descr);
-    while (iter != NULL) {
-      extract_inline_location(iter, &li);
+    for (debuginfo = extract_debuginfo_next(debuginfo);
+         debuginfo != NULL;
+         debuginfo = extract_debuginfo_next(debuginfo))
+    {
+      unpack_location_info(debuginfo, &li);
       print_location(&li, index);
       index++;
-
-      iter = extract_inline_next(iter);
     }
   }
 }
@@ -431,12 +376,7 @@ CAMLprim value caml_convert_raw_backtrace_slot(value backtrace_slot) {
   CAMLlocal2(p, fname);
   struct caml_loc_info li;
 
-  if (is_Descrptr(backtrace_slot)) {
-    extract_location_info(Descrptr_Val(backtrace_slot), &li);
-  } else {
-    Assert (is_Inlinedescrptr(backtrace_slot));
-    extract_inline_location(Inlinedescrptr_Val(backtrace_slot), &li);
-  }
+  unpack_location_info(Debuginfo_val(backtrace_slot), &li);
 
   if (li.loc_valid) {
     fname = caml_copy_string(li.loc_filename);
@@ -489,22 +429,23 @@ CAMLprim value caml_get_exception_raw_backtrace(value unit)
     backtrace_size = saved_caml_backtrace_pos;
     for (i = 0; i < saved_caml_backtrace_pos; i++) {
       frame_descr * descr = (frame_descr *) (saved_caml_backtrace_buffer[i]);
-      backtrace_size += count_inline_entries(descr);
+      backtrace_size += count_entries(descr);
     }
 
     res = caml_alloc(backtrace_size, tag);
     for (i = 0, j = 0; i < saved_caml_backtrace_pos; i++, j++) {
       frame_descr * descr = (frame_descr *) (saved_caml_backtrace_buffer[i]);
+      void * debuginfo = extract_debuginfo(descr);
 
-      /* [Val_Descrptr] always returns an immediate. */
-      Field(res, j) = Val_Descrptr(descr);
+      /* [Val_Debuginfo] always returns an immediate. */
+      Field(res, j) = Val_Debuginfo(debuginfo);
 
-      void * iter = extract_inline_entry(descr);
-      while (iter != NULL) {
-        /* [Val_Inlinedescrptr] always returns an immediate. */
-        Field(res, j) = Val_Inlinedescrptr(iter);
+      for (debuginfo = extract_debuginfo_next(debuginfo);
+           debuginfo != NULL;
+           debuginfo = extract_debuginfo_next(debuginfo))
+      {
+        Field(res, j) = Val_Debuginfo(debuginfo);
         j += 1;
-        iter = extract_inline_next(iter);
       }
     }
   }
@@ -564,7 +505,7 @@ CAMLprim value caml_caller_slot(value retaddr)
     }
 
     if (d != NULL) {
-      slot = Val_Descrptr(d);
+      slot = Val_Debuginfo(d);
       result = caml_alloc_small(1, 0);
       Field(result, 0) = slot;
     } else {
