@@ -164,12 +164,7 @@ CAMLexport void caml_print_exception_backtrace(void)
 CAMLprim value caml_get_exception_raw_backtrace(value unit)
 {
   CAMLparam0();
-  CAMLlocal1(res);
-
-  /* Beware: the allocations below may cause finalizers to be run, and another
-     backtrace---possibly of a different length---to be stashed (for example
-     if the finalizer raises then catches an exception).  We choose to ignore
-     any such finalizer backtraces and return the original one. */
+  CAMLlocal2(res, pair);
 
   if (!caml_backtrace_active ||
       caml_backtrace_buffer == NULL ||
@@ -177,22 +172,44 @@ CAMLprim value caml_get_exception_raw_backtrace(value unit)
     res = caml_alloc(0, 0);
   }
   else {
-    backtrace_slot saved_caml_backtrace_buffer[BACKTRACE_BUFFER_SIZE];
-    int saved_caml_backtrace_pos;
-    intnat i;
+    int i, exn_pos;
 
-    saved_caml_backtrace_pos = caml_backtrace_pos;
+    /* Beware: the allocations below may cause finalizers to be run, and another
+       backtrace---possibly of a different length---to be stashed (for example if
+       the finalizer raises then catches an exception).  We choose to ignore any
+       such finalizer backtraces and return the original one. */
 
-    if (saved_caml_backtrace_pos > BACKTRACE_BUFFER_SIZE) {
-      saved_caml_backtrace_pos = BACKTRACE_BUFFER_SIZE;
+    backtrace_slot saved_backtrace_buffer[BACKTRACE_BUFFER_SIZE];
+    CAMLlocalN(saved_backtrace_exns_values, BACKTRACE_EXN_COUNT);
+    int saved_backtrace_pos, saved_backtrace_exns_index;
+    int saved_backtrace_exns_positions[BACKTRACE_EXN_COUNT];
+
+    saved_backtrace_pos = caml_backtrace_pos;
+    saved_backtrace_exns_index = caml_backtrace_exns_index;
+
+    if (saved_backtrace_pos > BACKTRACE_BUFFER_SIZE) {
+      saved_backtrace_pos = BACKTRACE_BUFFER_SIZE;
     }
 
-    memcpy(saved_caml_backtrace_buffer, caml_backtrace_buffer,
-           saved_caml_backtrace_pos * sizeof(backtrace_slot));
+    memcpy(saved_backtrace_buffer, caml_backtrace_buffer,
+           saved_backtrace_pos * sizeof(backtrace_slot));
 
-    res = caml_alloc(saved_caml_backtrace_pos, 0);
-    for (i = 0; i < saved_caml_backtrace_pos; i++) {
-      Store_field(res, i, caml_val_raw_backtrace_slot(saved_caml_backtrace_buffer[i]));
+    for (i = 0; i < saved_backtrace_exns_index; ++i) {
+      saved_backtrace_exns_values[i] = Field(caml_backtrace_exns_values, i);
+      saved_backtrace_exns_positions[i] = caml_backtrace_exns_positions[i];
+    }
+
+    res = caml_alloc(saved_backtrace_pos, 0);
+    for (i = 0, exn_pos = 0; i < saved_backtrace_pos; i++) {
+      if ((exn_pos < saved_backtrace_exns_index) &&
+          saved_backtrace_exns_positions[exn_pos] == i) {
+        pair = caml_alloc(2, 0);
+        Field(pair, 0) = caml_val_raw_backtrace_slot(saved_backtrace_buffer[i]);
+        Field(pair, 1) = saved_backtrace_exns_values[exn_pos];
+        Store_field(res, i, pair);
+        exn_pos += 1;
+      } else
+        Field(res, i) = caml_val_raw_backtrace_slot(saved_backtrace_buffer[i]);
     }
   }
 
@@ -203,25 +220,35 @@ CAMLprim value caml_get_exception_raw_backtrace(value unit)
 CAMLprim value caml_convert_raw_backtrace_slot(value backtrace_slot)
 {
   CAMLparam1(backtrace_slot);
-  CAMLlocal2(p, fname);
+  CAMLlocal3(p, exn, fname);
   struct caml_loc_info li;
 
   if (!caml_debug_info_available())
     caml_failwith("No debug information available");
 
+  if (Is_long(backtrace_slot)) {
+    exn = Val_unit; /* None */
+  } else {
+    exn = caml_alloc_small(1, 0); /* Some */
+    Field(exn, 0) = Field(backtrace_slot, 1);
+    backtrace_slot = Field(backtrace_slot, 0);
+  }
+
   caml_extract_location_info(caml_raw_backtrace_slot_val(backtrace_slot), &li);
 
   if (li.loc_valid) {
     fname = caml_copy_string(li.loc_filename);
-    p = caml_alloc_small(5, 0);
+    p = caml_alloc_small(6, 0);
     Field(p, 0) = Val_bool(li.loc_is_raise);
     Field(p, 1) = fname;
     Field(p, 2) = Val_int(li.loc_lnum);
     Field(p, 3) = Val_int(li.loc_startchr);
     Field(p, 4) = Val_int(li.loc_endchr);
+    Field(p, 5) = exn;
   } else {
-    p = caml_alloc_small(1, 1);
+    p = caml_alloc_small(2, 1);
     Field(p, 0) = Val_bool(li.loc_is_raise);
+    Field(p, 1) = exn;
   }
 
   CAMLreturn(p);

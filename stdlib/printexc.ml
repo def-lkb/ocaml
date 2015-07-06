@@ -109,19 +109,31 @@ let convert_raw_backtrace rbckt =
   with Failure _ -> None
 
 let format_backtrace_slot pos slot =
-  let info is_raise =
-    if is_raise then
-      if pos = 0 then "Raised at" else "Re-raised at"
-    else
-      if pos = 0 then "Raised by primitive operation at" else "Called from"
+  let info is_raise exn =
+    let exn prefix =
+      match exn with
+      | None -> ""
+      | Some exn -> (try prefix ^ to_string exn with _ -> "")
+    in
+    if is_raise then (
+      if pos = 0 then
+        "Raised" ^ (exn " ") ^ " at"
+      else
+        "Re-raised" ^ (exn " as " ) ^ " at"
+    ) else (
+      if pos = 0 then
+        "Raised" ^ (exn " ") ^ " by primitive operation at"
+      else
+        "Called from"
+    )
   in
   match slot with
   | Unknown_location (true, _) -> (* compiler-inserted re-raise, skipped *) None
-  | Unknown_location (false, _) ->
-      Some (sprintf "%s unknown location" (info false))
-  | Known_location(is_raise, filename, lineno, startchar, endchar, _exn) ->
+  | Unknown_location (false, exn) ->
+      Some (sprintf "%s unknown location" (info false exn))
+  | Known_location(is_raise, filename, lineno, startchar, endchar, exn) ->
       Some (sprintf "%s file \"%s\", line %d, characters %d-%d"
-              (info is_raise) filename lineno startchar endchar)
+              (info is_raise exn) filename lineno startchar endchar)
 
 let print_exception_backtrace outchan backtrace =
   match backtrace with
