@@ -545,7 +545,7 @@ let rec name_pattern default = function
 
 type binding =
   | Bind_value of value_binding list
-  | Bind_module of Ident.t * string loc * module_expr 
+  | Bind_module of Ident.t * string loc * module_expr
 
 let rec push_defaults loc bindings cases partial =
   match cases with
@@ -661,7 +661,7 @@ let rec cut n l =
 
 (* Translation of expressions *)
 
-let try_ids = Hashtbl.create 8
+let try_in_handler = ref false
 
 let has_tailcall_attribute e =
   List.exists (fun ({txt},_) -> txt="tailcall") e.exp_attributes
@@ -743,13 +743,9 @@ and transl_exp0 e =
         match (prim, args) with
           (Praise k, [arg1]) ->
             let targ = List.hd argl in
-            let k =
-              match k, targ with
-              | Raise_regular, Lvar id
-                when Hashtbl.mem try_ids id ->
-                  Raise_reraise
-              | _ ->
-                  k
+            let k = match k with
+              | Raise_regular when !try_in_handler -> Raise_reraise
+              | _ -> k
             in
             wrap0 (Lprim(Praise k, [event_after arg1 targ]))
         | (Ploc kind, []) ->
@@ -991,18 +987,14 @@ and transl_cases cases =
   List.map transl_case cases
 
 and transl_case_try {c_lhs; c_guard; c_rhs} =
-  match c_lhs.pat_desc with
-  | Tpat_var (id, _)
-  | Tpat_alias (_, id, _) ->
-      Hashtbl.replace try_ids id ();
-      Misc.try_finally
-        (fun () -> c_lhs, transl_guard c_guard c_rhs)
-        (fun () -> Hashtbl.remove try_ids id)
-  | _ ->
-      c_lhs, transl_guard c_guard c_rhs
+  c_lhs, transl_guard c_guard c_rhs
 
 and transl_cases_try cases =
-  List.map transl_case_try cases
+  let try_in_handler' = !try_in_handler in
+  try_in_handler := true;
+  Misc.try_finally
+    (fun () -> List.map transl_case_try cases)
+    (fun () -> try_in_handler := try_in_handler')
 
 and transl_tupled_cases patl_expr_list =
   List.map (fun (patl, guard, expr) -> (patl, transl_guard guard expr))
