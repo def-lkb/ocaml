@@ -232,6 +232,8 @@ module Slot : sig
 
       @since 4.02
   *)
+
+  val get_exception : t -> exn option
 end
 
 

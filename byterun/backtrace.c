@@ -21,15 +21,46 @@
 #include "caml/memory.h"
 #include "caml/backtrace.h"
 #include "caml/backtrace_prim.h"
+#include "caml/printexc.h"
 
 CAMLexport int caml_backtrace_active = 0;
 CAMLexport int caml_backtrace_pos = 0;
-CAMLexport backtrace_slot * caml_backtrace_buffer = NULL;
-CAMLexport value caml_backtrace_last_exn = Val_unit;
+CAMLexport backtrace_slot *caml_backtrace_buffer = NULL;
+CAMLexport value caml_backtrace_exns_values = Val_unit;
+CAMLexport int *caml_backtrace_exns_positions = NULL;
+CAMLexport int caml_backtrace_exns_index = 0;
 
 void caml_init_backtrace(void)
 {
-  caml_register_global_root(&caml_backtrace_last_exn);
+  caml_register_global_root(&caml_backtrace_exns_values);
+  caml_backtrace_exns_values = caml_alloc(BACKTRACE_EXN_COUNT, 0);
+  caml_backtrace_exns_positions = malloc(sizeof(int) * BACKTRACE_EXN_COUNT);
+  caml_backtrace_exns_index = 0;
+}
+
+void caml_reset_backtrace_exns(void)
+{
+  int i;
+  for (i = 0; i < caml_backtrace_exns_index; ++i)
+    Field(caml_backtrace_exns_values, i) = Val_unit;
+  caml_backtrace_exns_index = 0;
+}
+
+void caml_store_backtrace_exn(value exn)
+{
+  Assert ((caml_backtrace_exns_values != Val_unit)
+          (caml_backtrace_exns_positions != NULL) &&
+          (caml_backtrace_exns_index >= 0) &&
+          (caml_backtrace_exns_index <= BACKTRACE_EXN_COUNT));
+
+  if (caml_backtrace_pos == 0 ||
+      Field(caml_backtrace_exns_values, caml_backtrace_exns_index - 1) != exn) {
+    if (caml_backtrace_exns_index < BACKTRACE_EXN_COUNT) {
+      Store_field(caml_backtrace_exns_values, caml_backtrace_exns_index, exn);
+      caml_backtrace_exns_positions[caml_backtrace_exns_index] = caml_backtrace_pos;
+      caml_backtrace_exns_index += 1;
+    }
+  }
 }
 
 /* Start or stop the backtrace machinery */
@@ -40,7 +71,8 @@ CAMLprim value caml_record_backtrace(value vflag)
   if (flag != caml_backtrace_active) {
     caml_backtrace_active = flag;
     caml_backtrace_pos = 0;
-    caml_backtrace_last_exn = Val_unit;
+
+    caml_reset_backtrace_exns();
     /* Note: lazy initialization of caml_backtrace_buffer in
        caml_stash_backtrace to simplify the interface with the thread
        libraries */
@@ -62,9 +94,10 @@ CAMLprim value caml_backtrace_status(value vunit)
    0, then li->loc_is_raise is always 1, so the latter test is
    useless. We kept it to keep code identical to the byterun/
    implementation. */
-static void print_location(struct caml_loc_info * li, int index)
+static void print_location(struct caml_loc_info * li, int index, value exn)
 {
-  char * info;
+  /* Messages is before + (if msg ? prefix + msg : "") + after */
+  char * before, * prefix, * msg, * after;
 
   /* Ignore compiler-inserted raise */
   if (!li->loc_valid && li->loc_is_raise) return;
@@ -72,28 +105,39 @@ static void print_location(struct caml_loc_info * li, int index)
   if (li->loc_is_raise) {
     /* Initial raise if index == 0, re-raise otherwise */
     if (index == 0)
-      info = "Raised at";
+      before = "Raised", prefix = " ", after = " at";
     else
-      info = "Re-raised at";
+      before = "Re-raised", prefix = " as ", after = " at";
   } else {
     if (index == 0)
-      info = "Raised by primitive operation at";
+      before = "Raised", prefix = " ", after = " by primitive operation at";
     else
-      info = "Called from";
+      before = "Called", prefix = "", exn = Val_unit, after = " from";
   }
+
+  if (exn != Val_unit)
+    msg = caml_format_exception(exn);
+  else
+    msg = "", prefix = "";
+
   if (! li->loc_valid) {
-    fprintf(stderr, "%s unknown location\n", info);
+    fprintf(stderr, "%s%s%s%s unknown location\n", before, prefix, msg, after);
   } else {
-    fprintf (stderr, "%s file \"%s\", line %d, characters %d-%d\n",
-             info, li->loc_filename, li->loc_lnum,
+    fprintf (stderr, "%s%s%s%s file \"%s\", line %d, characters %d-%d\n",
+             before, prefix, msg, after,
+             li->loc_filename, li->loc_lnum,
              li->loc_startchr, li->loc_endchr);
   }
+
+  /* msg has been allocated iff exn != Val_unit */
+  if (exn != Val_unit)
+    free(msg);
 }
 
 /* Print a backtrace */
 CAMLexport void caml_print_exception_backtrace(void)
 {
-  int i;
+  int i, exn_pos;
   struct caml_loc_info li;
 
   if (!caml_debug_info_available()) {
@@ -101,9 +145,18 @@ CAMLexport void caml_print_exception_backtrace(void)
     return;
   }
 
-  for (i = 0; i < caml_backtrace_pos; i++) {
+  for (i = 0, exn_pos = 0; i < caml_backtrace_pos; i++) {
+    value exn;
+
     caml_extract_location_info(caml_backtrace_buffer[i], &li);
-    print_location(&li, i);
+    if (exn_pos < caml_backtrace_exns_index &&
+        caml_backtrace_exns_positions[exn_pos] == i) {
+      exn = Field(caml_backtrace_exns_values, exn_pos);
+      exn_pos += 1;
+    } else
+      exn = Val_unit;
+
+    print_location(&li, i, exn);
   }
 }
 

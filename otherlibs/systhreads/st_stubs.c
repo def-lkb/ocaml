@@ -13,6 +13,7 @@
 
 #include "caml/alloc.h"
 #include "caml/backtrace.h"
+#include "caml/backtrace_prim.h"
 #include "caml/callback.h"
 #include "caml/custom.h"
 #include "caml/fail.h"
@@ -81,7 +82,9 @@ struct caml_thread_struct {
 #endif
   int backtrace_pos;            /* Saved backtrace_pos */
   backtrace_slot * backtrace_buffer;    /* Saved backtrace_buffer */
-  value backtrace_last_exn;     /* Saved backtrace_last_exn (root) */
+  value backtrace_exns_values;  /* Thread local caml_backtrace_exns_values (root) */
+  int backtrace_exns_positions[BACKTRACE_EXN_COUNT];
+  int backtrace_exns_index;
 };
 
 typedef struct caml_thread_struct * caml_thread_t;
@@ -133,7 +136,7 @@ static void caml_thread_scan_roots(scanning_action action)
   th = curr_thread;
   do {
     (*action)(th->descr, &th->descr);
-    (*action)(th->backtrace_last_exn, &th->backtrace_last_exn);
+    (*action)(th->backtrace_exns_values, &th->backtrace_exns_values);
     /* Don't rescan the stack of the current thread, it was done already */
     if (th != curr_thread) {
 #ifdef NATIVE_CODE
@@ -173,7 +176,8 @@ static void caml_thread_enter_blocking_section(void)
 #endif
   curr_thread->backtrace_pos = backtrace_pos;
   curr_thread->backtrace_buffer = backtrace_buffer;
-  curr_thread->backtrace_last_exn = backtrace_last_exn;
+  curr_thread->backtrace_exns_values = caml_backtrace_exns_values;
+  curr_thread->backtrace_exns_index = caml_backtrace_exns_index;
   /* Tell other threads that the runtime is free */
   st_masterlock_release(&caml_master_lock);
 }
@@ -203,7 +207,9 @@ static void caml_thread_leave_blocking_section(void)
 #endif
   backtrace_pos = curr_thread->backtrace_pos;
   backtrace_buffer = curr_thread->backtrace_buffer;
-  backtrace_last_exn = curr_thread->backtrace_last_exn;
+  caml_backtrace_exns_values = curr_thread->backtrace_exns_values;
+  caml_backtrace_exns_positions = &curr_thread->backtrace_exns_positions[0];
+  caml_backtrace_exns_index = curr_thread->backtrace_exns_index;
 }
 
 static int caml_thread_try_leave_blocking_section(void)
@@ -314,8 +320,20 @@ static caml_thread_t caml_thread_new_info(void)
 #endif
   th->backtrace_pos = 0;
   th->backtrace_buffer = NULL;
-  th->backtrace_last_exn = Val_unit;
+  th->backtrace_exns_values = Val_unit;
+  th->backtrace_exns_index = 0;
   return th;
+}
+
+/* Allocate memory for thread backtraces.
+   Must be call before the thread executes OCaml code, but after the thread has
+   been added in the list of threads, so that th->backtrace_exns_values won't
+   get collected.  */
+
+static void caml_thread_initialize_backtrace(caml_thread_t th)
+{
+  th->backtrace_exns_values = caml_alloc(BACKTRACE_EXN_COUNT, 0);
+  th->backtrace_exns_index = 0;
 }
 
 /* Allocate a thread descriptor block. */
@@ -411,7 +429,7 @@ CAMLprim value caml_thread_initialize(value unit)   /* ML */
   curr_thread->next = curr_thread;
   curr_thread->prev = curr_thread;
   all_threads = curr_thread;
-  curr_thread->backtrace_last_exn = Val_unit;
+  caml_thread_initialize_backtrace(curr_thread);
 #ifdef NATIVE_CODE
   curr_thread->exit_buf = &caml_termination_jmpbuf;
 #endif
@@ -521,6 +539,7 @@ CAMLprim value caml_thread_new(value clos)          /* ML */
   th->prev = curr_thread;
   curr_thread->next->prev = th;
   curr_thread->next = th;
+  caml_thread_initialize_backtrace(curr_thread);
   /* Create the new thread */
   err = st_thread_create(NULL, caml_thread_start, (void *) th);
   if (err != 0) {

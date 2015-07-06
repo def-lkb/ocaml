@@ -89,7 +89,9 @@ CAMLextern int caml_backtrace_pos;
  *   interpreter;
  * - directly resetting [caml_backtrace_pos] to 0 in native runtimes for raise.
  */
-CAMLextern value caml_backtrace_last_exn;
+CAMLextern value caml_backtrace_exns_values;
+CAMLextern int *caml_backtrace_exns_positions;
+CAMLextern int caml_backtrace_exns_index;
 
 /* [caml_record_backtrace] toggle backtrace recording on and off.
  * This function can be called at runtime by user-code, or during
@@ -99,7 +101,8 @@ CAMLextern value caml_backtrace_last_exn;
  * allocation.
  */
 CAMLprim value caml_record_backtrace(value vflag);
-
+void caml_reset_backtrace_exns(void);
+void caml_store_backtrace_exn(value exn);
 
 #ifndef NATIVE_CODE
 

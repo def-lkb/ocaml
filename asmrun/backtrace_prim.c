@@ -89,15 +89,17 @@ frame_descr * caml_next_frame_descriptor(uintnat * pc, char ** sp)
    [caml_get_current_callstack] was implemented. */
 void caml_stash_backtrace(value exn, uintnat pc, char * sp, char * trapsp)
 {
-  if (exn != caml_backtrace_last_exn) {
-    caml_backtrace_pos = 0;
-    caml_backtrace_last_exn = exn;
-  }
   if (caml_backtrace_buffer == NULL) {
     Assert(caml_backtrace_pos == 0);
     caml_backtrace_buffer = malloc(BACKTRACE_BUFFER_SIZE * sizeof(backtrace_slot));
     if (caml_backtrace_buffer == NULL) return;
   }
+
+  if (caml_backtrace_pos == 0) {
+    caml_reset_backtrace_exns();
+  }
+
+  caml_store_backtrace_exn(exn);
 
   /* iterate on each frame  */
   while (1) {
@@ -210,42 +212,6 @@ void caml_extract_location_info(backtrace_slot slot, /*out*/ struct caml_loc_inf
   li->loc_lnum = info2 >> 12;
   li->loc_startchr = (info2 >> 4) & 0xFF;
   li->loc_endchr = ((info2 & 0xF) << 6) | (info1 >> 26);
-}
-
-/* Print location information -- same behavior as in Printexc
-
-   note that the test for compiler-inserted raises is slightly redundant:
-     (!li->loc_valid && li->loc_is_raise)
-   extract_location_info above guarantees that when li->loc_valid is
-   0, then li->loc_is_raise is always 1, so the latter test is
-   useless. We kept it to keep code identical to the byterun/
-   implementation. */
-static void print_location(struct caml_loc_info * li, int index)
-{
-  char * info;
-
-  /* Ignore compiler-inserted raise */
-  if (!li->loc_valid && li->loc_is_raise) return;
-
-  if (li->loc_is_raise) {
-    /* Initial raise if index == 0, re-raise otherwise */
-    if (index == 0)
-      info = "Raised at";
-    else
-      info = "Re-raised at";
-  } else {
-    if (index == 0)
-      info = "Raised by primitive operation at";
-    else
-      info = "Called from";
-  }
-  if (! li->loc_valid) {
-    fprintf(stderr, "%s unknown location\n", info);
-  } else {
-    fprintf (stderr, "%s file \"%s\", line %d, characters %d-%d\n",
-             info, li->loc_filename, li->loc_lnum,
-             li->loc_startchr, li->loc_endchr);
-  }
 }
 
 CAMLprim value caml_add_debug_info(backtrace_slot start, value size, value events)

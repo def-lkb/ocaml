@@ -94,10 +94,12 @@ type backtrace_slot =
                     * int    (* line number *)
                     * int    (* start char *)
                     * int    (* end char *)
+                    * exn option (* if raise site, exception that was raised *)
   | Unknown_location of bool (*is_raise*)
+                      * exn option (* if raise site, exception that was raised *)
 
 (* to avoid warning *)
-let _ = [Known_location (false, "", 0, 0, 0); Unknown_location false]
+let _ = [Known_location (false, "", 0, 0, 0, None); Unknown_location (false, None)]
 
 external convert_raw_backtrace_slot:
   raw_backtrace_slot -> backtrace_slot = "caml_convert_raw_backtrace_slot"
@@ -114,10 +116,10 @@ let format_backtrace_slot pos slot =
       if pos = 0 then "Raised by primitive operation at" else "Called from"
   in
   match slot with
-  | Unknown_location true -> (* compiler-inserted re-raise, skipped *) None
-  | Unknown_location false ->
+  | Unknown_location (true, _) -> (* compiler-inserted re-raise, skipped *) None
+  | Unknown_location (false, _) ->
       Some (sprintf "%s unknown location" (info false))
-  | Known_location(is_raise, filename, lineno, startchar, endchar) ->
+  | Known_location(is_raise, filename, lineno, startchar, endchar, _exn) ->
       Some (sprintf "%s file \"%s\", line %d, characters %d-%d"
               (info is_raise) filename lineno startchar endchar)
 
@@ -157,8 +159,12 @@ let raw_backtrace_to_string raw_backtrace =
   backtrace_to_string (convert_raw_backtrace raw_backtrace)
 
 let backtrace_slot_is_raise = function
-  | Known_location(is_raise, _, _, _, _) -> is_raise
-  | Unknown_location(is_raise) -> is_raise
+  | Known_location(is_raise, _, _, _, _, _) -> is_raise
+  | Unknown_location(is_raise, _) -> is_raise
+
+let backtrace_slot_exception = function
+  | Known_location(_, _, _, _, _, exn) -> exn
+  | Unknown_location(_, exn) -> exn
 
 type location = {
   filename : string;
@@ -170,7 +176,7 @@ type location = {
 let backtrace_slot_location = function
   | Unknown_location _ -> None
   | Known_location(_is_raise, filename, line_number,
-                   start_char, end_char) ->
+                   start_char, end_char, _exn) ->
     Some {
       filename;
       line_number;
@@ -203,6 +209,7 @@ module Slot = struct
   let format = format_backtrace_slot
   let is_raise = backtrace_slot_is_raise
   let location = backtrace_slot_location
+  let get_exception = backtrace_slot_exception
 end
 
 let raw_backtrace_length bckt = Array.length bckt

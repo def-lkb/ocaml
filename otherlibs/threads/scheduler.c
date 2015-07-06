@@ -19,6 +19,7 @@
 
 #include "caml/alloc.h"
 #include "caml/backtrace.h"
+#include "caml/backtrace_prim.h"
 #include "caml/callback.h"
 #include "caml/config.h"
 #include "caml/fail.h"
@@ -81,7 +82,9 @@ struct caml_thread_struct {
   value * trapsp;
   value backtrace_pos;          /* The backtrace info for this thread */
   backtrace_slot * backtrace_buffer;
-  value backtrace_last_exn;
+  value backtrace_exns_values;
+  int *backtrace_exns_positions;
+  value backtrace_exns_index;
   value status;                 /* RUNNABLE, KILLED. etc (see below) */
   value fd;     /* File descriptor on which we're doing read or write */
   value readfds, writefds, exceptfds;
@@ -170,9 +173,13 @@ value thread_initialize(value unit)       /* ML */
   curr_thread->stack_threshold = stack_threshold;
   curr_thread->sp = extern_sp;
   curr_thread->trapsp = trapsp;
+
   curr_thread->backtrace_pos = Val_int(backtrace_pos);
   curr_thread->backtrace_buffer = backtrace_buffer;
-  caml_initialize (&curr_thread->backtrace_last_exn, backtrace_last_exn);
+  curr_thread->backtrace_exns_values = caml_alloc(BACKTRACE_EXN_COUNT, 0);
+  curr_thread->backtrace_exns_positions = malloc(BACKTRACE_EXN_COUNT * sizeof(int));
+  curr_thread->backtrace_exns_index = Val_int(0);
+
   curr_thread->status = RUNNABLE;
   curr_thread->fd = Val_int(0);
   curr_thread->readfds = NO_FDS;
@@ -217,12 +224,15 @@ value thread_initialize_preemption(value unit)     /* ML */
 
 value thread_new(value clos)          /* ML */
 {
+  CAMLparam1(clos);
+  CAMLlocal1(backtrace_values);
   caml_thread_t th;
+
+  backtrace_values = caml_alloc(BACKTRACE_EXN_COUNT, 0);
+
   /* Allocate the thread and its stack */
-  Begin_root(clos);
-    th = (caml_thread_t) alloc_shr(sizeof(struct caml_thread_struct)
-                                   / sizeof(value), 0);
-  End_roots();
+  th = (caml_thread_t) alloc_shr(sizeof(struct caml_thread_struct)
+                                 / sizeof(value), 0);
   th->ident = next_ident;
   next_ident = Val_int(Int_val(next_ident) + 1);
   th->stack_low = (value *) caml_stat_alloc(Thread_stack_size);
@@ -244,7 +254,10 @@ value thread_new(value clos)          /* ML */
   /* Finish initialization of th */
   th->backtrace_pos = Val_int(0);
   th->backtrace_buffer = NULL;
-  th->backtrace_last_exn = Val_unit;
+  th->backtrace_exns_values = backtrace_values;
+  th->backtrace_exns_positions = malloc(BACKTRACE_EXN_COUNT * sizeof (int));
+  th->backtrace_exns_index = Val_int(0);
+
   /* The thread is initially runnable */
   th->status = RUNNABLE;
   th->fd = Val_int(0);
@@ -261,7 +274,7 @@ value thread_new(value clos)          /* ML */
   Assign(curr_thread->prev->next, th);
   Assign(curr_thread->prev, th);
   /* Return thread */
-  return (value) th;
+  CAMLreturn ((value) th);
 }
 
 /* Return the thread identifier */
@@ -309,7 +322,7 @@ static value schedule_thread(void)
   curr_thread->trapsp = trapsp;
   curr_thread->backtrace_pos = Val_int(backtrace_pos);
   curr_thread->backtrace_buffer = backtrace_buffer;
-  caml_modify (&curr_thread->backtrace_last_exn, backtrace_last_exn);
+  curr_thread->backtrace_exns_index = Val_int(caml_backtrace_exns_index);
 
 try_again:
   /* Find if a thread is runnable.
@@ -502,7 +515,9 @@ try_again:
   trapsp = curr_thread->trapsp;
   backtrace_pos = Int_val(curr_thread->backtrace_pos);
   backtrace_buffer = curr_thread->backtrace_buffer;
-  backtrace_last_exn = curr_thread->backtrace_last_exn;
+  caml_backtrace_exns_index = Int_val(curr_thread->backtrace_exns_index);
+  caml_backtrace_exns_values = curr_thread->backtrace_exns_values;
+  caml_backtrace_exns_positions = curr_thread->backtrace_exns_positions;
   return curr_thread->retval;
 }
 

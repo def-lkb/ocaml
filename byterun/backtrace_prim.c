@@ -244,10 +244,12 @@ CAMLprim value caml_remove_debug_info(code_t start)
 void caml_stash_backtrace(value exn, code_t pc, value * sp, int reraise)
 {
   if (pc != NULL) pc = pc - 1;
-  if (exn != caml_backtrace_last_exn || !reraise) {
+  if (!reraise) {
     caml_backtrace_pos = 0;
-    caml_backtrace_last_exn = exn;
+    caml_reset_backtrace_exns();
   }
+
+  caml_store_backtrace_exn(exn);
 
   if (caml_backtrace_buffer == NULL) {
     Assert(caml_backtrace_pos == 0);

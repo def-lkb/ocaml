@@ -48,6 +48,7 @@ value caml_val_raw_backtrace_slot(backtrace_slot pc);
 backtrace_slot caml_raw_backtrace_slot_val(value slot);
 
 #define BACKTRACE_BUFFER_SIZE 1024
+#define BACKTRACE_EXN_COUNT 16
 
 /* Besides decoding backtrace info, [backtrace_prim] has two other responsibilities:
  *
