@@ -36,10 +36,19 @@ let is_none t =
   t = none
 
 let to_string d =
-  if d = none
-  then ""
-  else Printf.sprintf "{%s:%d,%d-%d}"
-           d.dinfo_file d.dinfo_line d.dinfo_char_start d.dinfo_char_end
+  let rec to_list d =
+    if is_none d then []
+    else
+      let s = Printf.sprintf "%s:%d,%d-%d"
+          d.dinfo_file d.dinfo_line d.dinfo_char_start d.dinfo_char_end
+      in
+      match d.dinfo_kind with
+      | Dinfo_inline d' -> s :: to_list d'
+      | _ -> [s]
+  in
+  match to_list d with
+  | [] -> ""
+  | ds -> "{" ^ String.concat ";" ds ^ "}"
 
 let from_location kind loc =
   if loc == Location.none then none else
