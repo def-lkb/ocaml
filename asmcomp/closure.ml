@@ -771,23 +771,28 @@ let excessive_function_nesting_depth = 5
 (* Decorate clambda term with debug information *)
 
 let rec add_debug_info ev u =
+  let put_dinfo dinfo ev =
+    if Debuginfo.is_none dinfo then
+      Debuginfo.from_call ev
+    else dinfo
+  in
   match ev.lev_kind with
   | Lev_after _ ->
       begin match u with
       | Udirect_apply(lbl, args, dinfo) ->
-          Udirect_apply(lbl, args, Debuginfo.from_call ev)
+          Udirect_apply(lbl, args, put_dinfo dinfo ev)
       | Ugeneric_apply(Udirect_apply(lbl, args1, dinfo1),
                        args2, dinfo2) ->
-          Ugeneric_apply(Udirect_apply(lbl, args1, Debuginfo.from_call ev),
-                         args2, Debuginfo.from_call ev)
+          Ugeneric_apply(Udirect_apply(lbl, args1, put_dinfo dinfo1 ev),
+                         args2, put_dinfo dinfo2 ev)
       | Ugeneric_apply(fn, args, dinfo) ->
-          Ugeneric_apply(fn, args, Debuginfo.from_call ev)
+          Ugeneric_apply(fn, args, put_dinfo dinfo ev)
       | Uprim(Praise k, args, dinfo) ->
-          Uprim(Praise k, args, Debuginfo.from_call ev)
+          Uprim(Praise k, args, put_dinfo dinfo ev)
       | Uprim(p, args, dinfo) ->
-          Uprim(p, args, Debuginfo.from_call ev)
+          Uprim(p, args, put_dinfo dinfo ev)
       | Usend(kind, u1, u2, args, dinfo) ->
-          Usend(kind, u1, u2, args, Debuginfo.from_call ev)
+          Usend(kind, u1, u2, args, put_dinfo dinfo ev)
       | Usequence(u1, u2) ->
           Usequence(u1, add_debug_info ev u2)
       | _ -> u
