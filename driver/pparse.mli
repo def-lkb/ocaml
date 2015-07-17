@@ -13,8 +13,9 @@
 open Format
 
 type error =
-  | CannotRun of string
-  | WrongMagic of string
+  | Cannot_run of string
+  | Wrong_pp_magic of string
+  | Wrong_file_magic of string
 
 exception Error of error
 
@@ -34,3 +35,8 @@ val report_error : formatter -> error -> unit
 
 val parse_implementation: formatter -> tool_name:string -> string -> Parsetree.structure
 val parse_interface: formatter -> tool_name:string -> string -> Parsetree.signature
+
+val write_binary_implementation: Parsetree.structure -> string -> unit
+val write_binary_interface: Parsetree.signature -> string -> unit
+val read_binary_implementation: string -> Parsetree.structure
+val read_binary_interface: string -> Parsetree.signature

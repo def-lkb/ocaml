@@ -13,8 +13,9 @@
 open Format
 
 type error =
-  | CannotRun of string
-  | WrongMagic of string
+  | Cannot_run of string
+  | Wrong_pp_magic of string
+  | Wrong_file_magic of string
 
 exception Error of error
 
@@ -30,7 +31,7 @@ let preprocess sourcefile =
       in
       if Ccomp.command comm <> 0 then begin
         Misc.remove_file tmpfile;
-        raise (Error (CannotRun comm));
+        raise (Error (Cannot_run comm));
       end;
       tmpfile
 
@@ -43,13 +44,16 @@ let remove_preprocessed inputfile =
 (* Note: some of the functions here should go to Ast_mapper instead,
    which would encapsulate the "binary AST" protocol. *)
 
-let write_ast magic ast =
-  let fn = Filename.temp_file "camlppx" "" in
+let write_ast magic ast fn =
   let oc = open_out_bin fn in
   output_string oc magic;
   output_value oc !Location.input_name;
   output_value oc ast;
-  close_out oc;
+  close_out oc
+
+let write_temp_ast magic ast =
+  let fn = Filename.temp_file "camlppx" "" in
+  write_ast magic ast fn;
   fn
 
 let apply_rewriter magic fn_in ppx =
@@ -61,10 +65,10 @@ let apply_rewriter magic fn_in ppx =
   Misc.remove_file fn_in;
   if not ok then begin
     Misc.remove_file fn_out;
-    raise (Error (CannotRun comm));
+    raise (Error (Cannot_run comm));
   end;
   if not (Sys.file_exists fn_out) then
-    raise (Error (WrongMagic comm));
+    raise (Error (Wrong_pp_magic comm));
   (* check magic before passing to the next ppx *)
   let ic = open_in_bin fn_out in
   let buffer =
@@ -72,29 +76,27 @@ let apply_rewriter magic fn_in ppx =
   close_in ic;
   if buffer <> magic then begin
     Misc.remove_file fn_out;
-    raise (Error (WrongMagic comm));
+    raise (Error (Wrong_pp_magic comm));
   end;
   fn_out
 
 let read_ast magic fn =
   let ic = open_in_bin fn in
-  try
-    let buffer = really_input_string ic (String.length magic) in
-    assert(buffer = magic); (* already checked by apply_rewriter *)
-    Location.input_name := input_value ic;
-    let ast = input_value ic in
-    close_in ic;
-    Misc.remove_file fn;
-    ast
-  with exn ->
-    close_in ic;
-    Misc.remove_file fn;
-    raise exn
+  Misc.try_finally
+    (fun () ->
+       let buffer = really_input_string ic (String.length magic) in
+       if buffer <> magic then
+         raise (Error (Wrong_file_magic fn));
+       Location.input_name := input_value ic;
+       input_value ic)
+    (fun () -> close_in ic)
 
 let rewrite magic ast ppxs =
-  read_ast magic
-    (List.fold_left (apply_rewriter magic) (write_ast magic ast)
-       (List.rev ppxs))
+  let fn = write_temp_ast magic ast in
+  let fn = List.fold_left (apply_rewriter magic) fn (List.rev ppxs) in
+  Misc.try_finally
+    (fun () -> read_ast magic fn)
+    (fun () -> Misc.remove_file fn)
 
 let apply_rewriters_str ?(restore = true) ~tool_name ast =
   match !Clflags.all_ppx with
@@ -160,12 +162,15 @@ let file ppf ~tool_name inputfile parse_fun ast_magic =
   apply_rewriters ~restore:false ~tool_name ast_magic ast
 
 let report_error ppf = function
-  | CannotRun cmd ->
+  | Cannot_run cmd ->
       fprintf ppf "Error while running external preprocessor@.\
                    Command line: %s@." cmd
-  | WrongMagic cmd ->
+  | Wrong_pp_magic cmd ->
       fprintf ppf "External preprocessor does not produce a valid file@.\
                    Command line: %s@." cmd
+  | Wrong_file_magic fn ->
+      fprintf ppf "File is not a valid binary parsetree@.\
+                   Path: %s@." fn
 
 let () =
   Location.register_error_of_exn
@@ -189,6 +194,19 @@ let parse_all ~tool_name parse_fun magic ppf sourcefile =
 let parse_implementation ppf ~tool_name sourcefile =
   parse_all ~tool_name Parse.implementation
     Config.ast_impl_magic_number ppf sourcefile
+
 let parse_interface ppf ~tool_name sourcefile =
   parse_all ~tool_name Parse.interface
     Config.ast_intf_magic_number ppf sourcefile
+
+let write_binary_implementation (ast : Parsetree.structure) fn =
+  write_ast Config.ast_impl_magic_number ast fn
+
+let write_binary_interface (ast : Parsetree.signature) fn =
+  write_ast Config.ast_intf_magic_number ast fn
+
+let read_binary_implementation fn : Parsetree.structure =
+  read_ast Config.ast_impl_magic_number fn
+
+let read_binary_interface fn : Parsetree.signature =
+  read_ast Config.ast_intf_magic_number fn
