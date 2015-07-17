@@ -19,20 +19,20 @@ let process_interface_file ppf name =
   Optcompile.interface ppf name opref;
   if !make_package then objfiles := (opref ^ ".cmi") :: !objfiles
 
-let process_binary_interface_file ppf name =
-  let opref = output_prefix (Misc.strip_if_suffix ".ast" ~from:name) in
-  Optcompile.binary_interface ppf name opref;
-  if !make_package then objfiles := (opref ^ ".cmi") :: !objfiles
-
 let process_implementation_file ppf name =
   let opref = output_prefix name in
   Optcompile.implementation ppf name opref;
   objfiles := (opref ^ ".cmx") :: !objfiles
 
-let process_binary_implementation_file ppf name =
-  let opref = output_prefix (Misc.strip_if_suffix ".ast" ~from:name) in
-  Optcompile.binary_implementation ppf name opref;
-  objfiles := (opref ^ ".cmx") :: !objfiles
+let process_cmp_file ppf name =
+  let cmp_infos = Cmp_format.read_cmp_infos name in
+  let opref = cmp_infos.Cmp_format.cmp_output_prefix in
+  Optcompile.cmp_file ppf cmp_infos;
+  match cmp_infos.Cmp_format.cmp_content with
+  | Cmp_format.Cmp_implementation _ ->
+      objfiles := (opref ^ ".cmx") :: !objfiles
+  | Cmp_format.Cmp_interface _ ->
+      if !make_package then objfiles := (opref ^ ".cmi") :: !objfiles
 
 let cmxa_present = ref false;;
 
@@ -42,10 +42,9 @@ let process_file ppf name =
     process_implementation_file ppf name
   else if Filename.check_suffix name !Config.interface_suffix then
     process_interface_file ppf name
-  else if Filename.check_suffix name ".ml.ast" then
-    process_binary_implementation_file ppf name
-  else if Filename.check_suffix name ".mli.ast" then
-    process_binary_interface_file ppf name
+  else if Filename.check_suffix name ".cmp"
+       || Filename.check_suffix name ".cmpi" then
+    process_cmp_file ppf name
   else if Filename.check_suffix name ".cmx" then
     objfiles := name :: !objfiles
   else if Filename.check_suffix name ".cmxa" then begin

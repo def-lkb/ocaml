@@ -17,6 +17,20 @@ open Format
 open Typedtree
 open Compenv
 
+(* Save a .cmp(i) file *)
+
+let save_cmp ~sourcefile ~outputprefix ~modulename ast fn =
+  let cmp_infos = { Cmp_format.
+                    cmp_source_file = sourcefile;
+                    cmp_output_prefix = outputprefix;
+                    cmp_module_name = modulename;
+                    cmp_input_name = !Location.input_name;
+                    cmp_content = ast
+                  }
+  in
+  Cmp_format.write_cmp_infos cmp_infos fn
+
+
 (* Compile a .mli file *)
 
 (* Keep in sync with the copy in optcompile.ml *)
@@ -49,16 +63,8 @@ let interface ppf sourcefile outputprefix =
   let initial_env = Compmisc.initial_env () in
   let ast = Pparse.parse_interface ~tool_name ppf sourcefile in
   if !Clflags.binary_ast then
-    Pparse.write_binary_interface ast (outputprefix ^ ".mli.ast");
-  process_signature ppf sourcefile outputprefix initial_env modulename ast
-
-let binary_interface ppf astfile outputprefix =
-  let sourcefile = strip_if_suffix ".ast" ~from:astfile in
-  Compmisc.init_path false;
-  let modulename = module_of_filename ppf sourcefile outputprefix in
-  Env.set_unit_name modulename;
-  let initial_env = Compmisc.initial_env () in
-  let ast = Pparse.read_binary_interface astfile in
+    save_cmp ~sourcefile ~outputprefix ~modulename
+      (Cmp_format.Cmp_interface ast) (outputprefix ^ ".cmpi");
   process_signature ppf sourcefile outputprefix initial_env modulename ast
 
 (* Compile a .ml file *)
@@ -122,17 +128,31 @@ let implementation ppf sourcefile outputprefix =
   let initial_env = Compmisc.initial_env() in
   let ast = Pparse.parse_implementation ~tool_name ppf sourcefile in
   if !Clflags.binary_ast then
-    Pparse.write_binary_implementation ast (outputprefix ^ ".ml.ast");
+    save_cmp ~sourcefile ~outputprefix ~modulename
+      (Cmp_format.Cmp_implementation ast) (outputprefix ^ ".cmp");
   process_structure ppf sourcefile outputprefix initial_env modulename ast
 
-let binary_implementation ppf astfile outputprefix =
-  let sourcefile = strip_if_suffix ".ast" ~from:astfile in
+let cmp_file ppf cmp_infos =
+  let open Cmp_format in
   Compmisc.init_path false;
-  let modulename = module_of_filename ppf sourcefile outputprefix in
-  Env.set_unit_name modulename;
+  Location.input_name := cmp_infos.cmp_input_name;
+  Env.set_unit_name cmp_infos.cmp_module_name;
   let initial_env = Compmisc.initial_env() in
-  let ast = Pparse.read_binary_implementation astfile in
-  process_structure ppf sourcefile outputprefix initial_env modulename ast
+  match cmp_infos.cmp_content with
+  | Cmp_implementation str ->
+      process_structure ppf
+        cmp_infos.cmp_source_file
+        cmp_infos.cmp_output_prefix
+        initial_env
+        cmp_infos.cmp_module_name
+        str
+  | Cmp_interface sg ->
+      process_signature ppf
+        cmp_infos.cmp_source_file
+        cmp_infos.cmp_output_prefix
+        initial_env
+        cmp_infos.cmp_module_name
+        sg
 
 let c_file name =
   Location.input_name := name;
