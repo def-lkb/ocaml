@@ -26,6 +26,10 @@ let mk_binannot f =
   "-bin-annot", Arg.Unit f, " Save typedtree in <filename>.cmt"
 ;;
 
+let mk_binast f =
+  "-bin-ast", Arg.Unit f, " Save parsetree in <filename>.<extension>.ast"
+;;
+
 let mk_c f =
   "-c", Arg.Unit f, " Compile only (do not link)"
 ;;
@@ -517,6 +521,7 @@ module type Compiler_options = sig
   val _a : unit -> unit
   val _annot : unit -> unit
   val _binannot : unit -> unit
+  val _binast : unit -> unit
   val _c : unit -> unit
   val _cc : string -> unit
   val _cclib : string -> unit
@@ -649,6 +654,7 @@ struct
     mk_absname F._absname;
     mk_annot F._annot;
     mk_binannot F._binannot;
+    mk_binast F._binast;
     mk_c F._c;
     mk_cc F._cc;
     mk_cclib F._cclib;
@@ -773,6 +779,7 @@ struct
     mk_absname F._absname;
     mk_annot F._annot;
     mk_binannot F._binannot;
+    mk_binast F._binast;
     mk_c F._c;
     mk_cc F._cc;
     mk_cclib F._cclib;

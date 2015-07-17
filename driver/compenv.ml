@@ -157,6 +157,7 @@ let read_OCAMLPARAM ppf position =
       | "g" -> set "g" [ Clflags.debug ] v
       | "p" -> set "p" [ Clflags.gprofile ] v
       | "bin-annot" -> set "bin-annot" [ Clflags.binary_annotations ] v
+      | "bin-ast" -> set "bin-ast" [ Clflags.binary_ast ] v
       | "annot" -> set "annot" [ Clflags.annotations ] v
       | "absname" -> set "absname" [ Location.absname ] v
       | "compat-32" -> set "compat-32" [ bytecode_compatible_32 ] v

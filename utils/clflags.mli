@@ -34,6 +34,7 @@ val preprocessor : string option ref
 val all_ppx : string list ref
 val annotations : bool ref
 val binary_annotations : bool ref
+val binary_ast : bool ref
 val use_threads : bool ref
 val use_vmthreads : bool ref
 val noassert : bool ref
