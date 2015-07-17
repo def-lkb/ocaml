@@ -21,7 +21,7 @@ OCAMLC    = $(OCAMLRUN) $(ROOTDIR)/ocamlc -nostdlib -I $(ROOTDIR)/stdlib
 OCAMLOPT  = $(OCAMLRUN) $(ROOTDIR)/ocamlopt -nostdlib -I $(ROOTDIR)/stdlib
 
 INCLUDES=-I ../../utils -I ../../typing -I ../../bytecomp -I ../../asmcomp
-COMPFLAGS=-w +33..39 -warn-error A -bin-annot -safe-string \
+COMPFLAGS=-w +33..39 -warn-error A -bin-annot -bin-ast -safe-string \
           -I ../../stdlib $(INCLUDES)
 
 OBJS=dynlinkaux.cmo dynlink.cmo
