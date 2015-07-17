@@ -98,6 +98,10 @@ val chop_extensions: string -> string
 
            Return the given name if it does not contain an extension. *)
 
+val strip_if_suffix: string -> from:string -> string
+        (* [strip_if_suffix suffix ~from] removes [suffix] from the end of [from]
+           if it is a suffix and returns the original string otherwise. *)
+
 val search_substring: string -> string -> int -> int
         (* [search_substring pat str start] returns the position of the first
            occurrence of string [pat] in string [str].  Search starts

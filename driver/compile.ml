@@ -23,12 +23,7 @@ open Compenv
 
 let tool_name = "ocamlc"
 
-let interface ppf sourcefile outputprefix =
-  Compmisc.init_path false;
-  let modulename = module_of_filename ppf sourcefile outputprefix in
-  Env.set_unit_name modulename;
-  let initial_env = Compmisc.initial_env () in
-  let ast = Pparse.parse_interface ~tool_name ppf sourcefile in
+let process_signature ppf sourcefile outputprefix initial_env modulename ast =
   if !Clflags.dump_parsetree then fprintf ppf "%a@." Printast.interface ast;
   if !Clflags.dump_source then fprintf ppf "%a@." Pprintast.signature ast;
   let tsg = Typemod.type_interface initial_env ast in
@@ -47,6 +42,25 @@ let interface ppf sourcefile outputprefix =
       initial_env sg ;
   end
 
+let interface ppf sourcefile outputprefix =
+  Compmisc.init_path false;
+  let modulename = module_of_filename ppf sourcefile outputprefix in
+  Env.set_unit_name modulename;
+  let initial_env = Compmisc.initial_env () in
+  let ast = Pparse.parse_interface ~tool_name ppf sourcefile in
+  if !Clflags.binary_ast then
+    Pparse.write_binary_interface ast (outputprefix ^ ".mli.ast");
+  process_signature ppf sourcefile outputprefix initial_env modulename ast
+
+let binary_interface ppf astfile outputprefix =
+  let sourcefile = strip_if_suffix ".ast" ~from:astfile in
+  Compmisc.init_path false;
+  let modulename = module_of_filename ppf sourcefile outputprefix in
+  Env.set_unit_name modulename;
+  let initial_env = Compmisc.initial_env () in
+  let ast = Pparse.read_binary_interface astfile in
+  process_signature ppf sourcefile outputprefix initial_env modulename ast
+
 (* Compile a .ml file *)
 
 let print_if ppf flag printer arg =
@@ -55,27 +69,23 @@ let print_if ppf flag printer arg =
 
 let (++) x f = f x
 
-let implementation ppf sourcefile outputprefix =
-  Compmisc.init_path false;
-  let modulename = module_of_filename ppf sourcefile outputprefix in
-  Env.set_unit_name modulename;
-  let env = Compmisc.initial_env() in
+let process_structure ppf sourcefile outputprefix initial_env modulename ast =
   if !Clflags.print_types then begin
     let comp ast =
       ast
       ++ print_if ppf Clflags.dump_parsetree Printast.implementation
       ++ print_if ppf Clflags.dump_source Pprintast.structure
-      ++ Typemod.type_implementation sourcefile outputprefix modulename env
+      ++ Typemod.type_implementation sourcefile outputprefix modulename initial_env
       ++ print_if ppf Clflags.dump_typedtree
-          Printtyped.implementation_with_coercion
+        Printtyped.implementation_with_coercion
       ++ (fun _ -> ());
       Warnings.check_fatal ();
       Stypes.dump (Some (outputprefix ^ ".annot"))
     in
-    try comp (Pparse.parse_implementation ~tool_name ppf sourcefile)
-    with x ->
+    try comp ast
+    with exn ->
       Stypes.dump (Some (outputprefix ^ ".annot"));
-      raise x
+      raise exn
   end else begin
     let objfile = outputprefix ^ ".cmo" in
     let oc = open_out_bin objfile in
@@ -83,9 +93,9 @@ let implementation ppf sourcefile outputprefix =
       ast
       ++ print_if ppf Clflags.dump_parsetree Printast.implementation
       ++ print_if ppf Clflags.dump_source Pprintast.structure
-      ++ Typemod.type_implementation sourcefile outputprefix modulename env
+      ++ Typemod.type_implementation sourcefile outputprefix modulename initial_env
       ++ print_if ppf Clflags.dump_typedtree
-                  Printtyped.implementation_with_coercion
+        Printtyped.implementation_with_coercion
       ++ Translmod.transl_implementation modulename
       ++ print_if ppf Clflags.dump_rawlambda Printlambda.lambda
       ++ Simplif.simplify_lambda
@@ -97,13 +107,32 @@ let implementation ppf sourcefile outputprefix =
       close_out oc;
       Stypes.dump (Some (outputprefix ^ ".annot"))
     in
-    try comp (Pparse.parse_implementation ~tool_name ppf sourcefile)
-    with x ->
+    try comp ast
+    with exn ->
       close_out oc;
       remove_file objfile;
       Stypes.dump (Some (outputprefix ^ ".annot"));
-      raise x
+      raise exn
   end
+
+let implementation ppf sourcefile outputprefix =
+  Compmisc.init_path false;
+  let modulename = module_of_filename ppf sourcefile outputprefix in
+  Env.set_unit_name modulename;
+  let initial_env = Compmisc.initial_env() in
+  let ast = Pparse.parse_implementation ~tool_name ppf sourcefile in
+  if !Clflags.binary_ast then
+    Pparse.write_binary_implementation ast (outputprefix ^ ".ml.ast");
+  process_structure ppf sourcefile outputprefix initial_env modulename ast
+
+let binary_implementation ppf astfile outputprefix =
+  let sourcefile = strip_if_suffix ".ast" ~from:astfile in
+  Compmisc.init_path false;
+  let modulename = module_of_filename ppf sourcefile outputprefix in
+  Env.set_unit_name modulename;
+  let initial_env = Compmisc.initial_env() in
+  let ast = Pparse.read_binary_implementation astfile in
+  process_structure ppf sourcefile outputprefix initial_env modulename ast
 
 let c_file name =
   Location.input_name := name;

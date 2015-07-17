@@ -196,6 +196,12 @@ let chop_extensions file =
       Filename.concat dirname basename
   with Not_found -> file
 
+let strip_if_suffix suffix ~from:astfile =
+  if Filename.check_suffix astfile suffix then
+    Filename.chop_suffix astfile suffix
+  else
+    astfile
+
 let search_substring pat str start =
   let rec search i j =
     if j >= String.length pat then i

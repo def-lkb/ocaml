@@ -19,9 +19,19 @@ let process_interface_file ppf name =
   Compile.interface ppf name opref;
   if !make_package then objfiles := (opref ^ ".cmi") :: !objfiles
 
+let process_binary_interface_file ppf name =
+  let opref = output_prefix (Misc.strip_if_suffix ".ast" ~from:name) in
+  Compile.binary_interface ppf name opref;
+  if !make_package then objfiles := (opref ^ ".cmi") :: !objfiles
+
 let process_implementation_file ppf name =
   let opref = output_prefix name in
   Compile.implementation ppf name opref;
+  objfiles := (opref ^ ".cmo") :: !objfiles
+
+let process_binary_implementation_file ppf name =
+  let opref = output_prefix (Misc.strip_if_suffix ".ast" ~from:name) in
+  Compile.binary_implementation ppf name opref;
   objfiles := (opref ^ ".cmo") :: !objfiles
 
 let process_file ppf name =
@@ -30,6 +40,10 @@ let process_file ppf name =
     process_implementation_file ppf name
   else if Filename.check_suffix name !Config.interface_suffix then
     process_interface_file ppf name
+  else if Filename.check_suffix name ".ml.ast" then
+    process_binary_implementation_file ppf name
+  else if Filename.check_suffix name ".mli.ast" then
+    process_binary_interface_file ppf name
   else if Filename.check_suffix name ".cmo"
        || Filename.check_suffix name ".cma" then
     objfiles := name :: !objfiles
