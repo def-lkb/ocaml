@@ -127,6 +127,7 @@ module Options = Main_args.Make_optcomp_options (struct
   let _runtime_variant s = runtime_variant := s
   let _safe_string = clear unsafe_string
   let _short_paths = clear real_paths
+  let _stop_after = Clflags.set_stop_after
   let _strict_sequence = set strict_sequence
   let _strict_formats = set strict_formats
   let _shared () = shared := true; dlcode := true
@@ -203,7 +204,9 @@ let main () =
       Asmlink.link_shared ppf (get_objfiles ()) target;
       Warnings.check_fatal ();
     end
-    else if not !compile_only && !objfiles <> [] then begin
+    else if not !compile_only && !objfiles <> [] &&
+            Clflags.don't_stop_at Clflags.Linking
+    then begin
       let target =
         if !output_c_object then
           let s = extract_output !output_name in

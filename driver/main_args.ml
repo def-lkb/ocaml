@@ -285,6 +285,11 @@ let mk_stdin f =
   "-stdin", Arg.Unit f, " Read script from standard input"
 ;;
 
+let mk_stop_after f =
+  "-c", Arg.String f,
+  "<parsing|typing|compiling|linking> Stop processing after the given step"
+;;
+
 let mk_strict_sequence f =
   "-strict-sequence", Arg.Unit f,
   " Left-hand part of a sequence must have type unit"
@@ -546,6 +551,7 @@ module type Compiler_options = sig
   val _runtime_variant : string -> unit
   val _safe_string : unit -> unit
   val _short_paths : unit -> unit
+  val _stop_after : string -> unit
   val _thread : unit -> unit
   val _v : unit -> unit
   val _verbose : unit -> unit
@@ -699,6 +705,7 @@ struct
     mk_runtime_variant F._runtime_variant;
     mk_safe_string F._safe_string;
     mk_short_paths F._short_paths;
+    mk_stop_after F._stop_after;
     mk_strict_sequence F._strict_sequence;
     mk_strict_formats F._strict_formats;
     mk_thread F._thread;
@@ -821,6 +828,7 @@ struct
     mk_safe_string F._safe_string;
     mk_shared F._shared;
     mk_short_paths F._short_paths;
+    mk_stop_after F._stop_after;
     mk_strict_sequence F._strict_sequence;
     mk_strict_formats F._strict_formats;
     mk_thread F._thread;

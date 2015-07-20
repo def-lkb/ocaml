@@ -10,10 +10,17 @@
 (*                                                                     *)
 (***********************************************************************)
 
+type stop_after =
+  | Parsing
+  | Typing
+  | Compiling
+  | Linking
+
 val objfiles : string list ref
 val ccobjs : string list ref
 val dllibs : string list ref
 val compile_only : bool ref
+val stop_after : stop_after ref
 val output_name : string option ref
 val include_dirs : string list ref
 val no_std_include : bool ref
@@ -98,3 +105,5 @@ val keep_docs : bool ref
 val keep_locs : bool ref
 val unsafe_string : bool ref
 val opaque : bool ref
+val set_stop_after : string -> unit
+val don't_stop_at : stop_after -> bool

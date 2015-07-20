@@ -12,11 +12,18 @@
 
 (* Command-line parameters *)
 
+type stop_after =
+  | Parsing
+  | Typing
+  | Compiling
+  | Linking
+
 let objfiles = ref ([] : string list)   (* .cmo and .cma files *)
 and ccobjs = ref ([] : string list)     (* .o, .a, .so and -cclib -lxxx *)
 and dllibs = ref ([] : string list)     (* .so and -dllib -lxxx *)
 
 let compile_only = ref false            (* -c *)
+and stop_after = ref Linking            (* -stop-after *)
 and output_name = ref (None : string option) (* -o *)
 and include_dirs = ref ([] : string list)(* -I *)
 and no_std_include = ref false          (* -nostdlib *)
@@ -117,3 +124,20 @@ let runtime_variant = ref "";;      (* -runtime-variant *)
 let keep_docs = ref false              (* -keep-docs *)
 let keep_locs = ref false              (* -keep-locs *)
 let unsafe_string = ref true;;         (* -safe-string / -unsafe-string *)
+
+let set_stop_after = function
+  | "parsing"   -> stop_after := Parsing
+  | "typing"    -> stop_after := Typing
+  | "compiling" -> stop_after := Compiling
+  | "linking"   -> stop_after := Linking
+  | _ -> raise (Arg.Bad "Invalid step, expected one of \
+                         parsing, typing, compiling, linking")
+
+let don't_stop_at =
+  let index = function
+    | Parsing   -> 1
+    | Typing    -> 2
+    | Compiling -> 3
+    | Linking   -> 4
+  in
+  fun step -> index step <= index !stop_after

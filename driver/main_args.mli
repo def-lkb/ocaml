@@ -76,6 +76,7 @@ module type Compiler_options =  sig
   val _runtime_variant : string -> unit
   val _safe_string : unit -> unit
   val _short_paths : unit -> unit
+  val _stop_after : string -> unit
   val _thread : unit -> unit
   val _v : unit -> unit
   val _verbose : unit -> unit

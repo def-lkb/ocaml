@@ -38,23 +38,26 @@ let save_cmp ~sourcefile ~outputprefix ~modulename ast fn =
 let tool_name = "ocamlopt"
 
 let process_signature ppf sourcefile outputprefix initial_env modulename ast =
-  if !Clflags.dump_parsetree then fprintf ppf "%a@." Printast.interface ast;
-  if !Clflags.dump_source then fprintf ppf "%a@." Pprintast.signature ast;
-  let tsg = Typemod.type_interface initial_env ast in
-  if !Clflags.dump_typedtree then fprintf ppf "%a@." Printtyped.interface tsg;
-  let sg = tsg.sig_type in
-  if !Clflags.print_types then
-    Printtyp.wrap_printing_env initial_env (fun () ->
-        fprintf std_formatter "%a@."
-          Printtyp.signature (Typemod.simplify_signature sg));
-  ignore (Includemod.signatures initial_env sg sg);
-  Typecore.force_delayed_checks ();
-  Warnings.check_fatal ();
-  if not !Clflags.print_types then begin
-    let sg = Env.save_signature sg modulename (outputprefix ^ ".cmi") in
-    Typemod.save_signature modulename tsg outputprefix sourcefile
-      initial_env sg ;
-  end
+  if Clflags.don't_stop_at Clflags.Typing then
+    begin
+      if !Clflags.dump_parsetree then fprintf ppf "%a@." Printast.interface ast;
+      if !Clflags.dump_source then fprintf ppf "%a@." Pprintast.signature ast;
+      let tsg = Typemod.type_interface initial_env ast in
+      if !Clflags.dump_typedtree then fprintf ppf "%a@." Printtyped.interface tsg;
+      let sg = tsg.sig_type in
+      if !Clflags.print_types then
+        Printtyp.wrap_printing_env initial_env (fun () ->
+            fprintf std_formatter "%a@."
+              Printtyp.signature (Typemod.simplify_signature sg));
+      ignore (Includemod.signatures initial_env sg sg);
+      Typecore.force_delayed_checks ();
+      Warnings.check_fatal ();
+      if not !Clflags.print_types then begin
+        let sg = Env.save_signature sg modulename (outputprefix ^ ".cmi") in
+        Typemod.save_signature modulename tsg outputprefix sourcefile
+          initial_env sg ;
+      end
+    end
 
 let interface ppf sourcefile outputprefix =
   Compmisc.init_path false;
@@ -78,37 +81,40 @@ let (+++) (x, y) f = (x, f y)
 
 let process_structure
     ppf sourcefile outputprefix initial_env modulename cmxfile objfile ast =
-  try
-    if !Clflags.print_types
-    then
+  let transl_step ast =
+    try
       ast
-      ++ print_if ppf Clflags.dump_parsetree Printast.implementation
-      ++ print_if ppf Clflags.dump_source Pprintast.structure
-      ++ Typemod.type_implementation sourcefile outputprefix modulename initial_env
-      ++ print_if ppf Clflags.dump_typedtree
-        Printtyped.implementation_with_coercion
-      ++ ignore
-    else begin
-      ast
-      ++ print_if ppf Clflags.dump_parsetree Printast.implementation
-      ++ print_if ppf Clflags.dump_source Pprintast.structure
-      ++ Typemod.type_implementation sourcefile outputprefix modulename initial_env
-      ++ print_if ppf Clflags.dump_typedtree
-        Printtyped.implementation_with_coercion
       ++ Translmod.transl_store_implementation modulename
       +++ print_if ppf Clflags.dump_rawlambda Printlambda.lambda
       +++ Simplif.simplify_lambda
       +++ print_if ppf Clflags.dump_lambda Printlambda.lambda
       ++ Asmgen.compile_implementation outputprefix ppf;
       Compilenv.save_unit_info cmxfile;
-    end;
-    Warnings.check_fatal ();
-    Stypes.dump (Some (outputprefix ^ ".annot"))
-  with exn ->
-    Stypes.dump (Some (outputprefix ^ ".annot"));
-    remove_file objfile;
-    remove_file cmxfile;
-    raise exn
+      Warnings.check_fatal ();
+    with exn ->
+      remove_file objfile;
+      remove_file cmxfile;
+      raise exn
+  in
+  let typing_step ast =
+    if Clflags.don't_stop_at Clflags.Typing then
+      ast
+      ++ print_if ppf Clflags.dump_parsetree Printast.implementation
+      ++ print_if ppf Clflags.dump_source Pprintast.structure
+      ++ Typemod.type_implementation sourcefile outputprefix modulename initial_env
+      ++ print_if ppf Clflags.dump_typedtree
+        Printtyped.implementation_with_coercion
+      ++ fun x ->
+        if Clflags.don't_stop_at Clflags.Compiling && not !Clflags.print_types then
+          transl_step x
+        else
+          Warnings.check_fatal ();
+    else ()
+  in
+  Misc.try_finally
+    (fun () -> typing_step ast)
+    (fun () -> Stypes.dump (Some (outputprefix ^ ".annot")))
+
 
 let implementation ppf sourcefile outputprefix =
   Compmisc.init_path true;
