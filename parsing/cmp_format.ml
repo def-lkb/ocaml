@@ -13,6 +13,7 @@ type cmp_infos = {
   cmp_source_file : string;
   cmp_module_name : string;
   cmp_input_name : string;
+  cmp_comments : (string * Location.t) list;
 }
 
 let write_cmp_infos (infos : cmp_infos) fn =

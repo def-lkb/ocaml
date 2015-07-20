@@ -8,6 +8,7 @@ type cmp_infos = {
   cmp_source_file : string;
   cmp_module_name : string;
   cmp_input_name : string;
+  cmp_comments : (string * Location.t) list;
 }
 
 val write_cmp_infos: cmp_infos -> string -> unit

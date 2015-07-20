@@ -26,7 +26,8 @@ let save_cmp ~sourcefile ~outputprefix ~modulename ast fn =
                     cmp_output_prefix = outputprefix;
                     cmp_module_name = modulename;
                     cmp_input_name = !Location.input_name;
-                    cmp_content = ast
+                    cmp_content = ast;
+                    cmp_comments = Lexer.comments ();
                   }
   in
   Cmp_format.write_cmp_infos cmp_infos fn
@@ -138,6 +139,7 @@ let cmp_file ppf cmp_infos =
       Compmisc.init_path true;
       Location.input_name := cmp_infos.cmp_input_name;
       Env.set_unit_name cmp_infos.cmp_module_name;
+      Lexer.set_comments cmp_infos.cmp_comments;
       let initial_env = Compmisc.initial_env() in
       Compilenv.reset ?packname:!Clflags.for_package cmp_infos.cmp_module_name;
       let cmxfile = cmp_infos.cmp_output_prefix ^ ".cmx" in
@@ -154,6 +156,7 @@ let cmp_file ppf cmp_infos =
       Compmisc.init_path false;
       Location.input_name := cmp_infos.cmp_input_name;
       Env.set_unit_name cmp_infos.cmp_module_name;
+      Lexer.set_comments cmp_infos.cmp_comments;
       let initial_env = Compmisc.initial_env() in
       process_signature ppf
         cmp_infos.cmp_source_file

@@ -248,6 +248,7 @@ let add_docstring_comment ds =
   let com = (Docstrings.docstring_body ds, Docstrings.docstring_loc ds) in
     add_comment com
 
+let set_comments cmts = comment_list := List.rev cmts
 let comments () = List.rev !comment_list
 
 (* Error report *)
