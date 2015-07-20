@@ -286,7 +286,7 @@ let mk_stdin f =
 ;;
 
 let mk_stop_after f =
-  "-c", Arg.String f,
+  "-stop-after", Arg.String f,
   "<parsing|typing|compiling|linking> Stop processing after the given step"
 ;;
 
