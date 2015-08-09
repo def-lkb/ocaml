@@ -203,13 +203,72 @@ let parse_all ~tool_name parse_fun invariant_fun magic ppf sourcefile =
   remove_preprocessed inputfile;
   ast
 
+let compare_parsers parsers sourcefile print use =
+  let asts = List.map (fun (name, parse) -> (name, use parse)) parsers in
+  match asts with
+  | [] -> invalid_arg "run_parser" (* input list was empty *)
+  | (name1, ast1) :: _ ->
+      begin match List.find (fun (_, ast) -> ast <> ast1) asts with
+      | (name2, ast2) ->
+        let output (name, ast) =
+          let out = open_out (String.concat "." [sourcefile; name; "ast"]) in
+          let ppf = Format.formatter_of_out_channel out in
+          print ppf ast;
+          Format.pp_print_flush ppf ();
+          close_out out;
+        in
+        List.iter output asts;
+        Printf.kprintf failwith
+          "Parsers '%s' and '%s' returned different ASTs on '%s'. \
+           See files %s.{%s,%s}.ast for details."
+          name1 name2 sourcefile
+          sourcefile name1 name2;
+      | exception Not_found -> ast1
+      end
+
+let choose_parsers parser_table =
+  match Sys.getenv "OCAML_PARSERS" with
+  | exception Not_found -> parser_table
+  | env_param ->
+      let env_parsers = List.rev (Misc.rev_split_words env_param) in
+      let get_parser name =
+        match List.assoc name parser_table with
+        | exception Not_found ->
+            let available_parsers =
+              String.concat " " (List.map fst parser_table) in
+            Printf.kprintf failwith
+              "%S is not a valid parser name,\
+               use a space-separated list among \"%s\""
+              name available_parsers
+        | parse -> (name, parse)
+      in
+      List.map get_parser env_parsers
+
+let yacc = "yacc"
+let menhir = "menhir"
+
 let parse_implementation ppf ~tool_name sourcefile =
-  parse_all ~tool_name
-    (Timings.(time (Parsing sourcefile)) Parse.implementation)
-    Ast_invariants.structure
-    Config.ast_impl_magic_number ppf sourcefile
+  compare_parsers
+    (choose_parsers [
+        yacc, Parse.implementation;
+        menhir, Parse.implementation_menhir;
+      ])
+    sourcefile Printast.implementation
+    (fun parse_impl ->
+       parse_all ~tool_name
+         (Timings.(time (Parsing sourcefile)) Parse.implementation)
+         parse_impl
+         Config.ast_impl_magic_number ppf sourcefile)
+
 let parse_interface ppf ~tool_name sourcefile =
-  parse_all ~tool_name
-    (Timings.(time (Parsing sourcefile)) Parse.interface)
-    Ast_invariants.signature
-    Config.ast_intf_magic_number ppf sourcefile
+  compare_parsers
+    (choose_parsers [
+        yacc, Parse.interface;
+        menhir, Parse.interface_menhir;
+      ])
+    sourcefile Printast.interface
+    (fun parse_intf ->
+       parse_all ~tool_name
+         (Timings.(time (Parsing sourcefile)) Parse.interface)
+         parse_intf
+         Config.ast_intf_magic_number ppf sourcefile)
