@@ -1584,8 +1584,8 @@ and transl_prim_1 p arg dbg =
       return_unit(remove_unit (transl arg))
   | Pgetcaller loc ->
       let prim = match loc with
-        | None -> Cretaddr
-        | Some loc -> Cdescriptor (Debuginfo.from_location Debuginfo.Dinfo_call loc)
+        | Normal | Real_address -> Cretaddr
+        | Inlined loc -> Cdescriptor (Debuginfo.from_location Debuginfo.Dinfo_call loc)
       in
       Csequence (remove_unit (transl arg), Cop (Cor, [Cop (prim, []); Cconst_int 1]))
 

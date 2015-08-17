@@ -314,7 +314,8 @@ let primitives_table = create_hashtable 57 [
   "%bswap_int64", Pbbswap(Pint64);
   "%bswap_native", Pbbswap(Pnativeint);
   "%int_as_pointer", Pint_as_pointer;
-  "%getcaller", Pgetcaller None;
+  "%getcaller", Pgetcaller Normal;
+  "%getretaddr", Pgetcaller Real_address;
 ]
 
 let index_primitives_table =
@@ -546,7 +547,7 @@ let rec name_pattern default = function
 
 type binding =
   | Bind_value of value_binding list
-  | Bind_module of Ident.t * string loc * module_expr 
+  | Bind_module of Ident.t * string loc * module_expr
 
 let rec push_defaults loc bindings cases partial =
   match cases with

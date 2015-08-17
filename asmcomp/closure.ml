@@ -582,7 +582,7 @@ let rec substitute loc fpc sb ulam =
       let sargs =
         List.map (substitute loc fpc sb) args in
       let p = match p with
-        | Pgetcaller None when loc <> Location.none -> Pgetcaller (Some loc)
+        | Pgetcaller Normal when loc <> Location.none -> Pgetcaller (Inlined loc)
         | p -> p in
       let (res, _) =
         simplif_prim fpc p (sargs, List.map approx_ulam sargs) dbg in

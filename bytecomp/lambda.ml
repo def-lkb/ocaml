@@ -126,7 +126,13 @@ type primitive =
   (* Integer to external pointer *)
   | Pint_as_pointer
   (* Get return address or location *)
-  | Pgetcaller of Location.t option
+  | Pgetcaller of caller_location
+
+and caller_location =
+  | Normal                (* Get return address, but can be inlined *)
+  | Inlined of Location.t (* Call has been inlined, return static location *)
+  | Real_address          (* Always get return address, no matter inlining *)
+
 
 and comparison =
     Ceq | Cneq | Clt | Cgt | Cle | Cge
