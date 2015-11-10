@@ -77,6 +77,10 @@ let mk_dllpath f =
   "<dir>  Add <dir> to the run-time search path for shared libraries"
 ;;
 
+let mk_parse_only f =
+  "-stop-after-parse", Arg.Unit f, " stop after the parsing phase"
+;;
+
 let mk_dtypes f =
   "-dtypes", Arg.Unit f, " (deprecated) same as -annot"
 ;;
@@ -705,6 +709,7 @@ module type Compiler_options = sig
   val _config : unit -> unit
   val _for_pack : string -> unit
   val _g : unit -> unit
+  val _parse_only : unit -> unit
   val _i : unit -> unit
   val _impl : string -> unit
   val _intf : string -> unit
@@ -875,6 +880,7 @@ struct
     mk_dtypes F._annot;
     mk_for_pack_byt F._for_pack;
     mk_g_byt F._g;
+    mk_parse_only F._parse_only;
     mk_i F._i;
     mk_I F._I;
     mk_impl F._impl;
@@ -1002,6 +1008,7 @@ struct
     mk_dtypes F._annot;
     mk_for_pack_opt F._for_pack;
     mk_g_opt F._g;
+    mk_parse_only F._parse_only;
     mk_i F._i;
     mk_I F._I;
     mk_impl F._impl;
