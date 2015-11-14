@@ -1,4 +1,18 @@
 module General : sig
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* This module offers general-purpose functions on lists and streams. *)
 
 (* --------------------------------------------------------------------------- *)
@@ -48,6 +62,20 @@ val foldr: ('a -> 'b -> 'b) -> 'a stream -> 'b -> 'b
 
 end
 module Convert : sig
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* An ocamlyacc-style, or Menhir-style, parser requires access to
    the lexer, which must be parameterized with a lexing buffer, and
    to the lexing buffer itself, where it reads position information. *)
@@ -114,6 +142,20 @@ module Simplified : sig
 end
 end
 module IncrementalEngine : sig
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 open General
 
 (* This signature describes the incremental LR engine. *)
@@ -449,6 +491,20 @@ end
 
 end
 module EngineTypes : sig
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* This file defines several types and module types that are used in the
    specification of module [Engine]. *)
 
@@ -811,6 +867,20 @@ end
 
 end
 module Engine : sig
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 open EngineTypes
 
 (* The LR parsing engine. *)
@@ -821,6 +891,20 @@ module Make (T : TABLE) : ENGINE with type state = T.state
                                   and type production = T.production
 end
 module Printers : sig
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* This module is part of MenhirLib. *)
 
 module Make
@@ -887,6 +971,20 @@ end
 
 end
 module InfiniteArray : sig
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 (** This module implements infinite arrays. **)
 type 'a t
 
@@ -912,6 +1010,20 @@ val extent: 'a t -> int
 val domain: 'a t -> 'a array
 end
 module PackedIntArray : sig
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* A packed integer array is represented as a pair of an integer [k] and
    a string [s]. The integer [k] is the number of bits per integer that we
    use. The string [s] is just an array of bits, which is read in 8-bit
@@ -958,6 +1070,20 @@ val unflatten1: int * string -> int -> int -> int
 
 end
 module RowDisplacement : sig
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* This module compresses a two-dimensional table, where some values
    are considered insignificant, via row displacement. *)
 
@@ -1009,6 +1135,20 @@ val getget:
 
 end
 module LinearizedArray : sig
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* An array of arrays (of possibly different lengths!) can be ``linearized'',
    i.e., encoded as a data array (by concatenating all of the little arrays)
    and an entry array (which contains offsets into the data array). *)
@@ -1070,6 +1210,20 @@ val read_row_via:
 
 end
 module TableFormat : sig
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* This signature defines the format of the parse tables. It is used as
    an argument to [TableInterpreter.Make]. *)
 
@@ -1197,6 +1351,20 @@ end
 
 end
 module InspectionTableFormat : sig
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* This signature defines the format of the tables that are produced (in
    addition to the tables described in [TableFormat]) when the command line
    switch [--inspection] is enabled. It is used as an argument to
@@ -1260,6 +1428,20 @@ end
 
 end
 module InspectionTableInterpreter : sig
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* This functor is invoked inside the generated parser, in [--table] mode. It
    produces no code! It simply constructs the types [symbol] and [xsymbol] on
    top of the generated types [terminal] and [nonterminal]. *)
@@ -1292,6 +1474,20 @@ module Make
 
 end
 module TableInterpreter : sig
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* This module instantiates the generic [Engine] with a thin decoding layer
    for the generated tables. Like [Engine], it is part of [MenhirLib]. *)
 
@@ -1311,10 +1507,5 @@ module Make (T : TableFormat.TABLES)
 
 end
 module StaticVersion : sig
-(* This file is overwritten when a package is created. It is supposed
-   to define a value of type [unit] whose name is [require_XXXXXXXX],
-   where [XXXXXXXX] is our 8-digit version number. *)
-
-val require_unreleased: unit
-
+val require_20151112 : unit
 end

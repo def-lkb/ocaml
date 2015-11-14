@@ -1,4 +1,18 @@
 module General = struct
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* --------------------------------------------------------------------------- *)
 
 (* Lists. *)
@@ -75,6 +89,20 @@ let rec foldr f xs accu =
 
 end
 module Convert = struct
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* An ocamlyacc-style, or Menhir-style, parser requires access to
    the lexer, which must be parameterized with a lexing buffer, and
    to the lexing buffer itself, where it reads position information. *)
@@ -185,6 +213,20 @@ module Simplified = struct
 end
 end
 module IncrementalEngine = struct
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 open General
 
 (* This signature describes the incremental LR engine. *)
@@ -520,6 +562,20 @@ end
 
 end
 module EngineTypes = struct
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* This file defines several types and module types that are used in the
    specification of module [Engine]. *)
 
@@ -882,6 +938,20 @@ end
 
 end
 module Engine = struct
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 open EngineTypes
 
 (* The LR parsing engine. *)
@@ -1599,6 +1669,20 @@ end
 
 end
 module Printers = struct
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 module Make
   (I : IncrementalEngine.EVERYTHING)
   (User : sig
@@ -1703,6 +1787,20 @@ end
 
 end
 module InfiniteArray = struct
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 (** This module implements infinite arrays, that is, arrays that grow
     transparently upon demand. *)
 
@@ -1755,6 +1853,20 @@ let domain a =
 
 end
 module PackedIntArray = struct
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* A packed integer array is represented as a pair of an integer [k] and
    a string [s]. The integer [k] is the number of bits per integer that we
    use. The string [s] is just an array of bits, which is read in 8-bit
@@ -1951,6 +2063,20 @@ let unflatten1 (n, data) i j =
 
 end
 module RowDisplacement = struct
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* This module compresses a two-dimensional table, where some values
    are considered insignificant, via row displacement. *)
 
@@ -2199,6 +2325,20 @@ let getget get_displacement get_data (displacement, data) i j =
 
 end
 module LinearizedArray = struct
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* The [entry] array contains offsets into the [data] array. It has [n+1]
    elements if the original (unencoded) array has [n] elements. The value
    of [entry.(n)] is the length of the [data] array. This convention is
@@ -2268,6 +2408,20 @@ let read_row ((data, entry) : 'a t) i : 'a list =
 
 end
 module TableFormat = struct
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* This signature defines the format of the parse tables. It is used as
    an argument to [TableInterpreter.Make]. *)
 
@@ -2395,6 +2549,20 @@ end
 
 end
 module InspectionTableFormat = struct
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* This signature defines the format of the tables that are produced (in
    addition to the tables described in [TableFormat]) when the command line
    switch [--inspection] is enabled. It is used as an argument to
@@ -2458,6 +2626,20 @@ end
 
 end
 module InspectionTableInterpreter = struct
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* -------------------------------------------------------------------------- *)
 
 (* The type functor. *)
@@ -2665,6 +2847,20 @@ module Make
 end
 end
 module TableInterpreter = struct
+(**************************************************************************)
+(*                                                                        *)
+(*  Menhir                                                                *)
+(*                                                                        *)
+(*  François Pottier, INRIA Paris-Rocquencourt                            *)
+(*  Yann Régis-Gianas, PPS, Université Paris Diderot                      *)
+(*                                                                        *)
+(*  Copyright 2005-2015 Institut National de Recherche en Informatique    *)
+(*  et en Automatique. All rights reserved. This file is distributed      *)
+(*  under the terms of the GNU Library General Public License, with the   *)
+(*  special exception on linking described in file LICENSE.               *)
+(*                                                                        *)
+(**************************************************************************)
+
 module Make (T : TableFormat.TABLES)
 
 = Engine.Make (struct
@@ -2824,10 +3020,5 @@ end)
 
 end
 module StaticVersion = struct
-(* This file is overwritten when a package is created. It is supposed
-   to define a value of type [unit] whose name is [require_XXXXXXXX],
-   where [XXXXXXXX] is our 8-digit version number. *)
-
-let require_unreleased =
-  ()
+let require_20151112 = ()
 end
