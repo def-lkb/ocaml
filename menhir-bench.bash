@@ -31,6 +31,16 @@ bench() {
   done 2>&1 | grep real | cut -f 2 | sort | head -n 1
 }
 
+# This beautiful function is an idea of Frédéric Bour
+seconds_number() {
+    echo $1 | sed 's/m/ * 60 +/' | sed 's/s//' | bc -l
+}
+
+ratio() {
+    echo "scale=4; $(seconds_number $2) / $(seconds_number $1)" | bc
+}
+
+
 cat <<EOF
 
   This is a benchmark of Yacc- and Menhir-generated parsers used in
@@ -56,23 +66,23 @@ cat <<EOF
 
 EOF
 
+run_test_with_compiler() {
+  echo -n "yacc:      "
+  YACC=$(bench $2 $3 $1 yacc)
+  echo $YACC
+  echo -n "menhir:    "
+  MENHIR=$(bench $2 $3 $1 menhir)
+  echo $MENHIR
+  echo "m/y ratio: $(ratio $YACC $MENHIR)"
+  echo
+}
+
 run_test() {
   echo "# $1"
-  
   echo "## native ($3 iterations)"
-  echo -n "yacc:   "
-  (bench $2 $3 ocamlc.opt yacc)
-  echo -n "menhir: "
-  (bench $2 $3 ocamlc.opt menhir)
-  echo
-  
+  (run_test_with_compiler ocamlc.opt $2 $3)
   echo "## byte ($4 iterations)"
-  echo -n "yacc:   "
-  (bench $2 $4 ocamlc yacc)
-  echo -n "menhir: "
-  (bench $2 $4 ocamlc menhir)
-  
-  echo
+  (run_test_with_compiler ocamlc $2 $4)
 }
 
 run_test "Parse only" test_parse 10 3
