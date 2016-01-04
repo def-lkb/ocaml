@@ -211,6 +211,14 @@ module Slot : sig
       @since 4.02
   *)
 
+  val is_inline : t -> bool
+  (** [is_inline slot] is [true] when [slot] refers to a call
+      that get inlined by compiler, and [false] when it comes from
+      any other context.
+
+      @since 4.03
+  *)
+
   val location : t -> location option
   (** [location slot] returns the location information of the slot,
       if available, and [None] otherwise.
