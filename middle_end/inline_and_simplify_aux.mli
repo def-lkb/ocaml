@@ -253,6 +253,12 @@ module Env : sig
 
   (** Print a human-readable version of the given environment. *)
   val print : Format.formatter -> t -> unit
+
+  (** Debuginfo to add to call-sites when inlining a function body. *)
+  val inline_debuginfo : t -> dbg:Debuginfo.t -> t
+
+  (** Add information to the debuginfo of a call-site being inlined. *)
+  val add_inlined_debuginfo : t -> dbg:Debuginfo.t -> Debuginfo.t
 end
 
 module Result : sig
