@@ -191,6 +191,7 @@ module Options = Main_args.Make_ocamldoc_options(struct
   let set r () = r := true
   let unset r () = r := false
   let _absname = set Location.absname
+  let _easytype = set Clflags.easytype
   let _I s = Odoc_global.include_dirs :=
        (Misc.expand_directory Config.standard_library s) :: !Odoc_global.include_dirs
   let _impl s = Odoc_global.files := !Odoc_global.files @ [Odoc_global.Impl_file s]
