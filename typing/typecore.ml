@@ -1991,8 +1991,8 @@ and type_expect_ ?in_function env sexp ty_expected =
         loc sexp.pexp_attributes env ty_expected "" caselist
   | Pexp_apply(sfunct, sargs) when !activate_easytype && not (  (* printf instance *)
          match sfunct.pexp_desc with
-         | Pexp_ident lid -> 
-            begin match lid.txt with 
+         | Pexp_ident lid ->
+            begin match lid.txt with
             (* "Printf" || s = "Format" || s = "Scanf" *)
             | (Longident.Lident s | Longident.Ldot (_, s)) when s = "sprintf" || s = "fprintf" || s = "printf" || s = "sscanf" || s = "fscanf" || s = "scanf" -> true
             | _ -> false end
@@ -2121,6 +2121,7 @@ and type_expect_ ?in_function env sexp ty_expected =
             split_cases vc ({c with pc_lhs = p} :: ec) rest
         | c :: rest ->
             split_cases (c :: vc) ec rest
+      in
       let val_caselist, exn_caselist = split_cases [] [] caselist in
       if val_caselist = [] && exn_caselist <> [] then
         raise (Error (loc, env, No_value_clauses));
@@ -3446,7 +3447,7 @@ and type_argument_easy env sarg targ ty_expected' ty_expected =
       let let_pat, let_var = var_pair "arg" texp.exp_type in
       re { texp with exp_type = ty_fun; exp_desc =
            Texp_let (Nonrecursive,
-                     [{vb_pat=let_pat; vb_expr=texp; vb_attributes=[]}],
+                     [{vb_pat=let_pat; vb_expr=texp; vb_attributes=[]; vb_loc=sarg.pexp_loc}],
                      func let_var) }
       end
   | _ ->
