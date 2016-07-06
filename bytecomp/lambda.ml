@@ -38,8 +38,12 @@ type immediate_or_pointer =
   | Immediate
   | Pointer
 
+type initialization_place =
+  | In_heap
+  | Root
+
 type initialization_or_assignment =
-  | Initialization
+  | Initialization of initialization_place
   | Assignment
 
 type primitive =

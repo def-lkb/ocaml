@@ -62,7 +62,8 @@ let operation = function
   | Cstore (c, init) ->
     let init =
       match init with
-      | Lambda.Initialization -> "(init)"
+      | Lambda.Initialization Lambda.In_heap -> "(init-in-heap)"
+      | Lambda.Initialization Lambda.Root -> "(init-out-of-heap)"
       | Lambda.Assignment -> ""
     in
     Printf.sprintf "store %s%s" (chunk c) init

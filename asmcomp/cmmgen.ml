@@ -1872,8 +1872,13 @@ and transl_prim_2 env p arg1 arg2 dbg =
       | Assignment, Pointer ->
         return_unit(Cop(Cextcall("caml_modify", typ_void, false,Debuginfo.none),
                         [field_address (transl env arg1) n; transl env arg2]))
+      | Initialization In_heap, Pointer ->
+        let prim = Cextcall("caml_initialize",typ_void,false,Debuginfo.none) in
+        return_unit(Cop(prim,
+                        [field_address (transl env arg1) n; transl env arg2]))
       | Assignment, Immediate
-      | Initialization, (Immediate | Pointer) ->
+      | Initialization In_heap, Immediate
+      | Initialization Root, (Immediate | Pointer) ->
         return_unit(set_field (transl env arg1) n (transl env arg2) init)
       end
   | Psetfloatfield (n, init) ->

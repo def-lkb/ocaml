@@ -38,11 +38,17 @@ type immediate_or_pointer =
   | Immediate
   | Pointer
 
+type initialization_place =
+  (* Initialization of in heap values, like [caml_initialize] C primitive.  The
+     field should not have been read before and initialization should happen
+     only once. *)
+  | In_heap
+  (* Initialization of roots only. Compiles to a simple store.
+     No checks are done to preserve GC invariants.  *)
+  | Root
+
 type initialization_or_assignment =
-  (* CR-someday mshinwell: For multicore, perhaps it might be necessary to
-     split [Initialization] into two cases, depending on whether the place
-     being initialized is in the heap or not. *)
-  | Initialization
+  | Initialization of initialization_place
   | Assignment
 
 type primitive =

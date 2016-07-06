@@ -147,7 +147,8 @@ let primitive ppf = function
       in
       let init =
         match init with
-        | Initialization -> "(init)"
+        | Initialization In_heap -> "(init-in-heap)"
+        | Initialization Root -> "(init-root)"
         | Assignment -> ""
       in
       fprintf ppf "setfield_%s%s %i" instr init n
@@ -155,7 +156,8 @@ let primitive ppf = function
   | Psetfloatfield (n, init) ->
       let init =
         match init with
-        | Initialization -> "(init)"
+        | Initialization In_heap -> "(init-in-heap)"
+        | Initialization Root -> "(init-root)"
         | Assignment -> ""
       in
       fprintf ppf "setfloatfield%s %i" init n

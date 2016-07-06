@@ -276,7 +276,7 @@ method select_operation op args =
       let (addr, eloc) = self#select_addressing chunk arg1 in
       let is_assign =
         match init with
-        | Lambda.Initialization -> false
+        | Lambda.Initialization _ -> false
         | Lambda.Assignment -> true
       in
       if chunk = Word_int || chunk = Word_val then begin

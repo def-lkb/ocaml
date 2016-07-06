@@ -27,8 +27,8 @@ let prim_size (prim : Lambda.primitive) args =
   | Pfield _ -> 1
   | Psetfield (_, isptr, init) ->
     begin match init with
-    | Initialization -> 1  (* never causes a write barrier hit *)
-    | Assignment ->
+    | Initialization Root -> 1  (* never causes a write barrier hit *)
+    | Assignment | Initialization In_heap ->
       match isptr with
       | Pointer -> 4
       | Immediate -> 1
