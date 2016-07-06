@@ -1878,9 +1878,18 @@ and transl_prim_2 env p arg1 arg2 dbg =
         return_unit(Cop(Cextcall("caml_modify", typ_void, false,Debuginfo.none),
                         [field_address (transl env arg1) n; transl env arg2]))
       | Heap_initialization, Pointer ->
+        let id_fp = Ident.create "fp" in
+        let id_val = Ident.create "val" in
+        let cond = Cop (Cand, [
+            Cop (Ccmpa Cge, [Cvar id_fp; Cconst_symbol "caml_young_end"]);
+            Cop (Ccmpa Cle, [Cvar id_fp; Cconst_symbol "caml_young_start"]);
+          ]) in
         let prim = Cextcall("caml_initialize",typ_void,false,Debuginfo.none) in
-        return_unit(Cop(prim,
-                        [field_address (transl env arg1) n; transl env arg2]))
+        let slow_path = Cop(prim, [field_address (Cvar id_fp) n; Cvar id_val]) in
+        let fast_path = set_field (Cvar id_fp) n (Cvar id_val) init in
+        Clet(id_fp, transl env arg1,
+             Clet(id_val, transl env arg2,
+                  return_unit (Cifthenelse(cond, fast_path, slow_path))))
       | Assignment, Immediate
       | Heap_initialization, Immediate
       | Root_initialization, (Immediate | Pointer) ->
