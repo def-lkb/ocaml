@@ -806,8 +806,8 @@ let rec find_map f = function
     which trmc occurs are kept into the stub_uses field, together with a fresh
     identifier.
 
-    A later pass will duplicate function body, specialize it for mutating the
-    offset and bind it to the identifier.
+    A later pass will duplicate function body, specialize it to mutate the
+    right field, and bind it to the identifier.
 *)
 
 type trmc_stub = {
@@ -951,10 +951,20 @@ let rec introduce_trmc all_candidates bindings =
 
   let all_candidates = candidates @ all_candidates in
 
+  (* FIXME:
+     Right now, incomplete blocks are allocated mutable and mutated with
+     Psetfield (..., ..., Assignment). This is too conservative and prevent
+     flambda optimizations.
+
+     It should be a Psetfield (..., ..., Initialization), but Initialization
+     compiles to a simple store which breaks GC invariants for TRMC.
+
+     A "heap-aware" Initialization would solve these problems, TODO later.
+  *)
   let rewrite_stub_use lfun (offset, id') =
     let caller_block = Ident.create "caller_block" in
     let on_return lam =
-      Lprim (Psetfield (offset, Pointer, Initialization),
+      Lprim (Psetfield (offset, Pointer, Assignment),
              [Lvar caller_block; lam])
     in
     let on_tail lam =
@@ -974,7 +984,7 @@ let rec introduce_trmc all_candidates bindings =
         let new_app = map_app old_app in
         Llet (Strict, Pgenval, name_block, value_block,
               Lsequence (
-                Lprim (Psetfield (offset, Pointer, Initialization),
+                Lprim (Psetfield (offset, Pointer, Assignment),
                        [Lvar caller_block; value_result]),
                 new_app))
       else on_return lam
