@@ -1872,7 +1872,7 @@ and transl_prim_2 env p arg1 arg2 dbg =
       | Assignment, Pointer ->
         return_unit(Cop(Cextcall("caml_modify", typ_void, false,Debuginfo.none),
                         [field_address (transl env arg1) n; transl env arg2]))
-      | Initialization In_heap, Pointer ->
+      | Heap_initialization, Pointer ->
         let id_fp = Ident.create "fp" in
         let id_val = Ident.create "val" in
         let cond = Cop (Cand, [
@@ -1886,8 +1886,8 @@ and transl_prim_2 env p arg1 arg2 dbg =
              Clet(id_val, transl env arg2,
                   return_unit (Cifthenelse(cond, fast_path, slow_path))))
       | Assignment, Immediate
-      | Initialization In_heap, Immediate
-      | Initialization Root, (Immediate | Pointer) ->
+      | Heap_initialization, Immediate
+      | Root_initialization, (Immediate | Pointer) ->
         return_unit(set_field (transl env arg1) n (transl env arg2) init)
       end
   | Psetfloatfield (n, init) ->

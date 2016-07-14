@@ -38,18 +38,15 @@ type immediate_or_pointer =
   | Immediate
   | Pointer
 
-type initialization_place =
+type initialization_or_assignment =
+  | Assignment
   (* Initialization of in heap values, like [caml_initialize] C primitive.  The
      field should not have been read before and initialization should happen
      only once. *)
-  | In_heap
+  | Heap_initialization
   (* Initialization of roots only. Compiles to a simple store.
      No checks are done to preserve GC invariants.  *)
-  | Root
-
-type initialization_or_assignment =
-  | Initialization of initialization_place
-  | Assignment
+  | Root_initialization
 
 type primitive =
     Pidentity

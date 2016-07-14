@@ -38,13 +38,10 @@ type immediate_or_pointer =
   | Immediate
   | Pointer
 
-type initialization_place =
-  | In_heap
-  | Root
-
 type initialization_or_assignment =
-  | Initialization of initialization_place
   | Assignment
+  | Heap_initialization
+  | Root_initialization
 
 type primitive =
     Pidentity
