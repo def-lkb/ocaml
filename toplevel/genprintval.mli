@@ -43,6 +43,20 @@ type ('a, 'b) gen_printer =
   | Zero of 'b
   | Succ of ('a -> ('a, 'b) gen_printer)
 
+type opaque_kind =
+  | Opaque_abstract
+  | Opaque_polymorphic
+  | Opaque_function
+  | Opaque_unknown_constructor
+  | Opaque_variant
+  | Opaque_object
+  | Opaque_module
+  | Opaque_extension
+  | Opaque_untyped_exception
+  | Opaque_untyped_exception_payload
+
+type 'a opaque_printer = opaque_kind -> 'a -> Outcometree.out_value option
+
 module type S =
   sig
     type t
@@ -62,8 +76,11 @@ module type S =
         function_path is used to remove the printer. *)
 
     val remove_printer : Path.t -> unit
-    val outval_of_untyped_exception : t -> Outcometree.out_value
+    val outval_of_untyped_exception :
+          ?opaque_printer:t opaque_printer ->
+          t -> Outcometree.out_value
     val outval_of_value :
+          ?opaque_printer:t opaque_printer ->
           int -> int ->
           (int -> t -> Types.type_expr -> Outcometree.out_value option) ->
           Env.t -> t -> type_expr -> Outcometree.out_value
