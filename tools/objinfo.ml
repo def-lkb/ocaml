@@ -56,6 +56,11 @@ let print_line name =
 let print_required_global id =
   printf "\t%s\n" (Ident.name id)
 
+let print_tag {Tagl_repr. tag; size; constructor; fields} =
+  printf "\t{ tag = %d; size = %d; constructor = %S; fields = [%s] }\n"
+    tag size constructor
+    (String.concat ";" (List.map (Printf.sprintf "%S") fields))
+
 let print_cmo_infos cu =
   printf "Unit name: %s\n" cu.cu_name;
   print_string "Interfaces imported:\n";
@@ -69,7 +74,9 @@ let print_cmo_infos cu =
         printf "YES\n";
         printf "Primitives declared in this module:\n";
         List.iter print_line l);
-  printf "Force link: %s\n" (if cu.cu_force_link then "YES" else "no")
+  printf "Force link: %s\n" (if cu.cu_force_link then "YES" else "no");
+  printf "Tag library:\n";
+  List.iter print_tag cu.cu_tagl
 
 let print_spaced_string s =
   printf " %s" s
