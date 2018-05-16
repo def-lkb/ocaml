@@ -129,6 +129,7 @@ char * caml_instr_string (code_t pc)
   case OFFSETREF:
   case OFFSETCLOSURE:
   case PUSHOFFSETCLOSURE:
+  case PROFINFO:
     snprintf(buf, sizeof(buf), "%s %d", nam, pc[0]);
     break;
     /* Instructions with two operands */
