@@ -336,7 +336,7 @@ module Inconstants (P:Param) (Backend:Backend_intf.S) = struct
        makeblock(Mutable) can be a 'constant' if it is allocated at
        toplevel: if this expression is evaluated only once.
     *)
-    | Prim (Lambda.Pmakeblock (_tag, Asttypes.Immutable, _value_kind), args,
+    | Prim (Lambda.Pmakeblock (_tag, Asttypes.Immutable, _value_kind, _tagl), args,
             _dbg) ->
       mark_vars args curr
 (*  (* CR-someday pchambart: If global mutables are allowed: *)
@@ -344,9 +344,9 @@ module Inconstants (P:Param) (Backend:Backend_intf.S) = struct
       when toplevel ->
       List.iter (mark_loop ~toplevel curr) args
 *)
-    | Prim (Pmakearray (Pfloatarray, Immutable), args, _) ->
+    | Prim (Pmakearray (Pfloatarray, Immutable, _tagl), args, _) ->
       mark_vars args curr
-    | Prim (Pmakearray (Pfloatarray, Mutable), args, _) ->
+    | Prim (Pmakearray (Pfloatarray, Mutable, _tagl), args, _) ->
       (* CR-someday pchambart: Toplevel float arrays could always be
          statically allocated using an equivalent of the
          Initialize_symbol construction.

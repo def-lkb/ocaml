@@ -2899,12 +2899,12 @@ let compile_matching repr handler_fun arg pat_act_list partial =
 let partial_function loc () =
   (* [Location.get_pos_info] is too expensive *)
   let (fname, line, char) = Location.get_pos_info loc.Location.loc_start in
-  Lprim(Praise Raise_regular, [Lprim(Pmakeblock(0, Immutable, None),
+  Lprim(Praise Raise_regular, [Lprim(Pmakeblock(0, Immutable, None, Tagl_repr.default),
           [transl_normal_path Predef.path_match_failure;
            Lconst(Const_block(0,
               [Const_base(Const_string (fname, None));
                Const_base(Const_int line);
-               Const_base(Const_int char)]))], loc)], loc)
+               Const_base(Const_int char)], Tagl_repr.default))], loc)], loc)
 
 let for_function loc repr param pat_act_list partial =
   compile_matching repr (partial_function loc) param pat_act_list partial
@@ -3000,7 +3000,7 @@ let assign_pat opt nraise catch_ids loc pat lam =
   | Tpat_tuple patl, Lprim(Pmakeblock _, lams, _) ->
       opt := true;
       List.fold_left2 collect acc patl lams
-  | Tpat_tuple patl, Lconst(Const_block(_, scl)) ->
+  | Tpat_tuple patl, Lconst(Const_block(_, scl, _)) ->
       opt := true;
       let collect_const acc pat sc = collect acc pat (Lconst sc) in
       List.fold_left2 collect_const acc patl scl
@@ -3139,12 +3139,12 @@ let do_for_multiple_match loc paraml pat_act_list partial =
         let raise_num = next_raise_count () in
         raise_num,
         { cases = List.map (fun (pat, act) -> ([pat], act)) pat_act_list;
-          args = [Lprim(Pmakeblock(0, Immutable, None), paraml, loc), Strict];
+          args = [Lprim(Pmakeblock(0, Immutable, None, Tagl_repr.default), paraml, loc), Strict];
           default = [[[omega]],raise_num] }
     | _ ->
         -1,
         { cases = List.map (fun (pat, act) -> ([pat], act)) pat_act_list;
-          args = [Lprim(Pmakeblock(0, Immutable, None), paraml, loc), Strict];
+          args = [Lprim(Pmakeblock(0, Immutable, None, Tagl_repr.default), paraml, loc), Strict];
           default = [] } in
 
   try

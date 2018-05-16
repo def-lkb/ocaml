@@ -24,8 +24,8 @@ let for_primitive (prim : Lambda.primitive) =
   | Pignore | Pidentity | Pbytes_to_string | Pbytes_of_string ->
       No_effects, No_coeffects
   | Pmakeblock _
-  | Pmakearray (_, Mutable) -> Only_generative_effects, No_coeffects
-  | Pmakearray (_, Immutable) -> No_effects, No_coeffects
+  | Pmakearray (_, Mutable, _) -> Only_generative_effects, No_coeffects
+  | Pmakearray (_, Immutable, _) -> No_effects, No_coeffects
   | Pduparray (_, Immutable) ->
       No_effects, No_coeffects  (* Pduparray (_, Immutable) is allowed only on
                                    immutable arrays. *)

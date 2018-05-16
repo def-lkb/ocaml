@@ -109,7 +109,7 @@ TYPING=typing/ident.cmo typing/path.cmo \
   typing/typeclass.cmo \
   typing/typemod.cmo
 
-COMP=bytecomp/lambda.cmo bytecomp/printlambda.cmo \
+COMP=bytecomp/tagl_repr.cmo bytecomp/lambda.cmo bytecomp/printlambda.cmo \
   bytecomp/semantics_of_primitives.cmo \
   bytecomp/switch.cmo bytecomp/matching.cmo \
   bytecomp/translobj.cmo bytecomp/translattribute.cmo \
