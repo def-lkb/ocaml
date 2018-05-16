@@ -846,7 +846,10 @@ and transl_exp0 e =
           begin try
             Lconst(Const_block(n, List.map extract_constant ll, Tagl_repr.default))
           with Not_constant ->
-            Lprim(Pmakeblock(n, Immutable, Some shape, Tagl_repr.default), ll, e.exp_loc)
+            let tagl =
+              Tagl_repr.make ~name:cstr.cstr_name ~size:(List.length ll) n
+            in
+            Lprim(Pmakeblock(n, Immutable, Some shape, tagl), ll, e.exp_loc)
           end
       | Cstr_extension(path, is_const) ->
           if is_const then

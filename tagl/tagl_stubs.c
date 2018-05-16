@@ -1,4 +1,7 @@
+#include <caml/alloc.h>
+#include <caml/memory.h>
 #include <caml/mlvalues.h>
+#include <caml/callback.h>
 
 #define Tagable Is_block
 
@@ -42,3 +45,25 @@ CAMLprim value ml_tagl_set_profinfo(value object, value tag)
 }
 
 #endif
+
+CAMLprim value ml_tagl_library(value unit)
+{
+  (void)unit;
+  CAMLparam0();
+  CAMLlocal1(ret);
+
+  static value* library;
+
+  if (!library)
+    library = caml_named_value("tagl_library");
+
+  if (library)
+  {
+    ret = caml_alloc(1, 0);
+    Store_field(ret, 0, *library);
+  }
+  else
+    ret = Val_long(0);
+
+  CAMLreturn(ret);
+}

@@ -1,10 +1,11 @@
 CC ?= gcc
 OCAMLC ?= ../ocamlc
+OCAMLMKLIB ?= ../tools/ocamlmklib
 OCAMLOPT ?= ../ocamlopt
 
 bytecode:
 	$(OCAMLC) -c tagl_stubs.c tagl.ml
-	$(CC) -shared -o dlltagl.so tagl_stubs.o
+	$(OCAMLMKLIB) -o tagl tagl_stubs.o
 	$(OCAMLC) -a -o tagl.cma tagl.cmo tagl_stubs.o -dllib -ltagl
 
 native:
@@ -13,3 +14,6 @@ native:
 
 clean:
 	rm -f *.a *.o *.cma *.cmxa *.cmo *.cmi *.cmx *.so
+
+ocaml:
+	../ocaml tagl.cma
