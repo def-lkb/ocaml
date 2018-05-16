@@ -98,8 +98,8 @@ val marshal : t -> bytes
 val unmarshal : bytes -> int -> t * int
   [@@ocaml.deprecated "Use Marshal.from_bytes and Marshal.total_size instead."]
 
-external has_profinfo : unit -> bool = "caml_obj_has_profinfo"
-external get_profinfo : t -> int = "caml_obj_get_profinfo"
+external profinfo_bits : unit -> int = "caml_obj_profinfo_bits" [@@noalloc]
+external get_profinfo : t -> int = "caml_obj_get_profinfo" [@@noalloc]
 external set_profinfo : t -> int -> bool = "caml_obj_set_profinfo"
 
 module Ephemeron: sig
@@ -153,4 +153,18 @@ module Ephemeron: sig
 
   val blit_data : t -> t -> unit
   (** Same as {!Ephemeron.K1.blit_data} *)
+end
+
+module Tag_descriptor : sig
+  type t = {
+    tag : int;
+    size : int;
+    constructor : string;
+    fields : string list;
+  }
+
+  val hash : t -> int
+
+  external read_self_descriptors : unit -> t list =
+    "caml_read_tag_section"
 end

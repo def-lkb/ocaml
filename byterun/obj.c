@@ -117,10 +117,10 @@ CAMLprim value caml_obj_dup(value arg)
 
 #ifdef WITH_PROFINFO
 
-CAMLprim value caml_obj_has_profinfo(value unit)
+CAMLprim value caml_obj_profinfo_bits(value unit)
 {
   (void)unit;
-  return Val_bool(1);
+  return Val_long(PROFINFO_WIDTH);
 }
 
 CAMLprim value caml_obj_get_profinfo(value obj)
@@ -147,10 +147,10 @@ CAMLprim value caml_obj_set_profinfo(value obj, value tag)
 
 #else
 
-CAMLprim value caml_obj_has_profinfo(value unit)
+CAMLprim value caml_obj_profinfo_bits(value unit)
 {
   (void)unit;
-  return Val_bool(0);
+  return Val_long(0);
 }
 
 CAMLprim value caml_obj_get_profinfo(value obj)

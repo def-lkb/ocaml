@@ -39,8 +39,8 @@ external dup : t -> t = "caml_obj_dup"
 external truncate : t -> int -> unit = "caml_obj_truncate"
 external add_offset : t -> Int32.t -> t = "caml_obj_add_offset"
 
-external has_profinfo : unit -> bool = "caml_obj_has_profinfo"
-external get_profinfo : t -> int = "caml_obj_get_profinfo"
+external profinfo_bits : unit -> int = "caml_obj_profinfo_bits" [@@noalloc]
+external get_profinfo : t -> int = "caml_obj_get_profinfo" [@@noalloc]
 external set_profinfo : t -> int -> bool = "caml_obj_set_profinfo"
 
 let marshal (obj : t) =
@@ -115,4 +115,27 @@ module Ephemeron = struct
   external blit_data : t -> t -> unit = "caml_ephe_blit_data"
 
 
+end
+
+module Tag_descriptor = struct
+  type t = {
+    tag : int;
+    size : int;
+    constructor : string;
+    fields : string list;
+  }
+
+  (* Copied from Hashtbl, to avoid introducing a dependency *)
+  external seeded_hash_param :
+    int -> int -> int -> 'a -> int = "caml_hash" [@@noalloc]
+
+  let hash {tag; size; constructor; fields} =
+    let hash seed v = seeded_hash_param 10 100 seed v in
+    let h = hash tag size in
+    let h = hash h constructor in
+    let h = List.fold_left hash h fields in
+    h
+
+  external read_self_descriptors : unit -> t list =
+    "caml_read_tag_section"
 end
