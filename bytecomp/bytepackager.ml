@@ -227,6 +227,12 @@ let package_object_files ppf files targetfile targetname coercion =
             List.fold_right Ident.Set.add cu_required_globals required_globals)
       members Ident.Set.empty
   in
+  let tagl = List.concat (List.map (function
+      | { pm_kind = PM_intf } -> []
+      | { pm_kind = PM_impl { cu_tagl } } -> cu_tagl
+    ) members)
+  in
+  let tagl = List.sort_uniq compare tagl in
   let unit_names =
     List.map (fun m -> m.pm_name) members in
   let mapping =
@@ -265,7 +271,9 @@ let package_object_files ppf files targetfile targetname coercion =
         cu_required_globals = Ident.Set.elements required_globals;
         cu_force_link = !force_link;
         cu_debug = if pos_final > pos_debug then pos_debug else 0;
-        cu_debugsize = pos_final - pos_debug } in
+        cu_debugsize = pos_final - pos_debug;
+        cu_tagl = tagl;
+      } in
     Emitcode.marshal_to_channel_with_possibly_32bit_compat
       ~filename:targetfile ~kind:"bytecode unit"
       oc compunit;
