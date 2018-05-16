@@ -69,6 +69,8 @@ module EvalPath =
 
 module Printer = Genprintval.Make(Debugcom.Remote_value)(EvalPath)
 
+(*let var_dump obj =*)
+
 let install_printer path ty _ppf fn =
   Printer.install_printer path ty
     (fun ppf remote_val ->
