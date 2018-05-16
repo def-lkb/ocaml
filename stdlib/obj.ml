@@ -39,6 +39,10 @@ external dup : t -> t = "caml_obj_dup"
 external truncate : t -> int -> unit = "caml_obj_truncate"
 external add_offset : t -> Int32.t -> t = "caml_obj_add_offset"
 
+external has_profinfo : unit -> bool = "caml_obj_has_profinfo"
+external get_profinfo : t -> int = "caml_obj_get_profinfo"
+external set_profinfo : t -> int -> bool = "caml_obj_set_profinfo"
+
 let marshal (obj : t) =
   Marshal.to_bytes obj []
 let unmarshal str pos =

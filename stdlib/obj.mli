@@ -98,6 +98,10 @@ val marshal : t -> bytes
 val unmarshal : bytes -> int -> t * int
   [@@ocaml.deprecated "Use Marshal.from_bytes and Marshal.total_size instead."]
 
+external has_profinfo : unit -> bool = "caml_obj_has_profinfo"
+external get_profinfo : t -> int = "caml_obj_get_profinfo"
+external set_profinfo : t -> int -> bool = "caml_obj_set_profinfo"
+
 module Ephemeron: sig
   (** Ephemeron with arbitrary arity and untyped *)
 
