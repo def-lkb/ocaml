@@ -516,7 +516,7 @@ let read_primitive_table ic len =
   let p = really_input_string ic len in
   String.split_on_char '\000' p |> List.filter ((<>) "") |> Array.of_list
 
-let print_tag {Tagl_repr. tag; size; constructor; fields} =
+let print_tag {Taglib. tag; size; constructor; fields} =
   printf "\t{ tag = %d; size = %d; constructor = %S; fields = [%s] }\n"
     tag size constructor
     (String.concat ";" (List.map (Printf.sprintf "%S") fields))
@@ -551,7 +551,7 @@ let dump_exe ic =
   print_code ic code_size;
   begin try
     ignore (Bytesections.seek_section ic "TAGL");
-    let tagl : Tagl_repr.t list = input_value ic in
+    let tagl : Taglib.t list = input_value ic in
     printf "Tag library:\n";
     List.iter print_tag tagl;
   with Not_found -> ()

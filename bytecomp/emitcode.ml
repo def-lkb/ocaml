@@ -250,7 +250,7 @@ let emit_instr = function
         if t = 0 then out opATOM0 else (out opATOM; out_int t)
       else (
         out opPROFINFO;
-        out_int (Tagl_repr.hash tagl);
+        out_int (Taglib.index tagl);
         if n < 4 then (out(opMAKEBLOCK1 + n - 1); out_int t)
         else (out opMAKEBLOCK; out_int n; out_int t)
       )
@@ -261,7 +261,7 @@ let emit_instr = function
   | Kmakefloatblock(n, tagl) ->
       if n = 0 then out opATOM0 else (
         out opPROFINFO;
-        out_int (Tagl_repr.hash tagl);
+        out_int (Taglib.index tagl);
         out opMAKEFLOATBLOCK; out_int n
       )
   | Kgetfloatfield n -> out opGETFLOATFIELD; out_int n
@@ -426,7 +426,7 @@ let to_file outchan unit_name objfile ~required_globals code =
       cu_force_link = !Clflags.link_everything;
       cu_debug = pos_debug;
       cu_debugsize = size_debug;
-      cu_tagl = Tagl_repr.emit_tags ();
+      cu_tagl = Taglib.emit_tags ();
     } in
   init();                               (* Free out_buffer and reloc_info *)
   Btype.cleanup_abbrev ();              (* Remove any cached abbreviation

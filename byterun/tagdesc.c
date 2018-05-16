@@ -58,3 +58,18 @@ CAMLprim value caml_read_tag_section(value unit)
 }
 
 #endif
+
+CAMLprim value caml_compiler_tags(value unit)
+{
+  (void)unit;
+  static value tag_ref = 0;
+
+  if (tag_ref == 0)
+  {
+    tag_ref = caml_alloc(1, 0);
+    Store_field(tag_ref, 0, Val_unit);
+    caml_register_generational_global_root(&tag_ref);
+  }
+
+  return tag_ref;
+}

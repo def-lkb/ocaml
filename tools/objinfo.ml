@@ -56,7 +56,7 @@ let print_line name =
 let print_required_global id =
   printf "\t%s\n" (Ident.name id)
 
-let print_tag {Tagl_repr. tag; size; constructor; fields} =
+let print_tag {Taglib. tag; size; constructor; fields} =
   printf "\t{ tag = %d; size = %d; constructor = %S; fields = [%s] }\n"
     tag size constructor
     (String.concat ";" (List.map (Printf.sprintf "%S") fields))

@@ -52,7 +52,7 @@ OTHEROBJS=\
   ../typing/oprint.cmo \
   ../typing/ctype.cmo ../typing/printtyp.cmo ../typing/mtype.cmo \
   ../typing/envaux.cmo \
-	../bytecomp/tagl_repr.cmo \
+	../bytecomp/taglib.cmo \
   ../bytecomp/runtimedef.cmo ../bytecomp/bytesections.cmo \
   ../bytecomp/dll.cmo ../bytecomp/meta.cmo ../bytecomp/symtable.cmo \
   ../bytecomp/opcodes.cmo ../driver/compdynlink.cmo \

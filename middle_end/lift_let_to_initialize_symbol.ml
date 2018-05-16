@@ -125,7 +125,7 @@ let rec accumulate ~substitution ~copied_lets ~extracted_lets
         Flambda_utils.toplevel_substitution def_substitution
           (Let_rec (renamed_defs,
                     Flambda_utils.name_expr ~name:"lifted_let_rec_block"
-                      (Prim (Pmakeblock (0, Immutable, None, Tagl_repr.default),
+                      (Prim (Pmakeblock (0, Immutable, None, Taglib.default),
                              List.map fst renamed_defs,
                              Debuginfo.none))))
       in

@@ -142,7 +142,7 @@ let init () =
       let cst = Const_block(Obj.object_tag,
                             [Const_base(Const_string (name, None));
                              Const_base(Const_int (-i-1))
-                            ], Tagl_repr.default)
+                            ], Taglib.default)
       in
       literal_table := (c, cst) :: !literal_table)
     Runtimedef.builtin_exceptions;

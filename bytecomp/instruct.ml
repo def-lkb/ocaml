@@ -68,8 +68,8 @@ type instruction =
   | Kgetglobal of Ident.t
   | Ksetglobal of Ident.t
   | Kconst of structured_constant
-  | Kmakeblock of int * int * Tagl_repr.t            (* size, tag *)
-  | Kmakefloatblock of int * Tagl_repr.t
+  | Kmakeblock of int * int * Taglib.t            (* size, tag *)
+  | Kmakefloatblock of int * Taglib.t
   | Kgetfield of int
   | Ksetfield of int
   | Kgetfloatfield of int

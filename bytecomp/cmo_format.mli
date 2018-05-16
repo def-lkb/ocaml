@@ -39,7 +39,7 @@ type compilation_unit =
     mutable cu_force_link: bool;        (* Must be linked even if unref'ed *)
     mutable cu_debug: int;              (* Position of debugging info, or 0 *)
     cu_debugsize: int;
-    cu_tagl : Tagl_repr.t list;
+    cu_tagl : Taglib.t list;
   }                 (* Length of debugging info *)
 
 (* Format of a .cmo file:

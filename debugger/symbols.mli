@@ -50,4 +50,4 @@ val event_near_pos : string -> int -> Instruct.debug_event
 (* Recompute the current event *)
 val update_current_event : unit -> unit
 
-val tag_description : int -> Tagl_repr.t list
+val tag_description : int -> Taglib.t list

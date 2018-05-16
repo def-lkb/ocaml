@@ -50,7 +50,7 @@ let open_implicit_module m env =
   snd (Typemod.type_open_ Override env lid.loc lid)
 
 let initial_env () =
-  Tagl_repr.reset_tags ();
+  Taglib.reset_tags ();
   Ident.reinit();
   let initial =
     if Config.safe_string then Env.initial_safe_string

@@ -37,7 +37,7 @@ let events_by_module =
 let all_events_by_module =
   (Hashtbl.create 17 : (string, debug_event list) Hashtbl.t)
 let all_tags =
-  (Hashtbl.create 257 : (int, Tagl_repr.t list) Hashtbl.t)
+  (Hashtbl.create 257 : (int, Taglib.t list) Hashtbl.t)
 
 let partition_modules evl =
   let rec partition_modules' ev evl =
@@ -89,7 +89,7 @@ let read_symbols' bytecode_file =
   let tagl =
     try
       ignore (Bytesections.seek_section ic "TAGL");
-      (input_value ic : Tagl_repr.t list)
+      (input_value ic : Taglib.t list)
     with Not_found -> []
   in
   begin try
@@ -102,7 +102,7 @@ let read_symbols' bytecode_file =
   close_in_noerr ic;
   !eventlists, !dirs, tagl
 
-let prerr_tag {Tagl_repr. tag; size; constructor; fields} =
+let prerr_tag {Taglib. tag; size; constructor; fields} =
   Printf.eprintf "\t{ tag = %d; size = %d; constructor = %S; fields = [%s] }\n"
     tag size constructor
     (String.concat ";" (List.map (Printf.sprintf "%S") fields))
@@ -147,7 +147,7 @@ let read_symbols bytecode_file =
     all_events;
 
   List.iter (fun tag ->
-      let h = Tagl_repr.hash tag in
+      let h = Taglib.index tag in
       match Hashtbl.find all_tags h with
       | tags -> Hashtbl.replace all_tags h (tag :: tags)
       | exception Not_found -> Hashtbl.add all_tags h [tag]
