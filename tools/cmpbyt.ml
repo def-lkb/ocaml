@@ -30,8 +30,9 @@ let rec cmpbytes ic1 ic2 len ofs =
     if c1 = c2 then cmpbytes ic1 ic2 (len - 1) (ofs + 1) else Differ ofs
   end
 
-let skip_section name =
-  name = "DBUG"
+let skip_section = function
+  | "DBUG" | "TAGL" -> true
+  | _ -> false
 
 let cmpbyt file1 file2 =
   let ic1 = open_in_bin file1 in

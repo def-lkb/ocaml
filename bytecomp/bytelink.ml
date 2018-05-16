@@ -170,6 +170,7 @@ let scan_file obj_name tolink =
 let crc_interfaces = Consistbl.create ()
 let interfaces = ref ([] : string list)
 let implementations_defined = ref ([] : (string * string) list)
+let tag_library = ref []
 
 let check_consistency ppf file_name cu =
   begin try
@@ -195,7 +196,8 @@ let check_consistency ppf file_name cu =
   with Not_found -> ()
   end;
   implementations_defined :=
-    (cu.cu_name, file_name) :: !implementations_defined
+    (cu.cu_name, file_name) :: !implementations_defined;
+  tag_library := cu.cu_tagl @ !tag_library
 
 let extract_crc_interfaces () =
   Consistbl.extract !interfaces crc_interfaces
@@ -379,6 +381,10 @@ let link_bytecode ppf tolink exec_name standalone =
       output_debug_info outchan;
       Bytesections.record outchan "DBUG"
     end;
+    (* Tag library *)
+    tag_library := List.sort_uniq compare !tag_library;
+    Marshal.to_channel outchan !tag_library [];
+    Bytesections.record outchan "TAGL";
     (* The table of contents and the trailer *)
     Bytesections.write_toc_and_trailer outchan;
     close_out outchan
@@ -710,5 +716,6 @@ let reset () =
   missing_globals := IdentSet.empty;
   Consistbl.clear crc_interfaces;
   implementations_defined := [];
+  tag_library := [];
   debug_info := [];
   output_code_string_counter := 0
