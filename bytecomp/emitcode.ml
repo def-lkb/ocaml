@@ -245,17 +245,25 @@ let emit_instr = function
       | _ ->
           out opGETGLOBAL; slot_for_literal sc
       end
-  | Kmakeblock(n, t) ->
+  | Kmakeblock(n, t, tagl) ->
       if n = 0 then
         if t = 0 then out opATOM0 else (out opATOM; out_int t)
-      else if n < 4 then (out(opMAKEBLOCK1 + n - 1); out_int t)
-      else (out opMAKEBLOCK; out_int n; out_int t)
+      else (
+        out opPROFINFO;
+        out_int (Tagl_repr.hash tagl);
+        if n < 4 then (out(opMAKEBLOCK1 + n - 1); out_int t)
+        else (out opMAKEBLOCK; out_int n; out_int t)
+      )
   | Kgetfield n ->
       if n < 4 then out(opGETFIELD0 + n) else (out opGETFIELD; out_int n)
   | Ksetfield n ->
       if n < 4 then out(opSETFIELD0 + n) else (out opSETFIELD; out_int n)
-  | Kmakefloatblock(n) ->
-      if n = 0 then out opATOM0 else (out opMAKEFLOATBLOCK; out_int n)
+  | Kmakefloatblock(n, tagl) ->
+      if n = 0 then out opATOM0 else (
+        out opPROFINFO;
+        out_int (Tagl_repr.hash tagl);
+        out opMAKEFLOATBLOCK; out_int n
+      )
   | Kgetfloatfield n -> out opGETFLOATFIELD; out_int n
   | Ksetfloatfield n -> out opSETFLOATFIELD; out_int n
   | Kvectlength -> out opVECTLENGTH

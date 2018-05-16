@@ -324,7 +324,7 @@ let comp_primitive p args =
     Pgetglobal id -> Kgetglobal id
   | Psetglobal id -> Ksetglobal id
   | Pintcomp cmp -> Kintcomp cmp
-  | Pmakeblock(tag, _mut, _, _) -> Kmakeblock(List.length args, tag)
+  | Pmakeblock(tag, _mut, _, tagl) -> Kmakeblock(List.length args, tag, tagl)
   | Pfield n -> Kgetfield n
   | Pfield_computed -> Kgetvectitem
   | Psetfield(n, _ptr, _init) -> Ksetfield n
@@ -658,17 +658,17 @@ let rec comp_expr env exp sz cont =
         (Kpush::
          Kconst (Const_base (Const_int n))::
          Kaddint::cont)
-  | Lprim(Pmakearray (kind, _, _), args, _) ->
+  | Lprim(Pmakearray (kind, _, repr), args, _) ->
       begin match kind with
         Pintarray | Paddrarray ->
-          comp_args env args sz (Kmakeblock(List.length args, 0) :: cont)
+          comp_args env args sz (Kmakeblock(List.length args, 0, repr) :: cont)
       | Pfloatarray ->
-          comp_args env args sz (Kmakefloatblock(List.length args) :: cont)
+          comp_args env args sz (Kmakefloatblock(List.length args, repr) :: cont)
       | Pgenarray ->
           if args = []
-          then Kmakeblock(0, 0) :: cont
+          then Kmakeblock(0, 0, repr) :: cont
           else comp_args env args sz
-                 (Kmakeblock(List.length args, 0) ::
+                 (Kmakeblock(List.length args, 0, repr) ::
                   Kccall("caml_make_array", 1) :: cont)
       end
   | Lprim (Pduparray (kind, mutability),
