@@ -215,6 +215,9 @@ let build_package_cmx members cmxfile =
       ui_force_link =
           List.exists (fun info -> info.ui_force_link) units;
       ui_export_info;
+      ui_tagl =
+        List.sort_uniq compare
+          (List.concat (List.map (fun ui -> ui.ui_tagl) units));
     } in
   Compilenv.write_unit_info pkg_infos cmxfile
 

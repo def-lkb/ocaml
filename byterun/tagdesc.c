@@ -11,11 +11,14 @@
 #include "caml/fix_code.h"
 #include "caml/memory.h"
 #include "caml/startup.h"
+#include "caml/stack.h"
 #include "caml/stacks.h"
 #include "caml/sys.h"
 #include "caml/backtrace.h"
 #include "caml/fail.h"
 #include "caml/backtrace_prim.h"
+
+#include <limits.h>
 
 #ifndef NATIVE_CODE
 
@@ -25,7 +28,7 @@ CAMLprim value caml_read_tag_section(value unit)
   CAMLparam0();
   CAMLlocal1(library);
   char_os *exec_name;
-  int fd, num_events, orig, i;
+  int fd;
   struct channel *chan;
   struct exec_trailer trail;
 
@@ -53,8 +56,7 @@ CAMLprim value caml_read_tag_section(value unit)
 
 CAMLprim value caml_read_tag_section(value unit)
 {
-  (void)unit;
-  return Val_unit;
+  return caml_input_value_from_block(caml_globals_taglib, INT_MAX);
 }
 
 #endif

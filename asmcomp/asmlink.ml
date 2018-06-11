@@ -231,6 +231,11 @@ let make_startup_file ppf units_list =
                in
                  (unit.ui_name, intf_crc, crc, unit.ui_defines))
           units_list));
+  compile_phrase
+    (Cmmgen.globals_taglib
+       (List.sort_uniq compare
+          (List.concat
+             (List.map (fun (unit,_,_) -> unit.ui_tagl) units_list))));
   compile_phrase(Cmmgen.data_segment_table ("_startup" :: name_list));
   compile_phrase(Cmmgen.code_segment_table ("_startup" :: name_list));
   let all_names = "_startup" :: "_system" :: name_list in

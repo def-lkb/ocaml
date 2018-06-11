@@ -190,6 +190,8 @@ sp is a local copy of the global variable caml_extern_sp. */
 static intnat caml_bcodcount;
 #endif
 
+#ifdef WITH_PROFINFO
+
 static uintnat next_profinfo;
 static inline uintnat pop_profinfo(void)
 {
@@ -201,6 +203,8 @@ static inline uintnat pop_profinfo(void)
 #undef Alloc_small
 #define Alloc_small(result, wosize, tag) \
   Alloc_small_with_profinfo(result, wosize, tag, pop_profinfo())
+
+#endif /* WITH_PROFINFO */
 
 /* The interpreter itself */
 
@@ -1132,7 +1136,9 @@ value caml_interprete(code_t prog, asize_t prog_size)
     }
 
     Instruct(PROFINFO):
+#ifdef WITH_PROFINFO
       next_profinfo = *pc;
+#endif
       pc++;
       Next;
 

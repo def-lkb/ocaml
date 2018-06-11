@@ -431,7 +431,7 @@ let field_approx n = function
 let simplif_prim_pure fpc p (args, approxs) dbg =
   match p, args, approxs with
   (* Block construction *)
-  | Pmakeblock(tag, Immutable, _kind), _, _ ->
+  | Pmakeblock(tag, Immutable, _kind, _tag), _, _ ->
       let field = function
         | Value_const c -> c
         | _ -> raise Exit
@@ -492,7 +492,7 @@ let simplif_prim fpc p (args, approxs as args_approxs) dbg =
     (* XXX : always return the same approxs as simplif_prim_pure? *)
     let approx =
       match p with
-      | Pmakeblock(_, Immutable, _kind) ->
+      | Pmakeblock(_, Immutable, _kind, _tag) ->
           Value_tuple (Array.of_list approxs)
       | _ ->
           Value_unknown
@@ -686,8 +686,8 @@ let rec bind_params_rec loc fpc subst params args body =
         let p1' = Ident.rename p1 in
         let u1, u2 =
           match Ident.name p1, a1 with
-          | "*opt*", Uprim(Pmakeblock(0, Immutable, kind), [a], dbg) ->
-              a, Uprim(Pmakeblock(0, Immutable, kind), [Uvar p1'], dbg)
+          | "*opt*", Uprim(Pmakeblock(0, Immutable, kind, tag), [a], dbg) ->
+              a, Uprim(Pmakeblock(0, Immutable, kind, tag), [Uvar p1'], dbg)
           | _ ->
               a1, Uvar p1'
         in
@@ -818,7 +818,7 @@ let rec close fenv cenv = function
         | Const_base(Const_int n) -> Uconst_int n
         | Const_base(Const_char c) -> Uconst_int (Char.code c)
         | Const_pointer n -> Uconst_ptr n
-        | Const_block (tag, fields) ->
+        | Const_block (tag, fields, _tagdesc) ->
             str (Uconst_block (tag, List.map transl fields))
         | Const_float_array sl ->
             (* constant float arrays are really immutable *)

@@ -84,33 +84,61 @@ let caml_black = Nativeint.shift_left (Nativeint.of_int 3) 8
 
 let floatarray_tag = Cconst_int Obj.double_array_tag
 
-let block_header tag sz =
-  Nativeint.add (Nativeint.shift_left (Nativeint.of_int sz) 10)
-                (Nativeint.of_int tag)
+let block_header ?(profinfo=0) tag sz =
+  let header_tag = Nativeint.of_int tag in
+  let header_sz = Nativeint.shift_left (Nativeint.of_int sz) 10 in
+  let header_profinfo =
+    Nativeint.shift_left (Nativeint.of_int profinfo)
+      (64 - Config.profinfo_width)
+  in
+  Nativeint.add header_tag (Nativeint.add header_sz header_profinfo)
+
+let block_header ?desc tag sz =
+  let profinfo = match desc with
+    | None -> 0
+    | Some desc -> Obj.Tag_descriptor.hash desc
+  in
+  block_header ~profinfo tag sz
+
 (* Static data corresponding to "value"s must be marked black in case we are
    in no-naked-pointers mode.  See [caml_darken] and the code below that emits
    structured constants and static module definitions. *)
-let black_block_header tag sz = Nativeint.logor (block_header tag sz) caml_black
-let white_closure_header sz = block_header Obj.closure_tag sz
-let black_closure_header sz = black_block_header Obj.closure_tag sz
-let infix_header ofs = block_header Obj.infix_tag ofs
-let float_header = block_header Obj.double_tag (size_float / size_addr)
-let floatarray_header len =
+let black_block_header ?desc tag sz =
+  Nativeint.logor (block_header ?desc tag sz) caml_black
+
+let white_closure_header ?desc sz =
+  block_header ?desc Obj.closure_tag sz
+
+let black_closure_header ?desc sz =
+  black_block_header ?desc Obj.closure_tag sz
+
+let infix_header ?desc ofs =
+  block_header ?desc Obj.infix_tag ofs
+
+let float_header =
+  block_header Obj.double_tag (size_float / size_addr)
+
+let floatarray_header ?desc len =
   (* Zero-sized float arrays have tag zero for consistency with
      [caml_alloc_float_array]. *)
   assert (len >= 0);
-  if len = 0 then block_header 0 0
-  else block_header Obj.double_array_tag (len * size_float / size_addr)
-let string_header len =
-      block_header Obj.string_tag ((len + size_addr) / size_addr)
+  if len = 0 then block_header ?desc 0 0
+  else block_header ?desc Obj.double_array_tag (len * size_float / size_addr)
+
+let string_header ?desc len =
+  block_header ?desc Obj.string_tag ((len + size_addr) / size_addr)
+
 let boxedint32_header = block_header Obj.custom_tag 2
 let boxedint64_header = block_header Obj.custom_tag (1 + 8 / size_addr)
 let boxedintnat_header = block_header Obj.custom_tag 2
 
 let alloc_float_header dbg = Cblockheader (float_header, dbg)
-let alloc_floatarray_header len dbg = Cblockheader (floatarray_header len, dbg)
-let alloc_closure_header sz dbg = Cblockheader (white_closure_header sz, dbg)
-let alloc_infix_header ofs dbg = Cblockheader (infix_header ofs, dbg)
+let alloc_floatarray_header ?desc len dbg =
+  Cblockheader (floatarray_header ?desc len, dbg)
+let alloc_closure_header ?desc sz dbg =
+  Cblockheader (white_closure_header ?desc sz, dbg)
+let alloc_infix_header ?desc ofs dbg =
+  Cblockheader (infix_header ?desc ofs, dbg)
 let alloc_boxedint32_header dbg = Cblockheader (boxedint32_header, dbg)
 let alloc_boxedint64_header dbg = Cblockheader (boxedint64_header, dbg)
 let alloc_boxedintnat_header dbg = Cblockheader (boxedintnat_header, dbg)
@@ -757,30 +785,38 @@ let call_cached_method obj tag cache pos args dbg =
 
 (* Allocation *)
 
-let make_alloc_generic set_fn dbg tag wordsize args =
+let make_alloc_generic ?desc set_fn dbg tag wordsize args =
   if wordsize <= Config.max_young_wosize then
-    Cop(Calloc, Cblockheader(block_header tag wordsize, dbg) :: args, dbg)
+    let header = block_header ?desc tag wordsize in
+    Cop(Calloc, Cblockheader(header, dbg) :: args, dbg)
   else begin
     let id = Ident.create "alloc" in
     let rec fill_fields idx = function
       [] -> Cvar id
     | e1::el -> Csequence(set_fn (Cvar id) (Cconst_int idx) e1 dbg,
                           fill_fields (idx + 2) el) in
-    Clet(id,
-         Cop(Cextcall("caml_alloc", typ_val, true, None),
-                 [Cconst_int wordsize; Cconst_int tag], dbg),
-         fill_fields 1 args)
+    let call =
+      match desc with
+      | None ->
+          Cop(Cextcall("caml_alloc", typ_val, true, None),
+              [Cconst_int wordsize; Cconst_int tag], dbg)
+      | Some desc ->
+          let profinfo = Obj.Tag_descriptor.hash desc in
+          Cop(Cextcall("caml_alloc_with_profinfo", typ_val, true, None),
+              [Cconst_int wordsize; Cconst_int tag; Cconst_int profinfo], dbg)
+    in
+    Clet(id, call, fill_fields 1 args)
   end
 
-let make_alloc dbg tag args =
+let make_alloc ?desc dbg tag args =
   let addr_array_init arr ofs newval dbg =
     Cop(Cextcall("caml_initialize", typ_void, false, None),
         [array_indexing log2_size_addr arr ofs dbg; newval], dbg)
   in
-  make_alloc_generic addr_array_init dbg tag (List.length args) args
+  make_alloc_generic ?desc addr_array_init dbg tag (List.length args) args
 
-let make_float_alloc dbg tag args =
-  make_alloc_generic float_array_set dbg tag
+let make_float_alloc ?desc dbg tag args =
+  make_alloc_generic ?desc float_array_set dbg tag
                      (List.length args * size_float / size_addr) args
 
 (* Bounds checking *)
@@ -832,11 +868,11 @@ let rec expr_size env = function
       expr_size env body
   | Uprim(Pmakeblock _, args, _) ->
       RHS_block (List.length args)
-  | Uprim(Pmakearray((Paddrarray | Pintarray), _), args, _) ->
+  | Uprim(Pmakearray((Paddrarray | Pintarray), _, _), args, _) ->
       RHS_block (List.length args)
-  | Uprim(Pmakearray(Pfloatarray, _), args, _) ->
+  | Uprim(Pmakearray(Pfloatarray, _, _), args, _) ->
       RHS_floatblock (List.length args)
-  | Uprim(Pmakearray(Pgenarray, _), _, _) ->
+  | Uprim(Pmakearray(Pgenarray, _, _), _, _) ->
      (* Pgenarray is excluded from recursive bindings by the
         check in Translcore.check_recursive_lambda *)
      RHS_nonrec
@@ -1762,11 +1798,11 @@ let rec transl env e =
           Cconst_symbol (Ident.name id)
       | (Pmakeblock _, []) ->
           assert false
-      | (Pmakeblock(tag, _mut, _kind), args) ->
-          make_alloc dbg tag (List.map (transl env) args)
+      | (Pmakeblock(tag, _mut, _kind, desc), args) ->
+          make_alloc ~desc dbg tag (List.map (transl env) args)
       | (Pccall prim, args) ->
           transl_ccall env prim args dbg
-      | (Pduparray (kind, _), [Uprim (Pmakearray (kind', _), args, _dbg)]) ->
+      | (Pduparray (kind, _), [Uprim (Pmakearray (kind', _, _), args, _dbg)]) ->
           (* We arrive here in two cases:
              1. When using Closure, all the time.
              2. When using Flambda, if a float array longer than
@@ -1786,7 +1822,7 @@ let rec transl env e =
           transl_ccall env prim_obj_dup [arg] dbg
       | (Pmakearray _, []) ->
           transl_structured_constant (Uconst_block(0, []))
-      | (Pmakearray (kind, _), args) -> transl_make_array dbg env kind args
+      | (Pmakearray (kind, _, _), args) -> transl_make_array dbg env kind args
       | (Pbigarrayref(unsafe, _num_dims, elt_kind, layout), arg1 :: argl) ->
           let elt =
             bigarray_get unsafe elt_kind layout
@@ -3443,6 +3479,8 @@ let global_data name v =
           (Uconst_string (Marshal.to_string v [])) [])
 
 let globals_map v = global_data "caml_globals_map" v
+
+let globals_taglib v = global_data "caml_globals_taglib" v
 
 (* Generate the master table of frame descriptors *)
 

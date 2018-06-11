@@ -84,7 +84,9 @@ let current_unit =
     ui_apply_fun = [];
     ui_send_fun = [];
     ui_force_link = false;
-    ui_export_info = default_ui_export_info }
+    ui_export_info = default_ui_export_info;
+    ui_tagl = [];
+  }
 
 let symbolname_for_pack pack name =
   match pack with
@@ -130,6 +132,7 @@ let reset ?packname name =
   Hashtbl.clear exported_constants;
   structured_constants := structured_constants_empty;
   current_unit.ui_export_info <- default_ui_export_info;
+  current_unit.ui_tagl <- [];
   merged_environment := Export_info.empty;
   Hashtbl.clear export_infos_table;
   let compilation_unit =
@@ -346,6 +349,7 @@ let write_unit_info info filename =
 
 let save_unit_info filename =
   current_unit.ui_imports_cmi <- Env.imports();
+  current_unit.ui_tagl <- Taglib.emit_tags();
   write_unit_info current_unit filename
 
 let current_unit_linkage_name () =

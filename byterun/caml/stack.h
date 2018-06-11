@@ -114,6 +114,7 @@ extern value * caml_gc_regs;
 extern char * caml_exception_pointer;
 extern value * caml_globals[];
 extern char caml_globals_map[];
+extern char caml_globals_taglib[];
 extern intnat caml_globals_inited;
 extern intnat * caml_frametable[];
 

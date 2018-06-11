@@ -212,8 +212,9 @@ let rec transl_const = function
   | Const_base(Const_nativeint i) -> Obj.repr i
   | Const_pointer i -> Obj.repr i
   | Const_immstring s -> Obj.repr s
-  | Const_block(tag, fields, _) ->
+  | Const_block(tag, fields, tagl) ->
       let block = Obj.new_block tag (List.length fields) in
+      ignore (Obj.set_profinfo block (Taglib.index tagl) : bool);
       let pos = ref 0 in
       List.iter
         (fun c -> Obj.set_field block !pos (transl_const c); incr pos)

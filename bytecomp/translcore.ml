@@ -843,12 +843,12 @@ and transl_exp0 e =
       | Cstr_unboxed ->
           (match ll with [v] -> v | _ -> assert false)
       | Cstr_block n ->
+          let tagl =
+            Taglib.make ~name:cstr.cstr_name ~size:(List.length ll) n
+          in
           begin try
-            Lconst(Const_block(n, List.map extract_constant ll, Taglib.default))
+            Lconst(Const_block(n, List.map extract_constant ll, tagl))
           with Not_constant ->
-            let tagl =
-              Taglib.make ~name:cstr.cstr_name ~size:(List.length ll) n
-            in
             Lprim(Pmakeblock(n, Immutable, Some shape, tagl), ll, e.exp_loc)
           end
       | Cstr_extension(path, is_const) ->
@@ -866,11 +866,12 @@ and transl_exp0 e =
         None -> Lconst(Const_pointer tag)
       | Some arg ->
           let lam = transl_exp arg in
+          let tagl = Taglib.make ~name:l ~size:2 0 in
           try
             Lconst(Const_block(0, [Const_base(Const_int tag);
-                                   extract_constant lam], Taglib.default))
+                                   extract_constant lam], tagl))
           with Not_constant ->
-            Lprim(Pmakeblock(0, Immutable, None, Taglib.default),
+            Lprim(Pmakeblock(0, Immutable, None, tagl),
                   [Lconst(Const_base(Const_int tag)); lam], e.exp_loc)
       end
   | Texp_record {fields; representation; extended_expression} ->
@@ -1253,6 +1254,18 @@ and transl_setinstvar loc self var expr =
 
 and transl_record loc env fields repres opt_init_expr =
   let size = Array.length fields in
+  let tagdesc =
+    Taglib.make
+      ~fields:(Array.to_list
+                 (Array.map (fun (desc,_) -> desc.Types.lbl_name) fields))
+      ~size
+      (match repres with
+       | Record_regular -> 0
+       | Record_inlined tag -> tag
+       | Record_unboxed _ -> assert false
+       | Record_extension -> Obj.object_tag
+       | Record_float -> Obj.double_array_tag)
+  in
   (* Determine if there are "enough" fields (only relevant if this is a
      functional-style record update *)
   let no_init = match opt_init_expr with None -> true | _ -> false in
@@ -1289,8 +1302,8 @@ and transl_record loc env fields repres opt_init_expr =
         if mut = Mutable then raise Not_constant;
         let cl = List.map extract_constant ll in
         match repres with
-        | Record_regular -> Lconst(Const_block(0, cl, Taglib.default))
-        | Record_inlined tag -> Lconst(Const_block(tag, cl, Taglib.default))
+        | Record_regular -> Lconst(Const_block(0, cl, tagdesc))
+        | Record_inlined tag -> Lconst(Const_block(tag, cl, tagdesc))
         | Record_unboxed _ -> Lconst(match cl with [v] -> v | _ -> assert false)
         | Record_float ->
             Lconst(Const_float_array(List.map extract_float cl))
@@ -1299,12 +1312,12 @@ and transl_record loc env fields repres opt_init_expr =
       with Not_constant ->
         match repres with
           Record_regular ->
-            Lprim(Pmakeblock(0, mut, Some shape, Taglib.default), ll, loc)
+            Lprim(Pmakeblock(0, mut, Some shape, tagdesc), ll, loc)
         | Record_inlined tag ->
-            Lprim(Pmakeblock(tag, mut, Some shape, Taglib.default), ll, loc)
+            Lprim(Pmakeblock(tag, mut, Some shape, tagdesc), ll, loc)
         | Record_unboxed _ -> (match ll with [v] -> v | _ -> assert false)
         | Record_float ->
-            Lprim(Pmakearray (Pfloatarray, mut, Taglib.default), ll, loc)
+            Lprim(Pmakearray (Pfloatarray, mut, tagdesc), ll, loc)
         | Record_extension ->
             let path =
               let (label, _) = fields.(0) in
@@ -1313,7 +1326,7 @@ and transl_record loc env fields repres opt_init_expr =
               | _ -> assert false
             in
             let slot = transl_extension_path env path in
-            Lprim(Pmakeblock(0, mut, Some (Pgenval :: shape), Taglib.default),
+            Lprim(Pmakeblock(0, mut, Some (Pgenval :: shape), tagdesc),
                   slot :: ll, loc)
     in
     begin match opt_init_expr with
