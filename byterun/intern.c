@@ -322,6 +322,12 @@ static void intern_rec(value *dest)
   struct custom_operations * ops;
   char * codeptr;
   struct intern_item * sp;
+  uintnat next_profinfo;
+#ifdef WITH_PROFINFO
+#undef Make_header_allocated_here
+#define Make_header_allocated_here(wosize, tag, color) \
+      (Make_header_with_profinfo(wosize, tag, color, next_profinfo))
+#endif
 
   sp = intern_stack;
 
@@ -354,6 +360,14 @@ static void intern_rec(value *dest)
     if (--(sp->arg) == 0) sp--;
     /* Read a value and set v to this value */
   code = read8u();
+  if (code == CODE_PROFINFO)
+  {
+    next_profinfo = read32u();
+    code = read8u();
+  } else
+  {
+    next_profinfo = 0;
+  }
   if (code >= PREFIX_SMALL_INT) {
     if (code >= PREFIX_SMALL_BLOCK) {
       /* Small block */

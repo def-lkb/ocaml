@@ -417,6 +417,12 @@ static void extern_rec(value v)
     tag_t tag = Tag_hd(hd);
     mlsize_t sz = Wosize_hd(hd);
 
+#ifdef WITH_PROFINFO
+    if (extern_flags && Profinfo_hd(hd)) {
+      writecode32(CODE_PROFINFO, Profinfo_hd(hd));
+    }
+#endif
+
     if (tag == Forward_tag) {
       value f = Forward_val (v);
       if (Is_block (f)

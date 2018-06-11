@@ -214,6 +214,7 @@ let rec transl_const = function
   | Const_immstring s -> Obj.repr s
   | Const_block(tag, fields, tagl) ->
       let block = Obj.new_block tag (List.length fields) in
+      prerr_endline ("CONST_BLOCK: " ^ tagl.Taglib.constructor);
       ignore (Obj.set_profinfo block (Taglib.index tagl) : bool);
       let pos = ref 0 in
       List.iter
