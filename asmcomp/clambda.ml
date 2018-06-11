@@ -26,7 +26,7 @@ type ustructured_constant =
   | Uconst_int32 of int32
   | Uconst_int64 of int64
   | Uconst_nativeint of nativeint
-  | Uconst_block of int * uconstant list
+  | Uconst_block of int * uconstant list * Taglib.t
   | Uconst_float_array of float list
   | Uconst_string of string
   | Uconst_closure of ufunction list * string * uconstant list
@@ -162,9 +162,13 @@ let compare_structured_constants c1 c2 =
   | Uconst_int32 x1, Uconst_int32 x2 -> Int32.compare x1 x2
   | Uconst_int64 x1, Uconst_int64 x2 -> Int64.compare x1 x2
   | Uconst_nativeint x1, Uconst_nativeint x2 -> Nativeint.compare x1 x2
-  | Uconst_block(t1, l1), Uconst_block(t2, l2) ->
+  | Uconst_block(t1, l1, desc1), Uconst_block(t2, l2, desc2) ->
       let c = t1 - t2 (* no overflow possible here *) in
-      if c <> 0 then c else compare_constant_lists l1 l2
+      if c <> 0 then c else begin
+        match compare desc1 desc2 with
+        | 0 -> compare_constant_lists l1 l2
+        | n -> n
+      end
   | Uconst_float_array l1, Uconst_float_array l2 ->
       compare_float_lists l1 l2
   | Uconst_string s1, Uconst_string s2 -> String.compare s1 s2

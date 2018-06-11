@@ -37,7 +37,7 @@ let rec structured_constant ppf = function
   | Uconst_int32 x -> fprintf ppf "%ldl" x
   | Uconst_int64 x -> fprintf ppf "%LdL" x
   | Uconst_nativeint x -> fprintf ppf "%ndn" x
-  | Uconst_block (tag, l) ->
+  | Uconst_block (tag, l, _tagdesc) ->
       fprintf ppf "block(%i" tag;
       List.iter (fun u -> fprintf ppf ",%a" uconstant u) l;
       fprintf ppf ")"

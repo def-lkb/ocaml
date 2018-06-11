@@ -1799,6 +1799,7 @@ let rec transl env e =
       | (Pmakeblock _, []) ->
           assert false
       | (Pmakeblock(tag, _mut, _kind, desc), args) ->
+          prerr_endline ("Pmakeblock: " ^ desc.Taglib.constructor);
           make_alloc ~desc dbg tag (List.map (transl env) args)
       | (Pccall prim, args) ->
           transl_ccall env prim args dbg
@@ -1821,7 +1822,7 @@ let rec transl env e =
           in
           transl_ccall env prim_obj_dup [arg] dbg
       | (Pmakearray _, []) ->
-          transl_structured_constant (Uconst_block(0, []))
+          transl_structured_constant (Uconst_block(0, [], Taglib.default))
       | (Pmakearray (kind, _, _), args) -> transl_make_array dbg env kind args
       | (Pbigarrayref(unsafe, _num_dims, elt_kind, layout), arg1 :: argl) ->
           let elt =
@@ -2893,9 +2894,9 @@ let rec emit_structured_constant symb cst cont =
   | Uconst_nativeint n ->
       emit_block boxedintnat_header symb
         (emit_boxed_nativeint_constant n cont)
-  | Uconst_block (tag, csts) ->
+  | Uconst_block (tag, csts, desc) ->
       let cont = List.fold_right emit_constant csts cont in
-      emit_block (block_header tag (List.length csts)) symb cont
+      emit_block (block_header ~desc tag (List.length csts)) symb cont
   | Uconst_float_array fields ->
       emit_block (floatarray_header (List.length fields)) symb
         (Misc.map_end (fun f -> Cdouble f) fields cont)
@@ -3535,7 +3536,8 @@ let predef_exception i name =
                        [
                          Uconst_ref(label, Some cst);
                          Uconst_int (-i-1);
-                       ])) cont)
+                       ],
+                       Taglib.default)) cont)
 
 (* Header for a plugin *)
 

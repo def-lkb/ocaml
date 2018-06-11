@@ -423,7 +423,7 @@ let simplif_arith_prim_pure fpc p (args, approxs) dbg =
 
 let field_approx n = function
   | Value_tuple a when n < Array.length a -> a.(n)
-  | Value_const (Uconst_ref(_, Some (Uconst_block(_, l))))
+  | Value_const (Uconst_ref(_, Some (Uconst_block(_, l, _))))
     when n < List.length l ->
       Value_const (List.nth l n)
   | _ -> Value_unknown
@@ -431,13 +431,13 @@ let field_approx n = function
 let simplif_prim_pure fpc p (args, approxs) dbg =
   match p, args, approxs with
   (* Block construction *)
-  | Pmakeblock(tag, Immutable, _kind, _tag), _, _ ->
+  | Pmakeblock(tag, Immutable, _kind, tagdesc), _, _ ->
       let field = function
         | Value_const c -> c
         | _ -> raise Exit
       in
       begin try
-        let cst = Uconst_block (tag, List.map field approxs) in
+        let cst = Uconst_block (tag, List.map field approxs, tagdesc) in
         let name =
           Compilenv.new_structured_constant cst ~shared:true
         in
@@ -446,7 +446,7 @@ let simplif_prim_pure fpc p (args, approxs) dbg =
         (Uprim(p, args, dbg), Value_tuple (Array.of_list approxs))
       end
   (* Field access *)
-  | Pfield n, _, [ Value_const(Uconst_ref(_, Some (Uconst_block(_, l)))) ]
+  | Pfield n, _, [ Value_const(Uconst_ref(_, Some (Uconst_block(_, l, _)))) ]
     when n < List.length l ->
       make_const (List.nth l n)
   | Pfield n, [ Uprim(Pmakeblock _, ul, _) ], [approx]
@@ -583,7 +583,7 @@ let rec substitute loc fpc sb rn ulam =
            in this substitute function.
         *)
         match sarg with
-        | Uconst (Uconst_ref (_,  Some (Uconst_block (tag, _)))) ->
+        | Uconst (Uconst_ref (_,  Some (Uconst_block (tag, _, _)))) ->
             find_action sw.us_index_blocks sw.us_actions_blocks tag
         | Uconst (Uconst_ptr tag) ->
             find_action sw.us_index_consts sw.us_actions_consts tag
@@ -818,8 +818,8 @@ let rec close fenv cenv = function
         | Const_base(Const_int n) -> Uconst_int n
         | Const_base(Const_char c) -> Uconst_int (Char.code c)
         | Const_pointer n -> Uconst_ptr n
-        | Const_block (tag, fields, _tagdesc) ->
-            str (Uconst_block (tag, List.map transl fields))
+        | Const_block (tag, fields, tagdesc) ->
+            str (Uconst_block (tag, List.map transl fields, tagdesc))
         | Const_float_array sl ->
             (* constant float arrays are really immutable *)
             str (Uconst_float_array (List.map float_of_string sl))
@@ -1335,7 +1335,7 @@ let collect_exported_structured_constants a =
     | Uconst_ref (_s, None) -> assert false (* Cannot be generated *)
     | Uconst_int _ | Uconst_ptr _ -> ()
   and structured_constant = function
-    | Uconst_block (_, ul) -> List.iter const ul
+    | Uconst_block (_, ul, _) -> List.iter const ul
     | Uconst_float _ | Uconst_int32 _
     | Uconst_int64 _ | Uconst_nativeint _
     | Uconst_float_array _ | Uconst_string _ -> ()
