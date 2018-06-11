@@ -418,7 +418,7 @@ static void extern_rec(value v)
     mlsize_t sz = Wosize_hd(hd);
 
 #ifdef WITH_PROFINFO
-    if (extern_flags && Profinfo_hd(hd)) {
+    if (Profinfo_hd(hd)) {
       writecode32(CODE_PROFINFO, Profinfo_hd(hd));
     }
 #endif

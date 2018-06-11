@@ -214,11 +214,11 @@ let rec transl_const = function
   | Const_immstring s -> Obj.repr s
   | Const_block(tag, fields, tagl) ->
       let block = Obj.new_block tag (List.length fields) in
-      prerr_endline ("CONST_BLOCK: " ^ tagl.Taglib.constructor);
-      ignore (Obj.set_profinfo block (Taglib.index tagl) : bool);
-      let pos = ref 0 in
-      List.iter
-        (fun c -> Obj.set_field block !pos (transl_const c); incr pos)
+      (*prerr_endline ("CONST_BLOCK: " ^ tagl.Taglib.constructor);*)
+      assert (Obj.set_profinfo block (Taglib.index tagl));
+      (*prerr_endline ("PROFINFO: " ^ string_of_int (Obj.get_profinfo block));*)
+      List.iteri
+        (fun i c -> Obj.set_field block i (transl_const c))
         fields;
       block
   | Const_float_array fields ->

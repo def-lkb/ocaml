@@ -827,8 +827,9 @@ and transl_exp0 e =
                Matching.for_trywith (Lvar id) (transl_cases_try pat_expr_list))
   | Texp_tuple el ->
       let ll, shape = transl_list_with_shape el in
+      let tagl = Taglib.make ~name:"tuple" 0 in
       begin try
-        Lconst(Const_block(0, List.map extract_constant ll, Taglib.default))
+        Lconst(Const_block(0, List.map extract_constant ll, tagl))
       with Not_constant ->
         Lprim(Pmakeblock(0, Immutable, Some shape, Taglib.default), ll, e.exp_loc)
       end
