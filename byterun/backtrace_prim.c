@@ -42,6 +42,7 @@
 #include "caml/backtrace.h"
 #include "caml/fail.h"
 #include "caml/backtrace_prim.h"
+#include "caml/callback.h"
 
 /* The table of debug information fragments */
 struct ext_table caml_debug_info;
@@ -319,6 +320,34 @@ CAMLprim value caml_get_current_callstack(value max_frames_value)
   CAMLreturn(trace);
 }
 
+CAMLprim value caml_fold_current_callstack(value visit_frame, value visit_local, value acc)
+{
+  CAMLparam3(visit_frame, visit_local, acc);
+  CAMLlocal1(trace);
+
+  value * sp = caml_extern_sp;
+  value * trsp = caml_trapsp;
+
+  while (sp < caml_stack_high)
+  {
+    while (sp < caml_stack_high) {
+      code_t *p = (code_t*) (sp);
+      if(&Trap_pc(trsp) == p) {
+        sp++;
+        trsp = Trap_link(trsp);
+        continue;
+      }
+
+      if (find_debug_info(*p) != NULL)
+        acc = caml_callback2(visit_frame, Val_backtrace_slot(*p), acc);
+      else
+        acc = caml_callback2(visit_local, *sp, acc);
+      sp++;
+    }
+  }
+
+  CAMLreturn(acc);
+}
 /* Read the debugging info contained in the current bytecode executable. */
 
 #ifndef O_BINARY
