@@ -1799,7 +1799,7 @@ let rec transl env e =
       | (Pmakeblock _, []) ->
           assert false
       | (Pmakeblock(tag, _mut, _kind, desc), args) ->
-          prerr_endline ("Pmakeblock: " ^ desc.Taglib.constructor);
+          (*prerr_endline ("Pmakeblock: " ^ desc.Taglib.constructor);*)
           make_alloc ~desc dbg tag (List.map (transl env) args)
       | (Pccall prim, args) ->
           transl_ccall env prim args dbg
