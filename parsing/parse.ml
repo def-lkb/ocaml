@@ -106,7 +106,10 @@ let rec loop lexbuf in_error checkpoint =
   | I.Accepted v -> v
   | I.Rejected -> raise Parser.Error
   | I.HandlingError _ ->
-      loop lexbuf true (I.resume checkpoint)
+      if in_error then
+        raise Parser.Error
+      else
+        loop lexbuf true (I.resume checkpoint)
 
 let wrap_menhir entry lexbuf =
   let initial = entry lexbuf.Lexing.lex_curr_p in
