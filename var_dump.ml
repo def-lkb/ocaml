@@ -7,6 +7,7 @@ type reflection =
   | Constructor of string * Obj.t array
   | Inline_record of string * string list * Obj.t array
   | Record of string list * Obj.t array
+  | Float_record of string list * float array
   | Perdu of Obj.t
 
 let mask = (1 lsl Obj.profinfo_bits () - 1)
@@ -48,29 +49,35 @@ let reflect_with_profinfo tag obj =
     let pred t = check t.tag tag && check t.size size in
     List.filter pred tags
   in
-  match tags with
-  | {tag = 0; fields = []; constructor = ""} :: _ ->
-      Tuple (array_of_fields obj)
-  | {fields = []; constructor} :: _ ->
-      Constructor (constructor, array_of_fields obj)
-  | {fields; constructor = ""} :: _ ->
-      Record (fields, array_of_fields obj)
-  | {fields; constructor} :: _ ->
-      Inline_record (constructor, fields, array_of_fields obj)
-  | [] -> Perdu obj
+  if tag = Obj.double_array_tag then
+    let obj : float array = Obj.obj obj in
+    match tags with
+    | {fields} :: _ when List.length fields = Array.length obj ->
+        Float_record (fields, obj)
+    | _ -> Float_array obj
+  else
+    match tags with
+    | {tag = 0; fields = []; constructor = ""} :: _ ->
+        Tuple (array_of_fields obj)
+    | {fields = []; constructor} :: _ ->
+        Constructor (constructor, array_of_fields obj)
+    | {fields; constructor = ""} :: _ ->
+        Record (fields, array_of_fields obj)
+    | {fields; constructor} :: _ ->
+        Inline_record (constructor, fields, array_of_fields obj)
+    | [] -> Perdu obj
 
 let reflect obj =
   let tag = Obj.tag obj in
   if tag = Obj.int_tag
   then Int (Obj.obj obj)
   else if
-    tag <= Obj.last_non_constant_constructor_tag &&
-    tag >= Obj.first_non_constant_constructor_tag
+    (tag <= Obj.last_non_constant_constructor_tag &&
+     tag >= Obj.first_non_constant_constructor_tag) ||
+    (tag = Obj.double_array_tag)
   then reflect_with_profinfo tag obj
   else if tag = Obj.double_tag then
     Float (Obj.obj obj)
-  else if tag = Obj.double_array_tag then
-    Float_array (Obj.obj obj)
   else if tag = Obj.string_tag then
     String (Obj.obj obj)
   else Perdu obj
@@ -82,8 +89,12 @@ let print_floats ppf f =
 
 let rec print_record ppf (keys, values) =
   List.iteri (fun i key ->
-      fprintf ppf "@[%s = %a@];@ " key
-        pp_hum values.(i))
+      fprintf ppf "@[%s = %a@];@ " key pp_hum values.(i))
+    keys
+
+and print_float_record ppf (keys, values) =
+  List.iteri (fun i key ->
+      fprintf ppf "@[%s = %f@];@ " key values.(i))
     keys
 
 and pp_hum ppf obj =
@@ -118,6 +129,9 @@ and pp_hum ppf obj =
         t
   | Record (keys, values) ->
       fprintf ppf "{@[<hv>%a@]}" print_record (keys, values)
+
+  | Float_record (keys, values) ->
+      fprintf ppf "{@[<hv>%a@]}" print_float_record (keys, values)
 
   | Inline_record (name, keys, values) ->
       fprintf ppf "%s{@[<hv>%a@]}" name print_record (keys, values)
