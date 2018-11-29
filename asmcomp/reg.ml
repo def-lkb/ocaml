@@ -117,6 +117,8 @@ let name t =
     | None -> with_spilled
     | Some part -> with_spilled ^ "#" ^ string_of_int part
 
+let local_name t = Raw_name.to_string t.raw_name
+
 let first_virtual_reg_stamp = ref (-1)
 
 let reset() =

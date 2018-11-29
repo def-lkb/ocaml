@@ -240,6 +240,14 @@ let record_frame_label ?label live raise_ dbg =
     | Some label -> label
   in
   let live_offset = ref [] in
+  let locals = 
+    Reg.Set.fold (fun r acc ->
+        match Reg.local_name r with
+        | None -> acc
+        | Some r -> r :: acc
+    ) live []
+  in 
+  prerr_endline ("locals: " ^ String.concat ", " locals);
   Reg.Set.iter
     (function
       | {typ = Val; loc = Reg r} ->
