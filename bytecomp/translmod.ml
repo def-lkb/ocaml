@@ -448,6 +448,7 @@ let rec compile_functor mexp coercion root_path loc =
       local = Default_local;
       is_a_functor = true;
       stub = false;
+      trmc_candidate = false;
     };
     loc;
     body;

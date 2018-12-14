@@ -106,6 +106,7 @@ module Options = Main_args.Make_bytecomp_options (struct
   let _no_strict_sequence = option "-no-strict-sequence"
   let _strict_formats = option "-strict-formats"
   let _no_strict_formats = option "-no-strict-formats"
+  let _trmc = option "-trmc"
   let _thread () = option "-thread" ()
   let _vmthread () = option "-vmthread" ()
   let _unboxed_types = option "-unboxed-types"
