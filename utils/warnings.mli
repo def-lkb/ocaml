@@ -82,6 +82,9 @@ type t =
   | Unused_module of string                 (* 60 *)
   | Unboxable_type_in_prim_decl of string   (* 61 *)
   | Constraint_on_gadt                      (* 62 *)
+  | Invalid_trmc_attribute                  (* 67 *)
+  | Unused_trmc_attribute                   (* 68 *)
+  | Potential_trmc_call                     (* 69 *)
 ;;
 
 val parse_options : bool -> string -> unit;;

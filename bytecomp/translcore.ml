@@ -679,6 +679,9 @@ and transl_let rec_flag pat_expr_list =
           let lam =
             Translattribute.add_specialise_attribute lam vb_loc attr
           in
+          let lam =
+            Translattribute.add_trmc_attribute lam vb_loc attr
+          in
           let mk_body = transl rem in
           fun body -> Matching.for_let pat.pat_loc lam pat (mk_body body)
       in transl pat_expr_list
@@ -698,6 +701,10 @@ and transl_let rec_flag pat_expr_list =
         in
         let lam =
           Translattribute.add_specialise_attribute lam vb_loc
+            vb_attributes
+        in
+        let lam =
+          Translattribute.add_trmc_attribute lam vb_loc
             vb_attributes
         in
         (id, lam) in

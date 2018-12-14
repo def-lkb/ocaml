@@ -229,6 +229,7 @@ type function_attribute = {
   specialise : specialise_attribute;
   is_a_functor: bool;
   stub: bool;
+  trmc_candidate: bool;
 }
 
 type lambda =

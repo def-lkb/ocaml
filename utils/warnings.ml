@@ -89,6 +89,9 @@ type t =
   | Unused_module of string                 (* 60 *)
   | Unboxable_type_in_prim_decl of string   (* 61 *)
   | Constraint_on_gadt                      (* 62 *)
+  | Invalid_trmc_attribute                  (* 67 *)
+  | Unused_trmc_attribute                   (* 68 *)
+  | Potential_trmc_call                     (* 69 *)
 ;;
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
@@ -160,9 +163,12 @@ let number = function
   | Unused_module _ -> 60
   | Unboxable_type_in_prim_decl _ -> 61
   | Constraint_on_gadt -> 62
+  | Invalid_trmc_attribute -> 67
+  | Unused_trmc_attribute -> 68
+  | Potential_trmc_call -> 69
 ;;
 
-let last_warning_number = 62
+let last_warning_number = 69
 ;;
 
 (* Must be the max number returned by the [number] function. *)
@@ -287,7 +293,8 @@ let parse_opt error active flags s =
        loop (i+1)
     | _ -> error ()
   in
-  loop 0
+  loop 0;
+  errors.(69) <- false (* Missed potential trmc call is not an error *)
 ;;
 
 let parse_options errflag s =
@@ -297,7 +304,7 @@ let parse_options errflag s =
   current := {error; active}
 
 (* If you change these, don't forget to change them in man/ocamlc.m *)
-let defaults_w = "+a-4-6-7-9-27-29-32..42-44-45-48-50-60";;
+let defaults_w = "+a-4-6-7-9-27-29-32..42-44-45-48-50-60-69";;
 let defaults_warn_error = "-a+31";;
 
 let () = parse_options false defaults_w;;
@@ -521,6 +528,12 @@ let message = function
          or [@@unboxed]." t t
   | Constraint_on_gadt ->
       "Type constraints do not apply to GADT cases of variant types."
+  | Invalid_trmc_attribute ->
+      "trmc attribute is only applicable on recursive function bindings"
+  | Unused_trmc_attribute ->
+      "this function is marked trmc but is never applied in trmc position"
+  | Potential_trmc_call ->
+      "this function is applied in trmc position"
 ;;
 
 let sub_locs = function
@@ -637,6 +650,9 @@ let descriptions =
    60, "Unused module declaration";
    61, "Unboxable type in primitive declaration";
    62, "Type constraint on GADT type declaration"
+   67, "Warning on non-recursive functions with @trmc attribute";
+   68, "Unused @trmc attribute";
+   69, "Warning on functions which would benefit from a @trmc attribute";
   ]
 ;;
 

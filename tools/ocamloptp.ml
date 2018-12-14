@@ -126,6 +126,7 @@ module Options = Main_args.Make_optcomp_options (struct
   let _no_strict_sequence = option "-no-strict-sequence"
   let _strict_formats = option "-strict-formats"
   let _no_strict_formats = option "-no-strict-formats"
+  let _trmc = option "-trmc"
   let _shared = option "-shared"
   let _thread = option "-thread"
   let _unbox_closures = option "-unbox-closures"

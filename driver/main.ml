@@ -91,6 +91,7 @@ module Options = Main_args.Make_bytecomp_options (struct
   let _no_strict_formats = unset strict_formats
   let _thread = set use_threads
   let _vmthread = set use_vmthreads
+  let _trmc = set force_trmc
   let _unboxed_types = set unboxed_types
   let _no_unboxed_types = unset unboxed_types
   let _unsafe = set fast
