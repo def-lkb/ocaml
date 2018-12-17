@@ -882,7 +882,7 @@ and need_recfunc (id,stub) offset =
   with Not_found ->
     assert (not stub.stub_frozen);
     let fresh = Ident.name id ^ "_" ^ string_of_int offset in
-    let id' = Ident.create_local fresh in
+    let id' = Ident.create fresh in
     stub.stub_uses <- (offset, id') :: stub.stub_uses;
     id'
 
@@ -929,8 +929,8 @@ and extract_trmc_list all_candidates name acc = function
 
 let on_trmc all_candidates lam =
   if has_trmc all_candidates lam then
-    let name_block = Ident.create_local "trmc_block" in
-    let name_result = Ident.create_local "trmc_result" in
+    let name_block = Ident.create "trmc_block" in
+    let name_result = Ident.create "trmc_result" in
     let (func, old_app, value_block), value_result =
       extract_trmc all_candidates name_block lam
     in
@@ -977,14 +977,14 @@ let rec introduce_trmc all_candidates bindings =
   let all_candidates = candidates @ all_candidates in
 
   let rewrite_stub_use lfun (offset, id') =
-    let caller_block = Ident.create_local "caller_block" in
+    let caller_block = Ident.create "caller_block" in
     let on_return lam =
       Lprim (Psetfield (offset, Pointer, Heap_initialization),
              [Lvar caller_block; lam], Location.none)
     in
     let on_tail lam =
       if has_trmc all_candidates lam then
-        let name_block = Ident.create_local "trmc_block" in
+        let name_block = Ident.create "trmc_block" in
         let (func, old_app, value_block), value_result =
           extract_trmc all_candidates name_block lam
         in
@@ -1005,8 +1005,7 @@ let rec introduce_trmc all_candidates bindings =
       else on_return lam
     in
     let body = map_exits ~on_return:(map_return on_return) ~on_tail lfun.body in
-    let param = (caller_block, Pgenval) in
-    id', Lfunction {lfun with params = param :: lfun.params; body}
+    id', Lfunction {lfun with params = caller_block :: lfun.params; body}
   in
   let bindings_of_stub (_id,stub) =
     List.map (rewrite_stub_use stub.stub_body) stub.stub_uses

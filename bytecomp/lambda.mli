@@ -340,6 +340,7 @@ val subst: lambda Ident.Map.t -> lambda -> lambda
     Assumes that the image of the substitution is out of reach
     of the bound variables of the lambda-term (no capture). *)
 
+val shallow_map : (lambda -> lambda) -> lambda -> lambda
 val map : (lambda -> lambda) -> lambda -> lambda
 val bind : let_kind -> Ident.t -> lambda -> lambda -> lambda
 

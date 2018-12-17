@@ -245,10 +245,10 @@ let mk_lazy f =
         raise exn
     )
 
-let parse_opt error active flags s =
+let parse_opt errors active flags s =
   let set i = flags.(i) <- true in
   let clear i = flags.(i) <- false in
-  let set_all i = active.(i) <- true; error.(i) <- true in
+  let set_all i = active.(i) <- true; errors.(i) <- true in
   let error () = raise (Arg.Bad "Ill-formed list of warnings") in
   let rec get_num n i =
     if i >= String.length s then i, n
@@ -649,7 +649,7 @@ let descriptions =
    59, "Assignment to non-mutable value";
    60, "Unused module declaration";
    61, "Unboxable type in primitive declaration";
-   62, "Type constraint on GADT type declaration"
+   62, "Type constraint on GADT type declaration";
    67, "Warning on non-recursive functions with @trmc attribute";
    68, "Unused @trmc attribute";
    69, "Warning on functions which would benefit from a @trmc attribute";

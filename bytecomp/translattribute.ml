@@ -180,7 +180,7 @@ let add_specialise_attribute expr loc attributes =
       expr
 
 let add_trmc_attribute expr loc attributes =
-  let is_trmc_attribute a = is_trmc_attribute a.Parsetree.attr_name in
+  let is_trmc_attribute (a,_) = is_trmc_attribute a in
   if List.exists is_trmc_attribute attributes then
     match expr with
     | Lfunction funct ->
