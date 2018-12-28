@@ -102,10 +102,33 @@ let read_symbols' bytecode_file =
   close_in_noerr ic;
   !eventlists, !dirs, tagl
 
-let prerr_tag {Taglib. tag; size; constructor; fields} =
-  Printf.eprintf "\t{ tag = %d; size = %d; constructor = %S; fields = [%s] }\n"
-    tag size constructor
-    (String.concat ";" (List.map (Printf.sprintf "%S") fields))
+let prerr_tag =
+  let print_fields fields =
+    let fields = Array.to_list fields in
+    let fields = List.map (Printf.sprintf "%S") fields in
+    ("[|" ^ String.concat ";" fields ^ "|]")
+  in
+  function
+  | Taglib.Unknown ->
+      Printf.eprintf "\tUnknown\n"
+  | Taglib.Tuple ->
+      Printf.eprintf "\tTuple\n"
+  | Taglib.Array ->
+      Printf.eprintf "\tArray\n"
+  | Taglib.Record fields ->
+      Printf.eprintf "\tRecord %s\n" (print_fields fields)
+  | Taglib.Float_record fields ->
+      Printf.eprintf "\tFloat_record (%s\n" (print_fields fields)
+  | Taglib.Variant_tuple t ->
+      Printf.eprintf "\tVariant_tuple { tag = %d; name = %S; size = %d }\n"
+        t.tag t.name t.size
+  | Taglib.Variant_record t ->
+      Printf.eprintf "\tVariant_tuple { tag = %d; name = %S; fields = %s }\n"
+        t.tag t.name (print_fields t.fields)
+  | Taglib.Polymorphic_variant ->
+      Printf.eprintf "\tPolymorphic_variant\n"
+  | Taglib.Polymorphic_variant_constant name ->
+      Printf.eprintf "\tPolymorphic_variant_constant %S\n" name
 
 let read_symbols bytecode_file =
   let all_events, all_dirs, tagl = read_symbols' bytecode_file in

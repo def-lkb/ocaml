@@ -134,12 +134,25 @@ module Tag_descriptor = struct
     int -> int -> int -> 'a -> int = "caml_hash" [@@noalloc]
 
   let hash_combine seed v = seeded_hash_param 10 100 seed v
-  let hash_array h strings = Array.fold_left hash_combine h strings
+
+  external char_code : char -> int = "%identity"
+  external string_get : string -> int -> char = "%string_safe_get"
+  external string_length : string -> int = "%string_length"
+  external array_get : 'a array -> int -> 'a = "%array_safe_get"
+  external array_length : 'a array -> int = "%array_length"
+
+  let hash_array h arr =
+    (* Avoid dependency on Array *)
+    let h = ref h in
+    for i = 0 to array_length arr - 1 do
+      h := hash_combine !h (array_get arr i)
+    done;
+    !h
 
   let hash_variant s =
     let accu = ref 0 in
-    for i = 0 to String.length s - 1 do
-      accu := 223 * !accu + Char.code s.[i]
+    for i = 0 to string_length s - 1 do
+      accu := 223 * !accu + char_code (string_get s i)
     done;
     (* reduce to 31 bits *)
     accu := !accu land (1 lsl 31 - 1);

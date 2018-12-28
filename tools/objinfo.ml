@@ -56,10 +56,33 @@ let print_line name =
 let print_required_global id =
   printf "\t%s\n" (Ident.name id)
 
-let print_tag {Taglib. tag; size; constructor; fields} =
-  printf "\t{ tag = %d; size = %d; constructor = %S; fields = [%s] }\n"
-    tag size constructor
-    (String.concat ";" (List.map (Printf.sprintf "%S") fields))
+let print_tag =
+  let print_fields fields =
+    let fields = Array.to_list fields in
+    let fields = List.map (Printf.sprintf "%S") fields in
+    ("[|" ^ String.concat ";" fields ^ "|]")
+  in
+  function
+  | Taglib.Unknown ->
+      printf "\tUnknown\n"
+  | Taglib.Tuple ->
+      printf "\tTuple\n"
+  | Taglib.Array ->
+      printf "\tArray\n"
+  | Taglib.Record fields ->
+      printf "\tRecord %s\n" (print_fields fields)
+  | Taglib.Float_record fields ->
+      printf "\tFloat_record (%s\n" (print_fields fields)
+  | Taglib.Variant_tuple t ->
+      printf "\tVariant_tuple { tag = %d; name = %S; size = %d }\n"
+        t.tag t.name t.size
+  | Taglib.Variant_record t ->
+      printf "\tVariant_tuple { tag = %d; name = %S; fields = %s }\n"
+        t.tag t.name (print_fields t.fields)
+  | Taglib.Polymorphic_variant ->
+      printf "\tPolymorphic_variant\n"
+  | Taglib.Polymorphic_variant_constant name ->
+      printf "\tPolymorphic_variant_constant %S\n" name
 
 let print_cmo_infos cu =
   printf "Unit name: %s\n" cu.cu_name;
