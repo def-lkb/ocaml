@@ -85,13 +85,71 @@ let remove_printer = Printer.remove_printer
 let max_printer_depth = ref 20
 let max_printer_steps = ref 300
 
+let descriptors = lazy (
+  let index = Tagprinter.Index.create () in
+  Tagprinter.Index.register_list index (Debugcom.remote_tag_descriptors ());
+  index
+)
+
+let opaque_printer _kind obj =
+  match Obj.repr (Debugcom.Remote_value.obj obj) with
+  | exception Debugcom.Marshalling_error ->
+      Some (Outcometree.Oval_stuff "<cannot fetch remote object>")
+  | obj ->
+      let list_fields f fields =
+        let acc = ref [] in
+        for i = fst fields - 1 downto 0 do
+          acc := f (snd fields i) :: !acc
+        done;
+        !acc
+      in
+      let rec print depth obj =
+        let open Tagprinter.Introspect in
+        let open Outcometree in
+        match
+          Tagprinter.Introspect.tagged_dynval (Lazy.force descriptors) obj
+        with
+        | String str ->
+          Oval_string (str, 70, Ostr_string)
+        | Float f -> Oval_float f
+        | Int n | Int_or_constant (n, []) -> Oval_int n
+        | Int_or_constant (n, name :: _) ->
+          Oval_stuff (Printf.sprintf "%d or `%s" n name)
+        | Tuple fields ->
+          Oval_tuple (list_fields (print (depth - 1)) fields)
+        | Array fields ->
+          Oval_array (list_fields (print (depth - 1)) fields)
+        | Float_array fields ->
+          Oval_array (list_fields (fun f -> Oval_float f) fields)
+        | Record fields ->
+          let pf (k,v) = (Oide_ident k, print (depth - 1) v) in
+          Oval_record (list_fields pf fields)
+        | Float_record fields ->
+          let pf (k,v) = (Oide_ident k, Oval_float v) in
+          Oval_record (list_fields pf fields)
+        | Variant_tuple (name, fields) ->
+          let tuple = Oval_tuple (list_fields (print (depth - 1)) fields) in
+          Oval_variant (name, Some tuple)
+        | Variant_record (name, fields) ->
+          let pf (k,v) = (Oide_ident k, print (depth - 1) v) in
+          Oval_variant (name, Some (Oval_record (list_fields pf fields)))
+        | Polymorphic_variant (name, tuple) ->
+          Oval_variant ("`" ^ name, Some (print (depth - 1) tuple))
+        | Closure  -> Oval_stuff "<closure>"
+        | Lazy     -> Oval_stuff "<lazy>"
+        | Abstract -> Oval_stuff "<abstract>"
+        | Custom   -> Oval_stuff "<custom>"
+        | Unknown  -> Oval_stuff "<unknown>"
+      in
+      Some (print !max_printer_depth obj)
+
 let print_exception ppf obj =
-  let t = Printer.outval_of_untyped_exception obj in
+  let t = Printer.outval_of_untyped_exception ~opaque_printer obj in
   !Oprint.out_value ppf t
 
 let print_value max_depth env obj (ppf : Format.formatter) ty =
   let t =
-    Printer.outval_of_value !max_printer_steps max_depth
+    Printer.outval_of_value ~opaque_printer !max_printer_steps max_depth
       check_depth env obj ty in
   !Oprint.out_value ppf t
 

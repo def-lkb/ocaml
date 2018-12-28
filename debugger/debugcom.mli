@@ -87,6 +87,8 @@ val update_follow_fork_mode : unit -> unit
 
 (* Handling of remote values *)
 
+val remote_tag_descriptors : unit -> Obj.Tag_descriptor.t list
+
 exception Marshalling_error
 
 module Remote_value :

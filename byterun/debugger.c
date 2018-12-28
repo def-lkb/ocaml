@@ -433,6 +433,10 @@ void caml_debugger(enum event_kind event)
     case REQ_SET_FORK_MODE:
       caml_debugger_fork_mode = caml_getword(dbg_in);
       break;
+    case REQ_GET_TAGS:
+      val = caml_read_tag_section(Val_unit);
+      safe_output_value(dbg_out, val);
+      caml_flush(dbg_out);
     }
   }
 }
