@@ -655,6 +655,8 @@ let rec cut n l =
   match l with [] -> failwith "Translcore.cut"
   | a::l -> let (l1,l2) = cut (n-1) l in (a::l1,l2)
 
+let current_constructor_name = ref ""
+
 (* Translation of expressions *)
 
 let try_ids = Hashtbl.create 8
@@ -834,6 +836,7 @@ and transl_exp0 e =
         Lprim(Pmakeblock(0, Immutable, Some shape, Taglib.default), ll, e.exp_loc)
       end
   | Texp_construct(_, cstr, args) ->
+      current_constructor_name := cstr.cstr_name;
       let ll, shape = transl_list_with_shape args in
       if cstr.cstr_inlined <> None then begin match ll with
         | [x] -> x
@@ -1260,9 +1263,11 @@ and transl_record loc env fields repres opt_init_expr =
     match repres with
     | Record_regular -> Taglib.make_record fields
     | Record_inlined tag ->
-        Taglib.make_variant_record tag "FIXME" fields
+        Taglib.make_variant_record
+          tag !current_constructor_name fields
     | Record_extension ->
-        Taglib.make_variant_record Obj.object_tag "FIXME" fields
+        Taglib.make_variant_record
+          Obj.object_tag !current_constructor_name fields
     | Record_float ->
         Taglib.make_float_record fields
     | Record_unboxed _ ->
