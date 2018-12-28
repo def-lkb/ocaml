@@ -88,8 +88,8 @@ module Introspect = struct
       let osize = Obj.size obj in
       let select = function
         | Obj.Tag_descriptor.Tuple -> true
+        | Obj.Tag_descriptor.Array -> true
         | Obj.Tag_descriptor.Polymorphic_variant -> osize = 2
-        | Obj.Tag_descriptor.Polymorphic_variant_constant _ -> false
         | Obj.Tag_descriptor.Record fields ->
             otag = 0 && osize = List.length fields
         | Obj.Tag_descriptor.Float_record fields ->
@@ -99,6 +99,8 @@ module Introspect = struct
             otag = t.tag && osize = t.size
         | Obj.Tag_descriptor.Variant_record t ->
             otag = t.tag && osize = List.length t.fields
+        | Obj.Tag_descriptor.Polymorphic_variant_constant _ -> false
+        | Obj.Tag_descriptor.Unknown -> false
       in
       List.find_opt select (Index.lookup_by_profinfo t obj)
 
@@ -139,6 +141,8 @@ module Introspect = struct
       match find_tag t obj with
       | Some (Obj.Tag_descriptor.Tuple) ->
           Tuple (Obj.size obj, Obj.field obj)
+      | Some (Obj.Tag_descriptor.Array) ->
+          Array (Obj.size obj, Obj.field obj)
       | Some (Obj.Tag_descriptor.Record fields) ->
           Record (map_fields (fun i field -> fields.(i), field)
                     (fields_of_block obj))
@@ -157,8 +161,8 @@ module Introspect = struct
           | [] -> Polymorphic_variant (string_of_int name, payload)
           | name :: _ -> Polymorphic_variant (name, payload)
           end
-      | Some (Obj.Tag_descriptor.Polymorphic_variant_constant _) ->
-          assert false
+      | Some (Obj.Tag_descriptor.Unknown)
+      | Some (Obj.Tag_descriptor.Polymorphic_variant_constant _)
       | None -> dynval obj
 
   type outcome =

@@ -827,7 +827,7 @@ and transl_exp0 e =
                Matching.for_trywith (Lvar id) (transl_cases_try pat_expr_list))
   | Texp_tuple el ->
       let ll, shape = transl_list_with_shape el in
-      let tagl = Taglib.make ~name:"tuple" 0 in
+      let tagl = Taglib.make_tuple () in
       begin try
         Lconst(Const_block(0, List.map extract_constant ll, tagl))
       with Not_constant ->
@@ -844,9 +844,7 @@ and transl_exp0 e =
       | Cstr_unboxed ->
           (match ll with [v] -> v | _ -> assert false)
       | Cstr_block n ->
-          let tagl =
-            Taglib.make ~name:cstr.cstr_name ~size:(List.length ll) n
-          in
+          let tagl = Taglib.make_variant n cstr.cstr_name (List.length ll) in
           begin try
             Lconst(Const_block(n, List.map extract_constant ll, tagl))
           with Not_constant ->
@@ -864,10 +862,12 @@ and transl_exp0 e =
   | Texp_variant(l, arg) ->
       let tag = Btype.hash_variant l in
       begin match arg with
-        None -> Lconst(Const_pointer tag)
+        None ->
+          Taglib.register_polymorphic_variant l;
+          Lconst(Const_pointer tag)
       | Some arg ->
           let lam = transl_exp arg in
-          let tagl = Taglib.make ~name:l ~size:2 0 in
+          let tagl = Taglib.make_polymorphic_variant l in
           try
             Lconst(Const_block(0, [Const_base(Const_int tag);
                                    extract_constant lam], tagl))
@@ -927,7 +927,7 @@ and transl_exp0 e =
                When not [Pfloatarray], the exception propagates to the handler
                below. *)
             let imm_array =
-              Lprim (Pmakearray (kind, Immutable, Taglib.default),
+              Lprim (Pmakearray (kind, Immutable, Taglib.make_array ()),
                      ll, e.exp_loc)
             in
             Lprim (Pduparray (kind, Mutable), [imm_array], e.exp_loc)
@@ -935,7 +935,7 @@ and transl_exp0 e =
             let imm_array =
               match kind with
               | Paddrarray | Pintarray ->
-                  Lconst(Const_block(0, cl, Taglib.default))
+                  Lconst(Const_block(0, cl, Taglib.make_array ()))
               | Pfloatarray ->
                   Lconst(Const_float_array(List.map extract_float cl))
               | Pgenarray ->
@@ -944,7 +944,7 @@ and transl_exp0 e =
             Lprim (Pduparray (kind, Mutable), [imm_array], e.exp_loc)
         end
       with Not_constant ->
-        Lprim(Pmakearray (kind, Mutable, Taglib.default), ll, e.exp_loc)
+        Lprim(Pmakearray (kind, Mutable, Taglib.make_array ()), ll, e.exp_loc)
       end
   | Texp_ifthenelse(cond, ifso, Some ifnot) ->
       Lifthenelse(transl_exp cond,
@@ -1256,16 +1256,17 @@ and transl_setinstvar loc self var expr =
 and transl_record loc env fields repres opt_init_expr =
   let size = Array.length fields in
   let tagdesc =
-    Taglib.make
-      ~fields:(Array.to_list
-                 (Array.map (fun (desc,_) -> desc.Types.lbl_name) fields))
-      ~size
-      (match repres with
-       | Record_regular -> 0
-       | Record_inlined tag -> tag
-       | Record_unboxed _ -> assert false
-       | Record_extension -> Obj.object_tag
-       | Record_float -> Obj.double_array_tag)
+    let fields = Array.map (fun (desc,_) -> desc.Types.lbl_name) fields in
+    match repres with
+    | Record_regular -> Taglib.make_record fields
+    | Record_inlined tag ->
+        Taglib.make_variant_record tag "FIXME" fields
+    | Record_extension ->
+        Taglib.make_variant_record Obj.object_tag "FIXME" fields
+    | Record_float ->
+        Taglib.make_float_record fields
+    | Record_unboxed _ ->
+        assert false
   in
   (* Determine if there are "enough" fields (only relevant if this is a
      functional-style record update *)

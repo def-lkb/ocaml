@@ -119,7 +119,9 @@ end
 
 module Tag_descriptor = struct
   type t =
+    | Unknown
     | Tuple
+    | Array
     | Record of string array
     | Float_record of string array
     | Variant_tuple  of { tag: int; name: string; size: int }
@@ -145,14 +147,16 @@ module Tag_descriptor = struct
     if !accu > 0x3FFFFFFF then !accu - (1 lsl 31) else !accu
 
   let hash = function
+    | Unknown -> 0
     | Tuple -> 1
-    | Record fields -> hash_array 2 fields
-    | Float_record fields -> hash_array 3 fields
+    | Array -> 2
+    | Record fields -> hash_array 3 fields
+    | Float_record fields -> hash_array 4 fields
     | Variant_tuple { tag; name; size } ->
-        hash_combine (hash_combine (hash_combine 4 tag) name) size
+        hash_combine (hash_combine (hash_combine 5 tag) name) size
     | Variant_record { tag; name; fields } ->
-        hash_array (hash_combine (hash_combine 5 tag) name) fields
-    | Polymorphic_variant -> 6
+        hash_array (hash_combine (hash_combine 6 tag) name) fields
+    | Polymorphic_variant -> 7
     | Polymorphic_variant_constant _ -> 0
 
   external read_self_descriptors : unit -> t list =

@@ -157,7 +157,9 @@ end
 
 module Tag_descriptor : sig
   type t =
+    | Unknown
     | Tuple
+    | Array
     | Record of string array
     | Float_record of string array
     | Variant_tuple  of { tag: int; name: string; size: int }
