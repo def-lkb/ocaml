@@ -128,13 +128,14 @@ let opaque_printer _kind obj =
           let pf (k,v) = (Oide_ident k, Oval_float v) in
           Oval_record (list_fields pf fields)
         | Variant_tuple (name, fields) ->
-          let tuple = Oval_tuple (list_fields (print (depth - 1)) fields) in
-          Oval_variant (name, Some tuple)
+          let tuple = list_fields (print (depth - 1)) fields in
+          Oval_constr (Oide_ident name, tuple)
         | Variant_record (name, fields) ->
           let pf (k,v) = (Oide_ident k, print (depth - 1) v) in
-          Oval_variant (name, Some (Oval_record (list_fields pf fields)))
+          let args = Oval_record (list_fields pf fields) in
+          Oval_constr (Oide_ident name, [args])
         | Polymorphic_variant (name, tuple) ->
-          Oval_variant ("`" ^ name, Some (print (depth - 1) tuple))
+          Oval_variant (name, Some (print (depth - 1) tuple))
         | Closure  -> Oval_stuff "<closure>"
         | Lazy     -> Oval_stuff "<lazy>"
         | Abstract -> Oval_stuff "<abstract>"
