@@ -14,16 +14,19 @@ module Index = struct
     variants = Hashtbl.create 17;
   }
 
-  let register (t : t) tag =
-    let table, hash = match tag with
-      | Obj.Tag_descriptor.Polymorphic_variant_constant name ->
-          (t.variants, Obj.Tag_descriptor.hash_variant name)
-      | _ ->
-          (t.descriptors, index tag)
-    in
-    match Hashtbl.find table i with
-    | exception Not_found -> Hashtbl.add table i [tag]
-    | tags -> Hashtbl.replace table i (tag :: tags)
+  let register (t : t) = function
+    | Obj.Tag_descriptor.Polymorphic_variant_constant name ->
+        let i = Obj.Tag_descriptor.hash_variant name in
+        begin match Hashtbl.find t.variants i with
+        | exception Not_found -> Hashtbl.add t.variants i [name]
+        | names -> Hashtbl.replace t.variants i (name :: names)
+        end
+    | tag ->
+        let i = index tag in
+        begin match Hashtbl.find t.descriptors i with
+        | exception Not_found -> Hashtbl.add t.descriptors i [tag]
+        | tags -> Hashtbl.replace t.descriptors i (tag :: tags)
+        end
 
   let register_list t tags =
     List.iter (register t) tags
@@ -45,23 +48,25 @@ module Introspect = struct
 
   type dynval =
     | String of string
-    (* [String "foo"]  = "foo" *)
-    | Int    of int
-    (* [Int 42]        = 42    *)
-    | Float  of float
-    (* [Float 12.12]   = 12.12 *)
+    (* [String "foo"] = "foo" *)
+    | Int of int
+    (* [Int 42] = 42    *)
+    | Float of float
+    (* [Float 12.12] = 12.12 *)
     | Int_or_constant of int * string list
     (* [Int_or_constant (1, ["`Bla"])] = 1 or `Bla *)
-    | Tuple  of Obj.t fields
+    | Tuple of Obj.t fields
     (* [Tuple f] = (f0, f1, f2, ...) *)
-    | Array  of Obj.t fields
+    | Array of Obj.t fields
+    (* [Array f] = [|f0, f1, f2, ...|] *)
+    | Float_array of float fields
     (* [Array f] = [|f0, f1, f2, ...|] *)
     | Record of (string * Obj.t) fields
     (* [Record f] = { fst f0 : snd f0; fst f1 : snd f1; ... } *)
     | Float_record of (string * float) fields
     (* [Float_record f] = { fst f0 : snd f0; fst f1 : snd f1; ... } *)
-    | Variant_tuple  of name * Obj.t fields
-    | Variant_record of name * (string * Obj.t) fields
+    | Variant_tuple  of string * Obj.t fields
+    | Variant_record of string * (string * Obj.t) fields
     | Polymorphic_variant of string * Obj.t
     | Closure | Lazy | Abstract | Custom | Unknown
 
@@ -91,14 +96,14 @@ module Introspect = struct
         | Obj.Tag_descriptor.Array -> true
         | Obj.Tag_descriptor.Polymorphic_variant -> osize = 2
         | Obj.Tag_descriptor.Record fields ->
-            otag = 0 && osize = List.length fields
+            otag = 0 && osize = Array.length fields
         | Obj.Tag_descriptor.Float_record fields ->
-            otag = Sys.double_array_tag &&
-            osize = List.length fields * double_to_wo_size
+            otag = Obj.double_array_tag &&
+            osize = Array.length fields * double_to_wo_size
         | Obj.Tag_descriptor.Variant_tuple t ->
             otag = t.tag && osize = t.size
         | Obj.Tag_descriptor.Variant_record t ->
-            otag = t.tag && osize = List.length t.fields
+            otag = t.tag && osize = Array.length t.fields
         | Obj.Tag_descriptor.Polymorphic_variant_constant _ -> false
         | Obj.Tag_descriptor.Unknown -> false
       in
@@ -133,7 +138,7 @@ module Introspect = struct
 
   let tagged_dynval t obj =
     if Obj.is_int obj then
-      let i = (Obj.repr obj : int) in
+      let i = (Obj.obj obj : int) in
       match Index.lookup_variant t i with
       | [] -> Int i
       | names -> Int_or_constant (i, names)
@@ -148,15 +153,16 @@ module Introspect = struct
                     (fields_of_block obj))
       | Some (Obj.Tag_descriptor.Float_record fields) ->
           Float_record (map_fields (fun i field -> fields.(i), field)
-                          (fields_of_float_array (Obj.repr obj)))
+                          (fields_of_float_array (Obj.obj obj)))
       | Some (Obj.Tag_descriptor.Variant_tuple t) ->
           Variant_tuple (t.name, fields_of_block obj)
       | Some (Obj.Tag_descriptor.Variant_record t) ->
-          Variant_tuple (t.name, map_fields (fun i field -> fields.(i), field)
-                           (fields_of_float_array (Obj.repr obj)))
+          let f i field = (t.fields.(i), field) in
+          let fields = map_fields f (fields_of_block (Obj.obj obj)) in
+          Variant_record (t.name, fields)
       | Some (Obj.Tag_descriptor.Polymorphic_variant) ->
-          let name = (Obj.repr (Obj.get obj 0) : int) in
-          let payload = Obj.get obj 1 in
+          let name = (Obj.obj (Obj.field obj 0) : int) in
+          let payload = Obj.field obj 1 in
           begin match Index.lookup_variant t name with
           | [] -> Polymorphic_variant (string_of_int name, payload)
           | name :: _ -> Polymorphic_variant (name, payload)
@@ -165,7 +171,7 @@ module Introspect = struct
       | Some (Obj.Tag_descriptor.Polymorphic_variant_constant _)
       | None -> dynval obj
 
-  type outcome =
+  (*type outcome =
     | Ostring of string
     | Ofloat of float
     | Oint of int
@@ -221,6 +227,9 @@ module Introspect = struct
         Ofloat flt
     | Int i ->
         Oint i
+    | Array a ->
+        Oarray
+          (fmt_fields (var_dump_outcome (depth - 1) width) )
     | Float_array a ->
         Oarray
           (fmt_fields (fun flt -> Ofloat flt) (fields_of_array a))
@@ -254,5 +263,5 @@ module Introspect = struct
 
   let var_dump v =
     format_outcome Format.std_formatter (var_dump_outcome v);
-    Format.pp_print_flush Format.std_formatter ()
+    Format.pp_print_flush Format.std_formatter ()*)
 end
