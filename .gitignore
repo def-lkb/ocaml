@@ -92,6 +92,7 @@ _ocamltest
 /asmrun/startup_aux.c
 /asmrun/str.c
 /asmrun/sys.c
+/asmrun/tagdesc.c
 /asmrun/terminfo.c
 /asmrun/unix.c
 /asmrun/weak.c
