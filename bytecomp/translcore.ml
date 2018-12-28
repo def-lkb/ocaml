@@ -475,7 +475,7 @@ let transl_primitive loc p env ty path =
   in
   match prim with
   | Plazyforce ->
-      let parm = Ident.create "prim" in
+      let parm = Ident.create_dummy "prim" in
       Lfunction{kind = Curried; params = [parm];
                 body = Matching.inline_lazy_force (Lvar parm) Location.none;
                 loc = loc;
@@ -485,7 +485,7 @@ let transl_primitive loc p env ty path =
     begin match p.prim_arity with
       | 0 -> lam
       | 1 -> (* TODO: we should issue a warning ? *)
-        let param = Ident.create "prim" in
+        let param = Ident.create_dummy "prim" in
         Lfunction{kind = Curried; params = [param];
                   attr = default_stub_attribute;
                   loc = loc;
@@ -495,7 +495,7 @@ let transl_primitive loc p env ty path =
     end
   | _ ->
       let rec make_params n =
-        if n <= 0 then [] else Ident.create "prim" :: make_params (n-1) in
+        if n <= 0 then [] else Ident.create_dummy "prim" :: make_params (n-1) in
       let params = make_params p.prim_arity in
       Lfunction{ kind = Curried; params;
                  attr = default_stub_attribute;
@@ -676,14 +676,14 @@ and transl_exp0 e =
       let public_send = p.prim_name = "%send" in
       if public_send || p.prim_name = "%sendself" then
         let kind = if public_send then Public else Self in
-        let obj = Ident.create "obj" and meth = Ident.create "meth" in
+        let obj = Ident.create_dummy "obj" and meth = Ident.create_dummy "meth" in
         Lfunction{kind = Curried; params = [obj; meth];
                   attr = default_stub_attribute;
                   loc = e.exp_loc;
                   body = Lsend(kind, Lvar meth, Lvar obj, [], e.exp_loc)}
       else if p.prim_name = "%sendcache" then
-        let obj = Ident.create "obj" and meth = Ident.create "meth" in
-        let cache = Ident.create "cache" and pos = Ident.create "pos" in
+        let obj = Ident.create_dummy "obj" and meth = Ident.create_dummy "meth" in
+        let cache = Ident.create_dummy "cache" and pos = Ident.create_dummy "pos" in
         Lfunction{kind = Curried; params = [obj; meth; cache; pos];
                   attr = default_stub_attribute;
                   loc = e.exp_loc;
@@ -760,7 +760,7 @@ and transl_exp0 e =
           | [a;b] -> a,b
           | _ -> assert false (* idem *)
         in
-        let vexn = Ident.create "exn" in
+        let vexn = Ident.create_dummy "exn" in
         Llet(Strict, Pgenval, vexn, texn2,
              event_before e begin
                Lsequence(
@@ -986,7 +986,7 @@ and transl_exp0 e =
   | Texp_setinstvar(path_self, path, _, expr) ->
       transl_setinstvar e.exp_loc (transl_normal_path path_self) path expr
   | Texp_override(path_self, modifs) ->
-      let cpy = Ident.create "copy" in
+      let cpy = Ident.create_dummy "copy" in
       Llet(Strict, Pgenval, cpy,
            Lapply{ap_should_be_tailcall=false;
                   ap_loc=Location.none;
@@ -1050,7 +1050,7 @@ and transl_exp0 e =
          transl_exp e
       | `Other ->
          (* other cases compile to a lazy block holding a function *)
-         let fn = Lfunction {kind = Curried; params = [Ident.create "param"];
+         let fn = Lfunction {kind = Curried; params = [Ident.create_dummy "param"];
                              attr = default_function_attribute;
                              loc = e.exp_loc;
                              body = transl_exp e} in
@@ -1058,7 +1058,7 @@ and transl_exp0 e =
       end
   | Texp_object (cs, meths) ->
       let cty = cs.cstr_type in
-      let cl = Ident.create "class" in
+      let cl = Ident.create_dummy "class" in
       !transl_object cl meths
         { cl_desc = Tcl_structure cs;
           cl_loc = e.exp_loc;
@@ -1153,7 +1153,7 @@ and transl_apply ?(should_be_tailcall=false) ?(inlined = Default_inline)
           if args = [] then lam else lapply lam (List.rev_map fst args) in
         let handle = protect "func" lam
         and l = List.map (fun (arg, opt) -> may_map (protect "arg") arg, opt) l
-        and id_arg = Ident.create "param" in
+        and id_arg = Ident.create_dummy "param" in
         let body =
           match build_apply handle ((Lvar id_arg, optional)::args') l with
             Lfunction{kind = Curried; params = ids; body = lam; attr; loc} ->
@@ -1198,7 +1198,7 @@ and transl_function loc untuplify_fn repr partial param cases =
             (fun {c_lhs; c_guard; c_rhs} ->
               (Matching.flatten_pattern size c_lhs, c_guard, c_rhs))
             cases in
-        let params = List.map (fun _ -> Ident.create "param") pl in
+        let params = List.map (fun _ -> Ident.create_dummy "param") pl in
         ((Tupled, params),
          Matching.for_tupled_function loc params
            (transl_tupled_cases pats_expr_list) partial)
@@ -1274,7 +1274,7 @@ and transl_record loc env fields repres opt_init_expr =
   then begin
     (* Allocate new record with given fields (and remaining fields
        taken from init_expr if any *)
-    let init_id = Ident.create "init" in
+    let init_id = Ident.create_dummy "init" in
     let lv =
       Array.mapi
         (fun i (_, definition) ->
@@ -1338,7 +1338,7 @@ and transl_record loc env fields repres opt_init_expr =
   end else begin
     (* Take a shallow copy of the init record, then mutate the fields
        of the copy *)
-    let copy_id = Ident.create "newrecord" in
+    let copy_id = Ident.create_dummy "newrecord" in
     let update_field cont (lbl, definition) =
       match definition with
       | Kept _type -> cont

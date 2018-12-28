@@ -840,7 +840,7 @@ let rec close fenv cenv = function
       in
       make_const (transl cst)
   | Lfunction _ as funct ->
-      close_one_function fenv cenv (Ident.create "fun") funct
+      close_one_function fenv cenv (Ident.create_dummy "fun") funct
 
     (* We convert [f a] to [let a' = a in let f' = f in fun b c -> f' a' b c]
        when fun_arity > nargs *)
@@ -863,10 +863,10 @@ let rec close fenv cenv = function
       | ((ufunct, (Value_closure(fundesc, _) as fapprox)), uargs)
           when nargs < fundesc.fun_arity ->
         let first_args = List.map (fun arg ->
-          (Ident.create "arg", arg) ) uargs in
+          (Ident.create_dummy "arg", arg) ) uargs in
         let final_args =
           Array.to_list (Array.init (fundesc.fun_arity - nargs)
-                                    (fun _ -> Ident.create "arg")) in
+                                    (fun _ -> Ident.create_dummy "arg")) in
         let rec iter args body =
           match args with
               [] -> body
@@ -878,7 +878,7 @@ let rec close fenv cenv = function
           (List.map (fun (arg1, _arg2) -> Lvar arg1) first_args)
           @ (List.map (fun arg -> Lvar arg ) final_args)
         in
-        let funct_var = Ident.create "funct" in
+        let funct_var = Ident.create_dummy "funct" in
         let fenv = Tbl.add funct_var fapprox fenv in
         let (new_fun, approx) = close fenv cenv
           (Lfunction{
@@ -902,7 +902,8 @@ let rec close fenv cenv = function
 
       | ((ufunct, Value_closure(fundesc, _approx_res)), uargs)
         when fundesc.fun_arity > 0 && nargs > fundesc.fun_arity ->
-          let args = List.map (fun arg -> Ident.create "arg", arg) uargs in
+          let make_arg arg = (Ident.create_dummy "arg", arg) in
+          let args = List.map make_arg uargs in
           let (first_args, rem_args) = split_list fundesc.fun_arity args in
           let first_args = List.map (fun (id, _) -> Uvar id) first_args in
           let rem_args = List.map (fun (id, _) -> Uvar id) rem_args in
@@ -951,7 +952,7 @@ let rec close fenv cenv = function
       then begin
         (* Simple case: only function definitions *)
         let (clos, infos) = close_functions fenv cenv defs in
-        let clos_ident = Ident.create "clos" in
+        let clos_ident = Ident.create_dummy "clos" in
         let fenv_body =
           List.fold_right
             (fun (id, _pos, approx) fenv -> Tbl.add id approx fenv)
@@ -1182,7 +1183,7 @@ and close_functions fenv cenv fun_defs =
   let useless_env = ref initially_closed in
   (* Translate each function definition *)
   let clos_fundef (id, params, body, fundesc, dbg) env_pos =
-    let env_param = Ident.create "env" in
+    let env_param = Ident.create_dummy "env" in
     let cenv_fv =
       build_closure_env env_param (fv_pos - env_pos) fv in
     let cenv_body =

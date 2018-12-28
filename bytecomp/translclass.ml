@@ -96,7 +96,7 @@ let bind_super tbl (vals, meths) cl_init =
        meths cl_init)
 
 let create_object cl obj init =
-  let obj' = Ident.create "self" in
+  let obj' = Ident.create_dummy "self" in
   let (inh_init, obj_init, has_init) = init obj' in
   if obj_init = lambda_unit then
     (inh_init,
@@ -125,7 +125,7 @@ let normalize_cl_path cl path =
 let rec build_object_init cl_table obj params inh_init obj_init cl =
   match cl.cl_desc with
     Tcl_ident ( path, _, _) ->
-      let obj_init = Ident.create "obj_init" in
+      let obj_init = Ident.create_dummy "obj_init" in
       let envs, inh_init = inh_init in
       let env =
         match envs with None -> []
@@ -205,8 +205,8 @@ let rec build_object_init_0 cl_table params cl copy_env subst_env top ids =
       let vals = List.map (fun (id, _, e) -> id,e) vals in
       build_object_init_0 cl_table (vals@params) cl copy_env subst_env top ids
   | _ ->
-      let self = Ident.create "self" in
-      let env = Ident.create "env" in
+      let self = Ident.create_dummy "self" in
+      let env = Ident.create_dummy "env" in
       let obj = if ids = [] then lambda_unit else Lvar self in
       let envs = if top then None else Some env in
       let ((_,inh_init), obj_init) =
@@ -226,7 +226,7 @@ let bind_methods tbl meths vals cl_init =
   let len = List.length methl and nvals = List.length vals in
   if len < 2 && nvals = 0 then Meths.fold (bind_method tbl) meths cl_init else
   if len = 0 && nvals < 2 then transl_vals tbl true Strict vals cl_init else
-  let ids = Ident.create "ids" in
+  let ids = Ident.create_dummy "ids" in
   let i = ref (len + nvals) in
   let getter, names =
     if nvals = 0 then "get_method_labels", [] else
@@ -354,7 +354,7 @@ let rec build_class_init cla cstr super inh_init cl_init msubst top cl =
         Tcl_ident (path, _, _), (obj_init, path')::inh_init ->
           assert (Path.same (normalize_cl_path cl path) path');
           let lpath = transl_normal_path path' in
-          let inh = Ident.create "inh"
+          let inh = Ident.create_dummy "inh"
           and ofs = List.length vals + 1
           and valids, methids = super in
           let cl_init =
@@ -467,8 +467,8 @@ let rec transl_class_rebind_0 self obj_init cl vf =
 
 let transl_class_rebind cl vf =
   try
-    let obj_init = Ident.create "obj_init"
-    and self = Ident.create "self" in
+    let obj_init = Ident.create_dummy "obj_init"
+    and self = Ident.create_dummy "self" in
     let obj_init0 =
       lapply {ap_should_be_tailcall=false;
               ap_loc=Location.none;
@@ -481,11 +481,11 @@ let transl_class_rebind cl vf =
     let id = (obj_init' = lfunction [self] obj_init0) in
     if id then transl_normal_path path else
 
-    let cla = Ident.create "class"
-    and new_init = Ident.create "new_init"
-    and env_init = Ident.create "env_init"
-    and table = Ident.create "table"
-    and envs = Ident.create "envs" in
+    let cla = Ident.create_dummy "class"
+    and new_init = Ident.create_dummy "new_init"
+    and env_init = Ident.create_dummy "env_init"
+    and table = Ident.create_dummy "table"
+    and envs = Ident.create_dummy "envs" in
     Llet(
     Strict, Pgenval, new_init, lfunction [obj_init] obj_init',
     Llet(
@@ -641,7 +641,7 @@ let transl_class ids cl_id pub_meths cl vflag =
   let top = not req in
   let cl_env, llets = build_class_lets cl in
   let new_ids = if top then [] else Env.diff top_env cl_env in
-  let env2 = Ident.create "env" in
+  let env2 = Ident.create_dummy "env" in
   let meth_ids = get_class_meths cl in
   let subst env lam i0 new_ids' =
     let fv = free_variables lam in
@@ -668,7 +668,7 @@ let transl_class ids cl_id pub_meths cl vflag =
   let new_ids_meths = ref [] in
   let msubst arr = function
       Lfunction {kind = Curried; params = self :: args; body} ->
-        let env = Ident.create "env" in
+        let env = Ident.create_dummy "env" in
         let body' =
           if new_ids = [] then body else
           subst_lambda (subst env body 0 new_ids_meths) body in
@@ -689,7 +689,7 @@ let transl_class ids cl_id pub_meths cl vflag =
       | _ -> assert false
   in
   let new_ids_init = ref [] in
-  let env1 = Ident.create "env" and env1' = Ident.create "env'" in
+  let env1 = Ident.create_dummy "env" and env1' = Ident.create_dummy "env'" in
   let copy_env self =
     if top then lambda_unit else
     Lifused(env2, Lprim(Psetfield_computed (Pointer, Assignment),
@@ -706,7 +706,7 @@ let transl_class ids cl_id pub_meths cl vflag =
   in
 
   (* Now we start compiling the class *)
-  let cla = Ident.create "class" in
+  let cla = Ident.create_dummy "class" in
   let (inh_init, obj_init) =
     build_object_init_0 cla [] cl copy_env subst_env top ids in
   let inh_init' = List.rev inh_init in
@@ -714,10 +714,10 @@ let transl_class ids cl_id pub_meths cl vflag =
     build_class_init cla true ([],[]) inh_init' obj_init msubst top cl
   in
   assert (inh_init' = []);
-  let table = Ident.create "table"
+  let table = Ident.create_dummy "table"
   and class_init = Ident.create (Ident.name cl_id ^ "_init")
-  and env_init = Ident.create "env_init"
-  and obj_init = Ident.create "obj_init" in
+  and env_init = Ident.create_dummy "env_init"
+  and obj_init = Ident.create_dummy "obj_init" in
   let pub_meths =
     List.sort
       (fun s s' -> compare (Btype.hash_variant s) (Btype.hash_variant s'))
@@ -775,8 +775,8 @@ let transl_class ids cl_id pub_meths cl vflag =
   if top then llets (lbody_virt lambda_unit) else
 
   (* Now for the hard stuff: prepare for table caching *)
-  let envs = Ident.create "envs"
-  and cached = Ident.create "cached" in
+  let envs = Ident.create_dummy "envs"
+  and cached = Ident.create_dummy "cached" in
   let lenvs =
     if !new_ids_meths = [] && !new_ids_init = [] && inh_init = []
     then lambda_unit

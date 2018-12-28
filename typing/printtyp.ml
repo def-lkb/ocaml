@@ -1102,7 +1102,7 @@ let rec tree_of_class_type sch params =
        if is_optional l then
          match (repr ty).desc with
          | Tconstr(path, [ty], _) when Path.same path Predef.path_option -> ty
-         | _ -> newconstr (Path.Pident(Ident.create "<hidden>")) []
+         | _ -> newconstr (Path.Pident(Ident.create_dummy "<hidden>")) []
        else ty in
       let tr = tree_of_typexp sch ty in
       Octy_arrow (lab, tr, tree_of_class_type sch params cty)

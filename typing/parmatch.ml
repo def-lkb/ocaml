@@ -1043,7 +1043,7 @@ let some_other_tag = "<some other tag>"
 let build_other ext env = match env with
 | ({pat_desc = Tpat_construct (lid, {cstr_tag=Cstr_extension _},_)},_) :: _ ->
         (* let c = {c with cstr_name = "*extension*"} in *) (* PR#7330 *)
-        make_pat (Tpat_var (Ident.create "*extension*",
+        make_pat (Tpat_var (Ident.create_dummy "*extension*",
                             {lid with txt="*extension*"})) Ctype.none Env.empty
 | ({pat_desc = Tpat_construct _} as p,_) :: _ ->
     begin match ext with

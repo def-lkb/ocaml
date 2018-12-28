@@ -99,7 +99,7 @@ module Function_decls = struct
         ~attr ~loc =
       let let_rec_ident =
         match let_rec_ident with
-        | None -> Ident.create "unnamed_function"
+        | None -> Ident.create_dummy "unnamed_function"
         | Some let_rec_ident -> let_rec_ident
       in
       { let_rec_ident;

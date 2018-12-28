@@ -726,7 +726,7 @@ let rec update_level env level expand ty =
         with Cannot_expand ->
           set_level ty level;
           iter_type_expr (update_level env level expand) ty
-        end          
+        end
     | Tpackage (p, nl, tl) when level < Path.binding_time p ->
         let p' = normalize_package_path env p in
         if Path.same p p' then raise (Unify [(ty, newvar2 level)]);
@@ -2255,7 +2255,7 @@ let nondep_instance env level id ty =
 (* Find the type paths nl1 in the module type mty2, and add them to the
    list (nl2, tl2). raise Not_found if impossible *)
 let complete_type_list ?(allow_absent=false) env nl1 lv2 mty2 nl2 tl2 =
-  let id2 = Ident.create "Pkg" in
+  let id2 = Ident.create_dummy "Pkg" in
   let env' = Env.add_module id2 mty2 env in
   let rec complete nl1 ntl2 =
     match nl1, ntl2 with

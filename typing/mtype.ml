@@ -345,7 +345,7 @@ let collect_arg_paths mty =
   let paths = ref PathSet.empty
   and subst = ref PathMap.empty
   and bindings = ref Ident.empty in
-  (* let rt = Ident.create "Root" in
+  (* let rt = Ident.create_dummy "Root" in
      and prefix = ref (Path.Pident rt) in *)
   let it_path p = paths := PathSet.union (get_arg_paths p) !paths
   and it_signature_item it si =

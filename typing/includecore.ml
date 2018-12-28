@@ -359,7 +359,7 @@ let extension_constructors ~loc env id ext1 ext2 =
        (ty1 :: ext1.ext_type_params)
        (ty2 :: ext2.ext_type_params)
   then
-    if compare_constructor_arguments ~loc env (Ident.create "")
+    if compare_constructor_arguments ~loc env (Ident.create_dummy "")
         ext1.ext_type_params ext2.ext_type_params
         ext1.ext_args ext2.ext_args = [] then
       if match ext1.ext_ret_type, ext2.ext_ret_type with

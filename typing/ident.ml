@@ -19,6 +19,7 @@ type t = { stamp: int; name: string; mutable flags: int }
 
 let global_flag = 1
 let predef_exn_flag = 2
+let dummy_flag = 4
 
 (* A stamp of 0 denotes a persistent identifier *)
 
@@ -38,6 +39,12 @@ let create_persistent s =
 let rename i =
   incr currentstamp;
   { i with stamp = !currentstamp }
+
+let create_dummy s =
+  incr currentstamp;
+  { name = s; stamp = !currentstamp; flags = dummy_flag }
+
+let is_dummy i = i.flags land dummy_flag <> 0
 
 let name i = i.name
 

@@ -982,7 +982,7 @@ and transl_recmodule_modtypes env sdecls =
     *)
     List.fold_left
       (fun env id ->
-         let dummy = Mty_ident (Path.Pident (Ident.create "#recmod#")) in
+         let dummy = Mty_ident (Path.Pident (Ident.create_dummy "#recmod#")) in
          Env.add_module ~arg:true id dummy env
       )
       env ids

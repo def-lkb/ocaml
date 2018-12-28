@@ -463,7 +463,7 @@ and to_clambda_set_of_closures t env
       (({ function_decls; free_vars } : Flambda.set_of_closures)
         as set_of_closures) : Clambda.ulambda =
   let all_functions = Variable.Map.bindings function_decls.funs in
-  let env_var = Ident.create "env" in
+  let env_var = Ident.create_dummy "env" in
   let to_clambda_function
         (closure_id, (function_decl : Flambda.function_declaration))
         : Clambda.ufunction =

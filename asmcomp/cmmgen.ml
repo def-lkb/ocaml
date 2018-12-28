@@ -747,7 +747,7 @@ let float_array_set arr ofs newval dbg =
 
 let string_length exp dbg =
   bind "str" exp (fun str ->
-    let tmp_var = Ident.create "tmp" in
+    let tmp_var = Ident.create_dummy "tmp" in
     Clet(tmp_var,
          Cop(Csubi,
              [Cop(Clsl,
@@ -790,7 +790,7 @@ let make_alloc_generic ?desc set_fn dbg tag wordsize args =
     let header = block_header ?desc tag wordsize in
     Cop(Calloc, Cblockheader(header, dbg) :: args, dbg)
   else begin
-    let id = Ident.create "alloc" in
+    let id = Ident.create_dummy "alloc" in
     let rec fill_fields idx = function
       [] -> Cvar id
     | e1::el -> Csequence(set_fn (Cvar id) (Cconst_int idx) e1 dbg,
@@ -2160,7 +2160,7 @@ and transl_prim_2 env p arg1 arg2 dbg =
       let dbg' = Debuginfo.none in
       transl_sequand env arg1 dbg arg2 dbg' Then_true_else_false
         (Cconst_pointer 3) (Cconst_pointer 1)
-      (* let id = Ident.create "res1" in
+      (* let id = Ident.create_dummy "res1" in
       Clet(id, transl env arg1,
            Cifthenelse(test_bool dbg (Cvar id), transl env arg2, Cvar id)) *)
   | Psequor ->
@@ -3116,8 +3116,8 @@ CAMLprim value caml_cache_public_method (value meths, value tag, value *cache)
 
 let cache_public_method meths tag cache dbg =
   let raise_num = next_raise_count () in
-  let li = Ident.create "li" and hi = Ident.create "hi"
-  and mi = Ident.create "mi" and tagged = Ident.create "tagged" in
+  let li = Ident.create_dummy "li" and hi = Ident.create_dummy "hi"
+  and mi = Ident.create_dummy "mi" and tagged = Ident.create_dummy "tagged" in
   Clet (
   li, Cconst_int 3,
   Clet (
@@ -3168,16 +3168,16 @@ let cache_public_method meths tag cache dbg =
 
 let apply_function_body arity =
   let dbg = Debuginfo.none in
-  let arg = Array.make arity (Ident.create "arg") in
-  for i = 1 to arity - 1 do arg.(i) <- Ident.create "arg" done;
-  let clos = Ident.create "clos" in
+  let arg = Array.make arity (Ident.create_dummy "arg") in
+  for i = 1 to arity - 1 do arg.(i) <- Ident.create_dummy "arg" done;
+  let clos = Ident.create_dummy "clos" in
   let env = empty_env in
   let rec app_fun clos n =
     if n = arity-1 then
       Cop(Capply typ_val,
           [get_field env (Cvar clos) 0 dbg; Cvar arg.(n); Cvar clos], dbg)
     else begin
-      let newclos = Ident.create "clos" in
+      let newclos = Ident.create_dummy "clos" in
       Clet(newclos,
            Cop(Capply typ_val,
                [get_field env (Cvar clos) 0 dbg; Cvar arg.(n); Cvar clos], dbg),
@@ -3197,14 +3197,15 @@ let apply_function_body arity =
 let send_function arity =
   let dbg = Debuginfo.none in
   let (args, clos', body) = apply_function_body (1+arity) in
-  let cache = Ident.create "cache"
+  let cache = Ident.create_dummy "cache"
   and obj = List.hd args
-  and tag = Ident.create "tag" in
+  and tag = Ident.create_dummy "tag" in
   let env = empty_env in
   let clos =
     let cache = Cvar cache and obj = Cvar obj and tag = Cvar tag in
-    let meths = Ident.create "meths" and cached = Ident.create "cached" in
-    let real = Ident.create "real" in
+    let meths = Ident.create_dummy "meths"
+    and cached = Ident.create_dummy "cached" in
+    let real = Ident.create_dummy "real" in
     let mask = get_field env (Cvar meths) 1 dbg in
     let cached_pos = Cvar cached in
     let tag_pos = Cop(Cadda, [Cop (Cadda, [cached_pos; Cvar meths], dbg);
@@ -3256,8 +3257,8 @@ let apply_function arity =
 
 let tuplify_function arity =
   let dbg = Debuginfo.none in
-  let arg = Ident.create "arg" in
-  let clos = Ident.create "clos" in
+  let arg = Ident.create_dummy "arg" in
+  let clos = Ident.create_dummy "clos" in
   let env = empty_env in
   let rec access_components i =
     if i >= arity
@@ -3306,8 +3307,8 @@ let tuplify_function arity =
 let max_arity_optimized = 15
 let final_curry_function arity =
   let dbg = Debuginfo.none in
-  let last_arg = Ident.create "arg" in
-  let last_clos = Ident.create "clos" in
+  let last_arg = Ident.create_dummy "arg" in
+  let last_clos = Ident.create_dummy "clos" in
   let env = empty_env in
   let rec curry_fun args clos n =
     if n = 0 then
@@ -3318,13 +3319,13 @@ let final_curry_function arity =
     else
       if n = arity - 1 || arity > max_arity_optimized then
         begin
-      let newclos = Ident.create "clos" in
+      let newclos = Ident.create_dummy "clos" in
       Clet(newclos,
            get_field env (Cvar clos) 3 dbg,
            curry_fun (get_field env (Cvar clos) 2 dbg :: args) newclos (n-1))
         end else
         begin
-          let newclos = Ident.create "clos" in
+          let newclos = Ident.create_dummy "clos" in
           Clet(newclos,
                get_field env (Cvar clos) 4 dbg,
                curry_fun (get_field env (Cvar clos) 3 dbg :: args) newclos (n-1))
@@ -3345,7 +3346,7 @@ let rec intermediate_curry_functions arity num =
   else begin
     let name1 = "caml_curry" ^ string_of_int arity in
     let name2 = if num = 0 then name1 else name1 ^ "_" ^ string_of_int num in
-    let arg = Ident.create "arg" and clos = Ident.create "clos" in
+    let arg = Ident.create_dummy "arg" and clos = Ident.create_dummy "clos" in
     Cfunction
      {fun_name = name2;
       fun_args = [arg, typ_val; clos, typ_val];
@@ -3370,7 +3371,7 @@ let rec intermediate_curry_functions arity num =
       (if arity <= max_arity_optimized && arity - num > 2 then
           let rec iter i =
             if i <= arity then
-              let arg = Ident.create (Printf.sprintf "arg%d" i) in
+              let arg = Ident.create_dummy (Printf.sprintf "arg%d" i) in
               (arg, typ_val) :: iter (i+1)
             else []
           in
@@ -3381,7 +3382,7 @@ let rec intermediate_curry_functions arity num =
                   (get_field env (Cvar clos) 2 dbg) :: args @ [Cvar clos],
                   dbg)
             else
-              let newclos = Ident.create "clos" in
+              let newclos = Ident.create_dummy "clos" in
               Clet(newclos,
                    get_field env (Cvar clos) 4 dbg,
                    iter (i-1) (get_field env (Cvar clos) 3 dbg :: args) newclos)
