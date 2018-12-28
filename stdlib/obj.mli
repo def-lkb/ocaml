@@ -156,14 +156,18 @@ module Ephemeron: sig
 end
 
 module Tag_descriptor : sig
-  type t = {
-    tag : int;
-    size : int;
-    constructor : string;
-    fields : string list;
-  }
+  type t =
+    | Tuple
+    | Record of string array
+    | Float_record of string array
+    | Variant_tuple  of { tag: int; name: string; size: int }
+    | Variant_record of { tag: int; name: string; fields: string array }
+    | Polymorphic_variant
+    | Polymorphic_variant_constant of string
 
   val hash : t -> int
+
+  val hash_variant : string -> int
 
   external read_self_descriptors : unit -> t list =
     "caml_read_tag_section"

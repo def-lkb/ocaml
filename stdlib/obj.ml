@@ -118,23 +118,42 @@ module Ephemeron = struct
 end
 
 module Tag_descriptor = struct
-  type t = {
-    tag : int;
-    size : int;
-    constructor : string;
-    fields : string list;
-  }
+  type t =
+    | Tuple
+    | Record of string array
+    | Float_record of string array
+    | Variant_tuple  of { tag: int; name: string; size: int }
+    | Variant_record of { tag: int; name: string; fields: string array }
+    | Polymorphic_variant
+    | Polymorphic_variant_constant of string
 
   (* Copied from Hashtbl, to avoid introducing a dependency *)
   external seeded_hash_param :
     int -> int -> int -> 'a -> int = "caml_hash" [@@noalloc]
 
-  let hash {tag; size; constructor; fields} =
-    let hash seed v = seeded_hash_param 10 100 seed v in
-    let h = hash tag size in
-    let h = hash h constructor in
-    let h = List.fold_left hash h fields in
-    h
+  let hash_combine seed v = seeded_hash_param 10 100 seed v
+  let hash_array h strings = Array.fold_left hash_combine h strings
+
+  let hash_variant s =
+    let accu = ref 0 in
+    for i = 0 to String.length s - 1 do
+      accu := 223 * !accu + Char.code s.[i]
+    done;
+    (* reduce to 31 bits *)
+    accu := !accu land (1 lsl 31 - 1);
+    (* make it signed for 64 bits architectures *)
+    if !accu > 0x3FFFFFFF then !accu - (1 lsl 31) else !accu
+
+  let hash = function
+    | Tuple -> 1
+    | Record fields -> hash_array 2 fields
+    | Float_record fields -> hash_array 3 fields
+    | Variant_tuple { tag; name; size } ->
+        hash_combine (hash_combine (hash_combine 4 tag) name) size
+    | Variant_record { tag; name; fields } ->
+        hash_array (hash_combine (hash_combine 5 tag) name) fields
+    | Polymorphic_variant -> 6
+    | Polymorphic_variant_constant _ -> 0
 
   external read_self_descriptors : unit -> t list =
     "caml_read_tag_section"
