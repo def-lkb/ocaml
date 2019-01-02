@@ -1271,7 +1271,7 @@ and transl_record loc env fields repres opt_init_expr =
     | Record_float ->
         Taglib.make_float_record fields
     | Record_unboxed _ ->
-        assert false
+        Taglib.default
   in
   (* Determine if there are "enough" fields (only relevant if this is a
      functional-style record update *)
