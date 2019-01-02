@@ -68,6 +68,33 @@ CAMLexport value caml_alloc_small (mlsize_t wosize, tag_t tag)
   return result;
 }
 
+CAMLexport value caml_alloc_with_profinfo (mlsize_t wosize, tag_t tag,
+                                           intnat profinfo)
+{
+  value result;
+  mlsize_t i;
+
+  CAMLassert (tag < 256);
+  CAMLassert (tag != Infix_tag);
+  if (wosize <= Max_young_wosize){
+    if (wosize == 0){
+      result = Atom (tag);
+    }else{
+      Alloc_small_with_profinfo (result, wosize, tag, profinfo);
+      if (tag < No_scan_tag){
+        for (i = 0; i < wosize; i++) Field (result, i) = Val_unit;
+      }
+    }
+  }else{
+    result = caml_alloc_shr_with_profinfo (wosize, tag, profinfo);
+    if (tag < No_scan_tag){
+      for (i = 0; i < wosize; i++) Field (result, i) = Val_unit;
+    }
+    result = caml_check_urgent_gc (result);
+  }
+  return result;
+}
+
 CAMLexport value caml_alloc_small_with_my_or_given_profinfo (mlsize_t wosize,
   tag_t tag, uintnat profinfo)
 {
