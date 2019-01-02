@@ -169,11 +169,13 @@ let read_symbols bytecode_file =
           Hashtbl.add events_by_module md (Array.of_list real_evl))
     all_events;
 
-  List.iter (fun tag ->
-      let h = Taglib.index tag in
-      match Hashtbl.find all_tags h with
-      | tags -> Hashtbl.replace all_tags h (tag :: tags)
-      | exception Not_found -> Hashtbl.add all_tags h [tag]
+  List.iter (function
+      | Taglib.Polymorphic_variant_constant _ -> ()
+      | tag ->
+          let h = Taglib.index tag in
+          match Hashtbl.find all_tags h with
+          | tags -> Hashtbl.replace all_tags h (tag :: tags)
+          | exception Not_found -> Hashtbl.add all_tags h [tag]
     )
     tagl;
 
