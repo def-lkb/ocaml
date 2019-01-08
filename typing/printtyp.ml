@@ -732,7 +732,7 @@ and tree_of_typobject sch fi nm =
   end
 
 and is_non_gen sch ty =
-    sch && is_Tvar ty && ty.level <> generic_level
+    sch && is_Tvar ty && ty.level < generic_level
 
 and tree_of_typfields sch rest = function
   | [] ->

@@ -445,7 +445,7 @@ let rec free_vars_rec real ty =
     | Tconstr (path, tl, _), Some env ->
         begin try
           let (_, body, _) = Env.find_type_expansion path env in
-          if (repr body).level <> generic_level then
+          if (repr body).level < generic_level then
             free_variables := (ty, real) :: !free_variables
         with Not_found -> ()
         end;
@@ -598,7 +598,7 @@ let duplicate_class_type ty =
 *)
 let rec generalize ty =
   let ty = repr ty in
-  if (ty.level > !current_level) && (ty.level <> generic_level) then begin
+  if (ty.level > !current_level) && (ty.level < generic_level) then begin
     set_level ty generic_level;
     begin match ty.desc with
       Tconstr (_, _, abbrev) ->
@@ -616,7 +616,7 @@ let generalize ty =
 
 let rec generalize_structure var_level ty =
   let ty = repr ty in
-  if ty.level <> generic_level then begin
+  if ty.level < generic_level then begin
     if is_Tvar ty && ty.level > var_level then
       set_level ty var_level
     else if
@@ -639,7 +639,7 @@ let generalize_structure var_level ty =
 
 let rec generalize_spine ty =
   let ty = repr ty in
-  if ty.level < !current_level || ty.level = generic_level then () else
+  if ty.level < !current_level || ty.level >= generic_level then () else
   match ty.desc with
     Tarrow (_, ty1, ty2, _) ->
       set_level ty generic_level;
@@ -726,7 +726,7 @@ let rec update_level env level expand ty =
         with Cannot_expand ->
           set_level ty level;
           iter_type_expr (update_level env level expand) ty
-        end          
+        end
     | Tpackage (p, nl, tl) when level < Path.binding_time p ->
         let p' = normalize_package_path env p in
         if Path.same p p' then raise (Unify [(ty, newvar2 level)]);
@@ -772,7 +772,7 @@ let update_level env level ty =
 
 let rec generalize_expansive env var_level visited ty =
   let ty = repr ty in
-  if ty.level = generic_level || ty.level <= var_level then () else
+  if ty.level >= generic_level || ty.level <= var_level then () else
   if not (Hashtbl.mem visited ty.id) then begin
     Hashtbl.add visited ty.id ();
     match ty.desc with
@@ -820,10 +820,10 @@ let limited_generalize ty0 ty =
 
   let rec inverse pty ty =
     let ty = repr ty in
-    if (ty.level > !current_level) || (ty.level = generic_level) then begin
+    if (ty.level > !current_level) || (ty.level >= generic_level) then begin
       decr idx;
       Hashtbl.add graph !idx (ty, ref pty);
-      if (ty.level = generic_level) || (ty == ty0) then
+      if (ty.level >= generic_level) || (ty == ty0) then
         roots := ty :: !roots;
       set_level ty !idx;
       iter_type_expr (inverse [ty]) ty
@@ -834,7 +834,7 @@ let limited_generalize ty0 ty =
 
   and generalize_parents ty =
     let idx = ty.level in
-    if idx <> generic_level then begin
+    if idx < generic_level then begin
       set_level ty generic_level;
       List.iter generalize_parents !(snd (Hashtbl.find graph idx));
       (* Special case for rows: must generalize the row variable *)
@@ -843,7 +843,7 @@ let limited_generalize ty0 ty =
           let more = row_more row in
           let lv = more.level in
           if (lv < lowest_level || lv > !current_level)
-          && lv <> generic_level then set_level more generic_level
+          && lv < generic_level then set_level more generic_level
       | _ -> ()
     end
   in
@@ -854,7 +854,7 @@ let limited_generalize ty0 ty =
   List.iter generalize_parents !roots;
   Hashtbl.iter
     (fun _ (ty, _) ->
-       if ty.level <> generic_level then set_level ty !current_level)
+       if ty.level < generic_level then set_level ty !current_level)
     graph
 
 
@@ -936,11 +936,11 @@ let rec copy ?env ?partial ?keep_names ty =
   match ty.desc with
     Tsubst ty -> ty
   | _ ->
-    if ty.level <> generic_level && partial = None then ty else
+    if ty.level < generic_level && partial = None then ty else
     (* We only forget types that are non generic and do not contain
        free univars *)
     let forget =
-      if ty.level = generic_level then generic_level else
+      if ty.level >= generic_level then generic_level else
       match partial with
         None -> assert false
       | Some (free_univars, keep) ->
@@ -948,7 +948,7 @@ let rec copy ?env ?partial ?keep_names ty =
             if keep then ty.level else !current_level
           else generic_level
     in
-    if forget <> generic_level then newty2 forget (Tvar None) else
+    if forget < generic_level then newty2 forget (Tvar None) else
     let desc = ty.desc in
     save_desc ty desc;
     let t = newvar() in          (* Stub *)
@@ -995,7 +995,7 @@ let rec copy ?env ?partial ?keep_names ty =
               Tlink ty2
           | _ ->
               (* If the row variable is not generic, we must keep it *)
-              let keep = more.level <> generic_level in
+              let keep = more.level < generic_level in
               let more' =
                 match more.desc with
                   Tsubst ty -> ty
@@ -1235,7 +1235,7 @@ let rec copy_sep fixed free bound visited ty =
   let ty = repr ty in
   let univars = free ty in
   if TypeSet.is_empty univars then
-    if ty.level <> generic_level then ty else
+    if ty.level < generic_level then ty else
     let t = newvar () in
     delayed_copy :=
       lazy (t.desc <- Tlink (copy ty))
@@ -1260,7 +1260,7 @@ let rec copy_sep fixed free bound visited ty =
           let row = row_repr row0 in
           let more = repr row.row_more in
           (* We shall really check the level on the row variable *)
-          let keep = is_Tvar more && more.level <> generic_level in
+          let keep = is_Tvar more && more.level < generic_level in
           let more' = copy_rec more in
           let fixed' = fixed && is_Tvar (repr more') in
           let row = copy_row copy_rec fixed' row keep more' in
@@ -1396,7 +1396,7 @@ let expand_abbrev_gen kind find_type_expansion env ty =
         Some ty' ->
           (* prerr_endline
             ("found a "^string_of_kind kind^" expansion for "^Path.name path);*)
-          if level <> generic_level then
+          if level < generic_level then
             begin try
               update_level env level ty'
             with Unify _ ->
@@ -1569,7 +1569,7 @@ let full_expand env ty =
 let generic_abbrev env path =
   try
     let (_, body, _) = Env.find_type_expansion path env in
-    (repr body).level = generic_level
+    (repr body).level >= generic_level
   with
     Not_found ->
       false
@@ -1580,7 +1580,7 @@ let generic_private_abbrev env path =
       {type_kind = Type_abstract;
        type_private = Private;
        type_manifest = Some body} ->
-         (repr body).level = generic_level
+         (repr body).level >= generic_level
     | _ -> false
   with Not_found -> false
 
@@ -2961,7 +2961,7 @@ let moregen_occur env level ty =
 
 let may_instantiate inst_nongen t1 =
   if inst_nongen then t1.level <> generic_level - 1
-                 else t1.level =  generic_level
+                 else t1.level >= generic_level
 
 let rec moregen inst_nongen type_pairs env t1 t2 =
   if t1 == t2 then () else
@@ -4185,7 +4185,7 @@ let rec closed_schema_rec env ty =
   if TypeSet.mem ty !visited then () else begin
     visited := TypeSet.add ty !visited;
     match ty.desc with
-      Tvar _ when ty.level <> generic_level ->
+      Tvar _ when ty.level < generic_level ->
         raise Non_closed0
     | Tconstr _ ->
         let old = !visited in

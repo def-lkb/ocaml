@@ -370,7 +370,7 @@ and transl_type_aux env policy styp =
         match decl.type_manifest with
           None -> unify_var
         | Some ty ->
-            if (repr ty).level = Btype.generic_level then unify_var else unify
+            if (repr ty).level >= Btype.generic_level then unify_var else unify
       in
       List.iter2
         (fun (sty, cty) ty' ->
@@ -628,7 +628,7 @@ and transl_type_aux env policy styp =
             let v = Btype.proxy ty1 in
             if deep_occur v ty then begin
               match v.desc with
-                Tvar name when v.level = Btype.generic_level ->
+                Tvar name when v.level >= Btype.generic_level ->
                   v.desc <- Tunivar name;
                   v :: tyl
               | _ ->
@@ -800,7 +800,7 @@ let transl_simple_type_univars env styp =
       (fun acc v ->
         let v = repr v in
         match v.desc with
-          Tvar name when v.level = Btype.generic_level ->
+          Tvar name when v.level >= Btype.generic_level ->
             v.desc <- Tunivar name; v :: acc
         | _ -> acc)
       [] !pre_univars

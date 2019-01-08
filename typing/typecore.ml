@@ -1255,7 +1255,7 @@ and type_pat_aux ~constrs ~labels ~no_existentials ~mode ~explode ~env
             List.iter generalize vars;
             let instantiated tv =
               let tv = expand_head !env tv in
-              not (is_Tvar tv) || tv.level <> generic_level in
+              not (is_Tvar tv) || tv.level < generic_level in
             if List.exists instantiated vars then
               raise
                 (Error(label_lid.loc, !env, Polymorphic_label label_lid.txt))
@@ -1750,7 +1750,7 @@ struct
     val empty : t
     (** No variables are accessed in an expression; it might be a
         constant or a global identifier *)
-      
+
     val unguarded : t -> Ident.t list
     (** The list of identifiers that are used in an unguarded context *)
 
@@ -1785,14 +1785,14 @@ struct
         x y
 
     let single id access = M.add id access M.empty
-  
+
     let empty = M.empty
 
     let list_matching p t =
       let r = ref [] in
       M.iter (fun id v -> if p v then r := id :: !r) t;
       !r
-    
+
     let unguarded =
       list_matching (function Unguarded | Dereferenced -> true | _ -> false)
 
@@ -1808,7 +1808,7 @@ struct
     let empty = Ident.empty
 
     let join x y =
-      let r = 
+      let r =
       Ident.fold_all
         (fun id v tbl ->
            let v' = try Ident.find_same id tbl with Not_found -> Use.empty in
@@ -1912,7 +1912,7 @@ struct
   type sd = Static | Dynamic
 
   let rec classify_expression : Typedtree.expression -> sd =
-    fun exp -> match exp.exp_desc with 
+    fun exp -> match exp.exp_desc with
       | Texp_let (_, _, e)
       | Texp_letmodule (_, _, _, e)
       | Texp_sequence (_, e)
@@ -1971,7 +1971,7 @@ struct
                 (join
                    (inspect (expression env e1))
                    (inspect (expression env e2)))
-                (* The body is evaluated, but not used, and not available 
+                (* The body is evaluated, but not used, and not available
                    for inclusion in another value *)
                 (discard (expression env e3)))
 
@@ -2213,7 +2213,7 @@ struct
         else Use.discard ty (* as in 'let' *)
       in
       let vars = pattern_variables c_lhs in
-      let env = 
+      let env =
         List.fold_left
           (fun env id -> Ident.add id ty env)
           env
@@ -2226,7 +2226,7 @@ struct
     fun rec_flag env bindings ->
       match rec_flag with
       | Recursive ->
-          (* Approximation: 
+          (* Approximation:
                 let rec y =
                   let rec x1 = e1
                       and x2 = e2
@@ -2285,7 +2285,7 @@ struct
     let ty = expression (build_unguarded_env idlist) expr in
     match Use.unguarded ty, Use.dependent ty, classify_expression expr with
     | _ :: _, _, _ (* The expression inspects rec-bound variables *)
-    | _, _ :: _, Dynamic -> (* The expression depends on rec-bound variables 
+    | _, _ :: _, Dynamic -> (* The expression depends on rec-bound variables
                                and its size is unknown *)
         raise(Error(expr.exp_loc, env, Illegal_letrec_expr))
     | [], _, Static (* The expression has known size *)
@@ -2409,7 +2409,7 @@ let check_univars env expans kind exp ty_expected vars =
         let t = repr t in
         generalize t;
         match t.desc with
-          Tvar name when t.level = generic_level ->
+          Tvar name when t.level >= generic_level ->
             log_type t; t.desc <- Tunivar name; true
         | _ -> false)
       vars in
@@ -2692,7 +2692,7 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
                   "format6", 0)) in
     let is_format = match ty_exp.desc with
       | Tconstr(path, _, _) when Path.same path fmt6_path ->
-        if !Clflags.principal && ty_exp.level <> generic_level then
+        if !Clflags.principal && ty_exp.level < generic_level then
           Location.prerr_warning loc
             (Warnings.Not_principal "this coercion to format6");
         true
@@ -2928,7 +2928,7 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
           try
             let (p0, p,_) = extract_concrete_record env ty in
             (* XXX level may be wrong *)
-            Some (p0, p, ty.level = generic_level || not !Clflags.principal)
+            Some (p0, p, ty.level >= generic_level || not !Clflags.principal)
           with Not_found -> None
         in
         match get_path ty_expected with
@@ -3335,7 +3335,7 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
             {desc = Tpoly (ty, [])} ->
               instance env ty
           | {desc = Tpoly (ty, tl); level = l} ->
-              if !Clflags.principal && l <> generic_level then
+              if !Clflags.principal && l < generic_level then
                 Location.prerr_warning loc
                   (Warnings.Not_principal "this use of a polymorphic method");
               snd (instance_poly false tl ty)
@@ -3748,7 +3748,7 @@ and type_label_access env srecord lid =
   let opath =
     try
       let (p0, p,_) = extract_concrete_record env ty_exp in
-      Some(p0, p, ty_exp.level = generic_level || not !Clflags.principal)
+      Some(p0, p, ty_exp.level >= generic_level || not !Clflags.principal)
     with Not_found -> None
   in
   let labels = Typetexp.find_all_labels env lid.loc lid.txt in
@@ -4097,7 +4097,7 @@ and type_argument ?recarg env sarg ty_expected' ty_expected =
       in
       let args, ty_fun', simple_res = make_args [] texp.exp_type in
       let warn = !Clflags.principal &&
-        (lv <> generic_level || (repr ty_fun').level <> generic_level)
+        (lv < generic_level || (repr ty_fun').level < generic_level)
       and texp = {texp with exp_type = instance env texp.exp_type}
       and ty_fun = instance env ty_fun' in
       if not (simple_res || no_labels ty_res) then begin
@@ -4242,7 +4242,7 @@ and type_application env funct sargs =
       {desc=Tarrow (_, ty0, ty_fun0, _)}
       when (sargs <> [] || more_sargs <> []) && commu_repr com = Cok ->
         let may_warn loc w =
-          if not !warned && !Clflags.principal && lv <> generic_level
+          if not !warned && !Clflags.principal && lv < generic_level
           then begin
             warned := true;
             Location.prerr_warning loc w
@@ -4359,7 +4359,7 @@ and type_construct env loc lid sarg ty_expected attrs =
   let opath =
     try
       let (p0, p,_) = extract_concrete_variant env ty_expected in
-      Some(p0, p, ty_expected.level = generic_level || not !Clflags.principal)
+      Some(p0, p, ty_expected.level >= generic_level || not !Clflags.principal)
     with Not_found -> None
   in
   let constrs = Typetexp.find_all_constructors env lid.loc lid.txt in
@@ -4498,7 +4498,7 @@ and type_cases ?in_function env ty_arg ty_res partial_flag loc caselist =
     Format.printf "lev = %d@.%a@." lev Printtyp.raw_type_expr ty_res; *)
   (* Do we need to propagate polymorphism *)
   let propagate =
-    !Clflags.principal || has_gadts || (repr ty_arg).level = generic_level ||
+    !Clflags.principal || has_gadts || (repr ty_arg).level >= generic_level ||
     match caselist with
       [{pc_lhs}] when is_var pc_lhs -> false
     | _ -> true in
@@ -4835,7 +4835,7 @@ and type_let ?(check = fun s -> Warnings.Unused_var s)
       l spat_sexp_list
   in
   if is_recursive then
-    List.iter 
+    List.iter
       (fun {vb_pat=pat} -> match pat.pat_desc with
            Tpat_var _ -> ()
          | Tpat_alias ({pat_desc=Tpat_any}, _, _) -> ()

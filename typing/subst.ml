@@ -212,7 +212,7 @@ let rec typexp s ty =
               Tlink ty2
           | _ ->
               let dup =
-                s.for_saving || more.level = generic_level || static_row row ||
+                s.for_saving || more.level >= generic_level || static_row row ||
                 match more.desc with Tconstr _ -> true | _ -> false in
               (* Various cases for the row variable *)
               let more' =
