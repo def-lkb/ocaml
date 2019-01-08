@@ -10,6 +10,8 @@ SOURCE= \
  	symbol_loader.mli symbol_loader.ml dbgtest.ml
 
 dbgtest: $(SOURCE)
-	ocamlfind c -custom -g -o dbgtest -package compiler-libs.common -linkpkg $^
+	../ocamlc -custom -g -o dbgtest -I \
+		../utils -I ../parsing -I ../typing -I ../bytecomp \
+		../compilerlibs/ocamlcommon.cma $^
 
 .PHONY: all

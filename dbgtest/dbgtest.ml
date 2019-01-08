@@ -51,7 +51,7 @@ let dump_typed_env_summary ppf : Env.summary -> unit = function
   | Env_empty -> ()
   | Env_value (_, id, vd) ->
     Printtyp.value_description id ppf vd;
-    Format.fprintf ppf "(* type = %a *)"
+    Format.fprintf ppf "@ (* type = %a *)@ "
       Printtyp.raw_type_expr vd.val_type
   | Env_type (_, id, td) ->
     Printtyp.type_declaration id ppf td
@@ -108,7 +108,7 @@ let () =
             | fp ->
               let rec print_fp = function
                 | Some fp ->
-                  Format.printf "- FP = %d\n" (Dbgprim.location fp);
+                  Format.printf "- FP = %d\n%!" (Dbgprim.location fp);
                   begin match Hashtbl.find events_index (Dbgprim.location fp) with
                     | exception Not_found ->
                       Format.eprintf "  Internal error: no debug information"
