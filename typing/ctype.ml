@@ -589,6 +589,9 @@ let duplicate_class_type ty =
                          (*  Type level manipulation  *)
                          (*****************************)
 
+let set_generic_level ty =
+  set_level ty (generic_level + Ident.current_time ())
+
 (*
    It would be a bit more efficient to remove abbreviation expansions
    rather than generalizing them: these expansions will usually not be
@@ -599,7 +602,7 @@ let duplicate_class_type ty =
 let rec generalize ty =
   let ty = repr ty in
   if (ty.level > !current_level) && (ty.level < generic_level) then begin
-    set_level ty generic_level;
+    set_generic_level ty;
     begin match ty.desc with
       Tconstr (_, _, abbrev) ->
         iter_abbrev generalize !abbrev
@@ -610,7 +613,8 @@ let rec generalize ty =
 
 let generalize ty =
   simple_abbrevs := Mnil;
-  generalize ty
+  generalize ty;
+  Ident.set_current_time (Ident.current_time () + 1)
 
 (* Generalize the structure and lower the variables *)
 
@@ -626,7 +630,7 @@ let rec generalize_structure var_level ty =
           not (is_object_type p) && (abbrev := Mnil; true)
       | _ -> true
     then begin
-      set_level ty generic_level;
+      set_generic_level ty;
       iter_type_expr (generalize_structure var_level) ty
     end
   end
@@ -642,18 +646,18 @@ let rec generalize_spine ty =
   if ty.level < !current_level || ty.level >= generic_level then () else
   match ty.desc with
     Tarrow (_, ty1, ty2, _) ->
-      set_level ty generic_level;
+      set_generic_level ty;
       generalize_spine ty1;
       generalize_spine ty2;
   | Tpoly (ty', _) ->
-      set_level ty generic_level;
+      set_generic_level ty;
       generalize_spine ty'
   | Ttuple tyl
   | Tpackage (_, _, tyl) ->
-      set_level ty generic_level;
+      set_generic_level ty;
       List.iter generalize_spine tyl
   | Tconstr (p, tyl, memo) when not (is_object_type p) ->
-      set_level ty generic_level;
+      set_generic_level ty;
       memo := Mnil;
       List.iter generalize_spine tyl
   | _ -> ()
@@ -835,7 +839,7 @@ let limited_generalize ty0 ty =
   and generalize_parents ty =
     let idx = ty.level in
     if idx < generic_level then begin
-      set_level ty generic_level;
+      set_generic_level ty;
       List.iter generalize_parents !(snd (Hashtbl.find graph idx));
       (* Special case for rows: must generalize the row variable *)
       match ty.desc with
@@ -843,7 +847,7 @@ let limited_generalize ty0 ty =
           let more = row_more row in
           let lv = more.level in
           if (lv < lowest_level || lv > !current_level)
-          && lv < generic_level then set_level more generic_level
+          && lv < generic_level then set_generic_level more
       | _ -> ()
     end
   in

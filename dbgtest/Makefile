@@ -9,7 +9,7 @@ SOURCE= \
 	dbgprim_stubs.c dbgprim.mli dbgprim.ml \
  	symbol_loader.mli symbol_loader.ml dbgtest.ml
 
-dbgtest: $(SOURCE)
+dbgtest: $(SOURCE) | ../ocamlc
 	../ocamlc -custom -g -o dbgtest -I \
 		../utils -I ../parsing -I ../typing -I ../bytecomp \
 		../compilerlibs/ocamlcommon.cma $^

@@ -87,6 +87,8 @@ let dump_env_summaries ppf env =
   Format.fprintf ppf "Env_summary %a"
     (Printer.list dump_env_summary) (unfold_summaries env)
 
+let todo x = x
+
 let () =
   let myself = Sys.executable_name in
   match Symbol_loader.read_symbols myself with
@@ -101,59 +103,61 @@ let () =
             Hashtbl.add events_index event.ev_pos event)
           events) symbols.events;
     (*Format.printf "%a\n%!" Symbol_loader.dump symbols;*)
-    let k f y =
-       (fun x ->
-          Dbgprim.with_stack begin function
-            | None -> prerr_endline "No debug information for stack frames"
-            | fp ->
-              let rec print_fp = function
-                | Some fp ->
-                  Format.printf "- FP = %d\n%!" (Dbgprim.location fp);
-                  begin match Hashtbl.find events_index (Dbgprim.location fp) with
-                    | exception Not_found ->
-                      Format.eprintf "  Internal error: no debug information"
-                    | ev ->
-                      Format.printf "  Summary: @[%a@]\n%!"
-                        (Printer.list dump_typed_env_summary)
-                        (unfold_summaries ev.Instruct.ev_typenv);
-                      begin try
-                          Envaux.reset_cache ();
-                          Ctype.reset_global_level ();
-                          let env =
-                            Envaux.env_from_summary
-                              ev.Instruct.ev_typenv
-                              ev.Instruct.ev_typsubst
-                          in
-                          let expr =
-                            Parser.parse_expression Lexer.token
-                              (Lexing.from_string "y := !y + 1")
-                          in
-                          Ctype.set_levels { Ctype.
-                                             current_level = 10000;
-                                             nongen_level = 10000;
-                                             global_level = 10001;
-                                             saved_level = [] };
-                          let _expr = Typecore.type_expression env expr in
-                          ()
-                        with exn ->
-                          Location.report_exception Format.err_formatter exn
-                      end;
-                      (*let env =
-                        Envaux.env_from_summary
-                          ev.Instruct.ev_typenv
-                          ev.Instruct.ev_typsubst
-                        in
-                        let summaries = unfold_summaries (Env.summary env) in
-                        Format.printf "%a\n%!"
-                        (Printer.list dump_typed_env_summary) summaries*)
-                  end;
-                  print_fp (Dbgprim.next fp)
-                | None -> ()
-              in
-              print_fp fp
-          end;
-          ignore x)
-         ();
-       f y
-    in
-    k print_int 42
+    match (fun x -> x) with
+    | _todo ->
+        let k f y =
+          (fun x ->
+             Dbgprim.with_stack begin function
+             | None -> prerr_endline "No debug information for stack frames"
+             | fp ->
+                 let rec print_fp = function
+                   | Some fp ->
+                       Format.printf "- FP = %d\n%!" (Dbgprim.location fp);
+                       begin match Hashtbl.find events_index (Dbgprim.location fp) with
+                       | exception Not_found ->
+                           Format.eprintf "  Internal error: no debug information"
+                       | ev ->
+                           Format.printf "  Summary: @[%a@]\n%!"
+                             (Printer.list dump_typed_env_summary)
+                             (unfold_summaries ev.Instruct.ev_typenv);
+                           begin try
+                             Envaux.reset_cache ();
+                             Ctype.reset_global_level ();
+                             let env =
+                               Envaux.env_from_summary
+                                 ev.Instruct.ev_typenv
+                                 ev.Instruct.ev_typsubst
+                             in
+                             let expr =
+                               Parser.parse_expression Lexer.token
+                                 (Lexing.from_string "y := !y + 1")
+                             in
+                             Ctype.set_levels { Ctype.
+                                                current_level = 10000;
+                                                nongen_level = 10000;
+                                                global_level = 10001;
+                                                saved_level = [] };
+                             let _expr = Typecore.type_expression env expr in
+                             ()
+                           with exn ->
+                             Location.report_exception Format.err_formatter exn
+                           end;
+                           (*let env =
+                             Envaux.env_from_summary
+                               ev.Instruct.ev_typenv
+                               ev.Instruct.ev_typsubst
+                             in
+                             let summaries = unfold_summaries (Env.summary env) in
+                             Format.printf "%a\n%!"
+                             (Printer.list dump_typed_env_summary) summaries*)
+                       end;
+                       print_fp (Dbgprim.next fp)
+                   | None -> ()
+                 in
+                 print_fp fp
+             end;
+             ignore x)
+            ();
+          f y
+        in
+        k print_int 42
