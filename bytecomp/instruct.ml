@@ -30,7 +30,9 @@ type debug_event =
     ev_typsubst: Subst.t;               (* Substitution over types *)
     ev_compenv: compilation_env;        (* Compilation environment *)
     ev_stacksize: int;                  (* Size of stack frame *)
-    ev_repr: debug_event_repr }         (* Position of the representative *)
+    ev_repr: debug_event_repr;          (* Position of the representative *)
+    ev_typtime: int;                    (*  *)
+  }
 
 and debug_event_kind =
     Event_before

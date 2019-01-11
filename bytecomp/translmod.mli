@@ -37,6 +37,12 @@ val transl_store_package:
 val transl_package_flambda:
       Ident.t option list -> module_coercion -> int * lambda
 
+val call_toploop_getvalue : string -> lambda
+val call_toploop_setvalue : string -> lambda -> lambda
+
+val toploop_getvalue : (Ident.t -> lambda) ref
+val toploop_setvalue : (Ident.t -> lambda -> lambda) ref
+
 val toplevel_name: Ident.t -> string
 val nat_toplevel_name: Ident.t -> Ident.t * int
 

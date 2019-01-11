@@ -2477,7 +2477,9 @@ let rec event_branch repr lam =
       Levent(lam', {lev_loc = ev.lev_loc;
                     lev_kind = ev.lev_kind;
                     lev_repr = repr;
-                    lev_env = ev.lev_env})
+                    lev_env = ev.lev_env;
+                    lev_typtime = ev.lev_typtime;
+                   })
   | (Llet(str, k, id, lam, body), _) ->
       Llet(str, k, id, lam, event_branch repr body)
   | Lstaticraise _,_ -> lam

@@ -36,7 +36,8 @@ let debug_event ppf (ev : Instruct.debug_event) =
      ev_typsubst = %a;@ \
      ev_compenv = %a;@ \
      ev_stacksize = %d;@ \
-     ev_repr = %a@]@ \
+     ev_repr = %a;@ \
+     ev_typtime = %d@]@ \
      }@]"
     ev.ev_pos
     ev.ev_module
@@ -48,3 +49,4 @@ let debug_event ppf (ev : Instruct.debug_event) =
     placeholder ev.ev_compenv
     ev.ev_stacksize
     placeholder ev.ev_repr
+    ev.ev_typtime

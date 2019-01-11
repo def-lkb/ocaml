@@ -21,6 +21,9 @@ open Format
 val getvalue : string -> Obj.t
 val setvalue : string -> Obj.t -> unit
 
+module StringMap : Map.S with type key = string
+val toplevel_value_bindings : Obj.t StringMap.t ref
+
 (* Set the load paths, before running anything *)
 
 val set_paths : unit -> unit

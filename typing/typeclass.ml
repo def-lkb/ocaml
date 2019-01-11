@@ -1008,7 +1008,9 @@ and class_expr_aux cl_num val_env met_env scl =
               exp_loc = Location.none; exp_extra = [];
               exp_type = Ctype.instance val_env' vd.val_type;
               exp_attributes = []; (* check *)
-              exp_env = val_env'})
+              exp_env = val_env';
+              exp_time = Ident.current_time()
+             })
           end
           pv
       in
@@ -1164,6 +1166,7 @@ and class_expr_aux cl_num val_env met_env scl =
                 exp_type = Ctype.instance val_env vd.val_type;
                 exp_attributes = [];
                 exp_env = val_env;
+                exp_time = Ident.current_time()
                }
              in
              Ctype.end_def ();

@@ -500,6 +500,7 @@ and transl_structure loc fields cc rootpath final_env = function
                 {lev_loc = loc;
                  lev_kind = Lev_pseudo;
                  lev_repr = None;
+                 lev_typtime = 0;
                  lev_env = Env.summary final_env})
        else
          body),
@@ -556,6 +557,7 @@ and transl_structure loc fields cc rootpath final_env = function
               lev_kind = Lev_module_definition id;
               lev_repr = None;
               lev_env = Env.summary Env.empty;
+              lev_typtime = mb.mb_time;
             })
           in
           Llet(pure_module mb.mb_expr, Pgenval, id,
@@ -579,6 +581,9 @@ and transl_structure loc fields cc rootpath final_env = function
                    lev_kind = Lev_module_definition id;
                    lev_repr = None;
                    lev_env = Env.summary Env.empty;
+                   lev_typtime =
+                     List.fold_left
+                       (fun time mb -> min time mb.mb_time) max_int bindings;
                  }))
               bindings
               body
@@ -1119,32 +1124,38 @@ let toplevel_name id =
   try Ident.find_same id !aliased_idents
   with Not_found -> Ident.name id
 
-let toploop_getvalue id =
+let call_toploop_getvalue name =
   Lapply{ap_should_be_tailcall=false;
          ap_loc=Location.none;
          ap_func=Lprim(Pfield toploop_getvalue_pos,
                        [Lprim(Pgetglobal toploop_ident, [], Location.none)],
                        Location.none);
-         ap_args=[Lconst(Const_base(Const_string (toplevel_name id, None)))];
+         ap_args=[Lconst(Const_base(Const_string (name, None)))];
          ap_inlined=Default_inline;
          ap_specialised=Default_specialise}
 
-let toploop_setvalue id lam =
+let call_toploop_setvalue name lam =
   Lapply{ap_should_be_tailcall=false;
          ap_loc=Location.none;
          ap_func=Lprim(Pfield toploop_setvalue_pos,
                        [Lprim(Pgetglobal toploop_ident, [], Location.none)],
                        Location.none);
-         ap_args=[Lconst(Const_base(Const_string (toplevel_name id, None)));
+         ap_args=[Lconst(Const_base(Const_string (name, None)));
                   lam];
          ap_inlined=Default_inline;
          ap_specialised=Default_specialise}
 
-let toploop_setvalue_id id = toploop_setvalue id (Lvar id)
+let toploop_getvalue = ref (fun id ->
+    call_toploop_getvalue (toplevel_name id))
+
+let toploop_setvalue = ref (fun id lam ->
+    call_toploop_setvalue (toplevel_name id) lam)
+
+let toploop_setvalue_id id = !toploop_setvalue id (Lvar id)
 
 let close_toplevel_term (lam, ()) =
   IdentSet.fold (fun id l -> Llet(Strict, Pgenval, id,
-                                  toploop_getvalue id, l))
+                                  !toploop_getvalue id, l))
                 (free_variables lam) lam
 
 let transl_toplevel_item item =
@@ -1172,14 +1183,14 @@ let transl_toplevel_item item =
           (make_sequence toploop_setvalue_id idents)
   | Tstr_exception ext ->
       set_toplevel_unique_name ext.ext_id;
-      toploop_setvalue ext.ext_id
+      !toploop_setvalue ext.ext_id
         (transl_extension_constructor item.str_env None ext)
   | Tstr_module {mb_id=id; mb_expr=modl} ->
       (* we need to use the unique name for the module because of issues
          with "open" (PR#1672) *)
       set_toplevel_unique_name id;
       let lam = transl_module Tcoerce_none (Some(Pident id)) modl in
-      toploop_setvalue id lam
+      !toploop_setvalue id lam
   | Tstr_recmodule bindings ->
       let idents = List.map (fun mb -> mb.mb_id) bindings in
       compile_recmodule
@@ -1200,7 +1211,7 @@ let transl_toplevel_item item =
         [] ->
           lambda_unit
       | id :: ids ->
-          Lsequence(toploop_setvalue id
+          Lsequence(!toploop_setvalue id
                       (Lprim(Pfield pos, [Lvar mid], Location.none)),
                     set_idents (pos + 1) ids) in
       Llet(Strict, Pgenval, mid,

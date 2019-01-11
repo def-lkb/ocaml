@@ -102,3 +102,86 @@ dbgprim_next(value oldfp)
 
   CAMLreturn(opt);
 }
+
+CAMLprim value
+dbgprim_peek(value fp, value pos)
+{
+  CAMLparam2(fp, pos);
+  CAMLlocal2(result, opt);
+
+  opt = Val_unit;
+  if (fp_is_valid(fp))
+  {
+    value * sp = (value *)Backtrace_slot_val(Field(fp, 2));
+    result = sp[Long_val(pos)];
+
+    opt = caml_alloc(1, 0);
+    Field(opt, 0) = result;
+  }
+
+  CAMLreturn(opt);
+}
+
+CAMLprim value
+dbgprim_peek_stack(value fp, value pos)
+{
+  CAMLparam2(fp, pos);
+  CAMLlocal2(result, opt);
+
+  opt = Val_unit;
+  if (fp_is_valid(fp))
+  {
+    value * sp = (value *)Backtrace_slot_val(Field(fp, 2));
+    result = sp[2 + Long_val(pos)];
+
+    opt = caml_alloc(1, 0);
+    Field(opt, 0) = result;
+  }
+
+  CAMLreturn(opt);
+}
+
+CAMLprim value
+dbgprim_peek_heap(value fp, value pos)
+{
+  CAMLparam2(fp, pos);
+  CAMLlocal2(result, opt);
+
+  opt = Val_unit;
+  if (fp_is_valid(fp))
+  {
+    value * sp = (value *)Backtrace_slot_val(Field(fp, 2));
+    result = ((value**)sp)[0][Long_val(pos)];
+
+    opt = caml_alloc(1, 0);
+    Field(opt, 0) = result;
+  }
+
+  CAMLreturn(opt);
+}
+
+CAMLprim value
+dbgprim_peek_rec(value fp, value pos)
+{
+  CAMLparam2(fp, pos);
+  CAMLlocal2(result, opt);
+
+  opt = Val_unit;
+  if (fp_is_valid(fp))
+  {
+    value * sp = (value *)Backtrace_slot_val(Field(fp, 2));
+    result = ((value*)sp)[0] + Long_val(pos) * sizeof(value);
+
+    opt = caml_alloc(1, 0);
+    Field(opt, 0) = result;
+  }
+
+  CAMLreturn(opt);
+}
+
+CAMLprim value
+dbgprim_log(value log)
+{
+  (void)log;
+  return Val_unit;
+}

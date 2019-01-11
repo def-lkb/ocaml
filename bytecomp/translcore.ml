@@ -603,7 +603,8 @@ let event_before exp lam = match lam with
   then Levent(lam, {lev_loc = exp.exp_loc;
                     lev_kind = Lev_before;
                     lev_repr = None;
-                    lev_env = Env.summary exp.exp_env})
+                    lev_env = Env.summary exp.exp_env;
+                    lev_typtime = exp.exp_time })
   else lam
 
 let event_after exp lam =
@@ -611,7 +612,8 @@ let event_after exp lam =
   then Levent(lam, {lev_loc = exp.exp_loc;
                     lev_kind = Lev_after exp.exp_type;
                     lev_repr = None;
-                    lev_env = Env.summary exp.exp_env})
+                    lev_env = Env.summary exp.exp_env;
+                    lev_typtime = exp.exp_time})
   else lam
 
 let event_function exp lam =
@@ -622,7 +624,8 @@ let event_function exp lam =
      Levent(body, {lev_loc = exp.exp_loc;
                    lev_kind = Lev_function;
                    lev_repr = repr;
-                   lev_env = Env.summary exp.exp_env}))
+                   lev_env = Env.summary exp.exp_env;
+                    lev_typtime = exp.exp_time}))
   else
     lam None
 
@@ -998,6 +1001,7 @@ and transl_exp0 e =
           lev_kind = Lev_module_definition id;
           lev_repr = None;
           lev_env = Env.summary Env.empty;
+          lev_typtime = e.exp_time;
         })
       in
       Llet(Strict, Pgenval, id, defining_expr, transl_exp body)
@@ -1021,7 +1025,7 @@ and transl_exp0 e =
       | `Constant_or_function ->
         (* a constant expr of type <> float gets compiled as itself *)
          transl_exp e
-      | `Float -> 
+      | `Float ->
           (* We don't need to wrap with Popaque: this forward
              block will never be shortcutted since it points to a float. *)
           Lprim(Pmakeblock(Obj.forward_tag, Immutable, None),

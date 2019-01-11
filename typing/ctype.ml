@@ -613,8 +613,7 @@ let rec generalize ty =
 
 let generalize ty =
   simple_abbrevs := Mnil;
-  generalize ty;
-  Ident.set_current_time (Ident.current_time () + 1)
+  generalize ty
 
 (* Generalize the structure and lower the variables *)
 
@@ -932,6 +931,13 @@ let rec find_repr p1 =
 let abbreviations = ref (ref Mnil)
   (* Abbreviation memorized. *)
 
+let rigid_range_before = ref 0
+let rigid_range_after = ref 0
+
+let is_generic {level; _} =
+  level >= generic_level &&
+  (level <= !rigid_range_before || level >= !rigid_range_after)
+
 (* partial: we may not wish to copy the non generic types
    before we call type_pat *)
 let rec copy ?env ?partial ?keep_names ty =
@@ -940,11 +946,12 @@ let rec copy ?env ?partial ?keep_names ty =
   match ty.desc with
     Tsubst ty -> ty
   | _ ->
-    if ty.level < generic_level && partial = None then ty else
+    let is_generic = is_generic ty in
+    if not is_generic && partial = None then ty else
     (* We only forget types that are non generic and do not contain
        free univars *)
     let forget =
-      if ty.level >= generic_level then generic_level else
+      if is_generic then generic_level else
       match partial with
         None -> assert false
       | Some (free_univars, keep) ->
@@ -952,6 +959,9 @@ let rec copy ?env ?partial ?keep_names ty =
             if keep then ty.level else !current_level
           else generic_level
     in
+    (*if ty.level > generic_level then
+      Format.eprintf "COPY GENERIC level = %d = generic_level + %d\n%!"
+        ty.level (ty.level - generic_level);*)
     if forget < generic_level then newty2 forget (Tvar None) else
     let desc = ty.desc in
     save_desc ty desc;
@@ -2315,12 +2325,19 @@ let unify_eq t1 t2 =
       try TypePairs.find unify_eq_set (order_type_pair t1 t2); true
       with Not_found -> false
 
+let rigid_var t =
+  t.level > !rigid_range_before && t.level < !rigid_range_after
+
 let unify1_var env t1 t2 =
   assert (is_Tvar t1);
   occur env t1 t2;
   occur_univar env t2;
   let d1 = t1.desc in
   link_type t1 t2;
+  if t1.level > generic_level then
+    Format.eprintf "UNIFY GENERIC level = %d = generic_level + %d\n%!"
+      t1.level (t1.level - generic_level);
+  if rigid_var t1 then raise (Unify [t1, t2]);
   try
     update_level env t1.level t2
   with Unify _ as e ->
@@ -2342,10 +2359,12 @@ let rec unify (env:Env.t ref) t1 t2 =
         unify2 env t1 t2
     | (Tconstr _, Tvar _) when deep_occur t2 t1 ->
         unify2 env t1 t2
-    | (Tvar _, _) ->
+    | (Tvar _, _) when not (rigid_var t1) ->
         unify1_var !env t1 t2
     | (_, Tvar _) ->
         unify1_var !env t2 t1
+    | (Tvar _, _) ->
+        unify1_var !env t1 t2
     | (Tunivar _, Tunivar _) ->
         unify_univar t1 t2 !univar_pairs;
         update_level !env t1.level t2;
@@ -2818,24 +2837,27 @@ let unify_gadt ~newtype_level:lev (env:Env.t ref) ty1 ty2 =
 
 let unify_var env t1 t2 =
   let t1 = repr t1 and t2 = repr t2 in
-  if t1 == t2 then () else
-  match t1.desc, t2.desc with
-    Tvar _, Tconstr _ when deep_occur t1 t2 ->
-      unify (ref env) t1 t2
-  | Tvar _, _ ->
-      let reset_tracing = check_trace_gadt_instances env in
-      begin try
-        occur env t1 t2;
-        update_level env t1.level t2;
-        link_type t1 t2;
-        reset_trace_gadt_instances reset_tracing;
-      with Unify trace ->
-        reset_trace_gadt_instances reset_tracing;
-        let expanded_trace = expand_trace env ((t1,t2)::trace) in
-        raise (Unify expanded_trace)
-      end
-  | _ ->
-      unify (ref env) t1 t2
+  if t1 == t2 then () else (
+    if t1.level > !rigid_range_before && t1.level < !rigid_range_after then
+      raise (Unify [t1, t2]);
+    match t1.desc, t2.desc with
+      Tvar _, Tconstr _ when deep_occur t1 t2 ->
+        unify (ref env) t1 t2
+    | Tvar _, _ ->
+        let reset_tracing = check_trace_gadt_instances env in
+        begin try
+          occur env t1 t2;
+          update_level env t1.level t2;
+          link_type t1 t2;
+          reset_trace_gadt_instances reset_tracing;
+        with Unify trace ->
+          reset_trace_gadt_instances reset_tracing;
+          let expanded_trace = expand_trace env ((t1,t2)::trace) in
+          raise (Unify expanded_trace)
+        end
+    | _ ->
+        unify (ref env) t1 t2
+  )
 
 let _ = unify' := unify_var
 

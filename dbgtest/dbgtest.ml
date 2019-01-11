@@ -47,12 +47,89 @@ let dump_env_summary ppf : Env.summary -> unit = function
     Format.fprintf ppf "Env_copy_types (_, %a)"
       (Printer.list (Printer.fmt "%S")) names
 
+type runtime_state = {
+  fp : Dbgprim.frame_pointer;
+  ev : Instruct.debug_event;
+  env : Env.t;
+}
+
+let print_env = ref None
+
+module Evp = struct
+  type valu = Obj.t
+
+  exception Error
+
+  let rec eval_path' st = function
+    | Path.Pident id ->
+        begin match Ident.find_same id
+                      st.ev.Instruct.ev_compenv.Instruct.ce_stack
+        with
+        | pos ->
+            begin match Dbgprim.peek st.fp (2 + st.ev.Instruct.ev_stacksize - pos) with
+            | None -> failwith "eval_path (Pident _) = invalid stack access"
+            | Some obj -> obj
+            end
+        | exception Not_found ->
+            Ident.iter (fun ident pos ->
+                Format.eprintf "stack: %a -> %d\n%!" Printtyp.ident ident pos
+              ) st.ev.Instruct.ev_compenv.Instruct.ce_stack;
+            Ident.iter (fun ident pos ->
+                Format.eprintf "heap: %a -> %d\n%!" Printtyp.ident ident pos
+              ) st.ev.Instruct.ev_compenv.Instruct.ce_heap;
+            Ident.iter (fun ident pos ->
+                Format.eprintf "rec: %a -> %d\n%!" Printtyp.ident ident pos;
+                begin match Dbgprim.peek_rec st.fp 2 with
+                | None -> assert false
+                | Some obj ->
+                    prerr_endline (Obj.obj obj ())
+                end
+              ) st.ev.Instruct.ev_compenv.Instruct.ce_rec;
+            begin match Dbgprim.peek st.fp 0 with
+            | None -> failwith "eval_path (Pident _) = missing env"
+            | Some env ->
+                match Ident.find_same id st.ev.Instruct.ev_compenv.Instruct.ce_heap with
+                | exception Not_found ->
+                    failwith "eval_path (Pident _) = invalid heap access"
+                | pos ->
+                    Obj.field env pos
+            end
+        end
+    | Path.Pdot (p, _, pos) ->
+        Obj.field (eval_path' st p) pos
+    | Path.Papply _ ->
+        failwith "eval_path (Papply _) = TODO"
+
+  let eval_path env path =
+    match !print_env with
+    | Some st -> eval_path' st path
+    | None -> failwith "eval_path _ = runtime state is missing"
+
+  let same_value = (==)
+end
+
+module Printval = Genprintval.Make(Obj)(Evp)
+
+let outval_of_value steps depth path typ =
+  match !print_env with
+  | None -> Outcometree.Oval_ellipsis
+  | Some st ->
+      begin match
+        Printval.outval_of_value
+          steps depth (fun _ _ _ -> None) st.env (Evp.eval_path st.env path) typ
+      with
+      | tree -> tree
+      | exception exn ->
+          let s = Printexc.to_string exn in
+          Outcometree.Oval_string (s, String.length s, Outcometree.Ostr_string)
+      end
+
 let dump_typed_env_summary ppf : Env.summary -> unit = function
   | Env_empty -> ()
   | Env_value (_, id, vd) ->
-    Printtyp.value_description id ppf vd;
-    Format.fprintf ppf "@ (* type = %a *)@ "
-      Printtyp.raw_type_expr vd.val_type
+    let tree = outval_of_value 10 10 (Path.Pident id) vd.val_type in
+    Format.fprintf ppf "@[@[%a@] =@ @[%a@]@]\n%!"
+      (Printtyp.value_description id) vd !Oprint.out_value tree;
   | Env_type (_, id, td) ->
     Printtyp.type_declaration id ppf td
   | Env_extension (_, id, ec) ->
@@ -103,61 +180,73 @@ let () =
             Hashtbl.add events_index event.ev_pos event)
           events) symbols.events;
     (*Format.printf "%a\n%!" Symbol_loader.dump symbols;*)
-    match (fun x -> x) with
-    | _todo ->
-        let k f y =
-          (fun x ->
-             Dbgprim.with_stack begin function
-             | None -> prerr_endline "No debug information for stack frames"
-             | fp ->
-                 let rec print_fp = function
-                   | Some fp ->
-                       Format.printf "- FP = %d\n%!" (Dbgprim.location fp);
-                       begin match Hashtbl.find events_index (Dbgprim.location fp) with
-                       | exception Not_found ->
-                           Format.eprintf "  Internal error: no debug information"
-                       | ev ->
-                           Format.printf "  Summary: @[%a@]\n%!"
-                             (Printer.list dump_typed_env_summary)
-                             (unfold_summaries ev.Instruct.ev_typenv);
-                           begin try
-                             Envaux.reset_cache ();
-                             Ctype.reset_global_level ();
-                             let env =
-                               Envaux.env_from_summary
-                                 ev.Instruct.ev_typenv
-                                 ev.Instruct.ev_typsubst
-                             in
-                             let expr =
-                               Parser.parse_expression Lexer.token
-                                 (Lexing.from_string "y := !y + 1")
-                             in
-                             Ctype.set_levels { Ctype.
-                                                current_level = 10000;
-                                                nongen_level = 10000;
-                                                global_level = 10001;
-                                                saved_level = [] };
-                             let _expr = Typecore.type_expression env expr in
-                             ()
-                           with exn ->
-                             Location.report_exception Format.err_formatter exn
-                           end;
-                           (*let env =
-                             Envaux.env_from_summary
-                               ev.Instruct.ev_typenv
-                               ev.Instruct.ev_typsubst
-                             in
-                             let summaries = unfold_summaries (Env.summary env) in
-                             Format.printf "%a\n%!"
-                             (Printer.list dump_typed_env_summary) summaries*)
+    let _todo x = x in
+    (*Ctype.rigid_range_before := 100_002_621;
+      Ctype.rigid_range_after  := 100_002_624;*)
+    let rec k f (y : int) =
+      (fun x ->
+         Dbgprim.with_stack begin function
+         | None -> prerr_endline "No debug information for stack frames"
+         | fp ->
+             Dbgprim.log g;
+             let rec print_fp = function
+               | Some fp ->
+                   Format.printf "- FP = %d\n%!" (Dbgprim.location fp);
+                   begin match Hashtbl.find events_index (Dbgprim.location fp) with
+                   | exception Not_found ->
+                       Format.eprintf "  Internal error: no debug information"
+                   | ev ->
+                       Format.printf "  Type time: %d\n" ev.Instruct.ev_typtime;
+                       (*Format.printf "  Summary: @[%a@]\n%!"
+                         (Printer.list dump_typed_env_summary)
+                         (unfold_summaries ev.Instruct.ev_typenv);*)
+                       begin try
+                         Envaux.reset_cache ();
+                         Ctype.reset_global_level ();
+                         let env =
+                           Envaux.env_from_summary
+                             ev.Instruct.ev_typenv
+                             ev.Instruct.ev_typsubst
+                         in
+                         Ctype.rigid_range_before :=
+                           Btype.generic_level + ev.Instruct.ev_typtime - 1;
+                         Ctype.rigid_range_after  :=
+                           Btype.generic_level + ev.Instruct.ev_typtime + 1000;
+                         let expr =
+                           Parser.parse_expression Lexer.token
+                             (Lexing.from_string "_todo y" (*"y := !y + 1"*))
+                         in
+                         Ctype.set_levels { Ctype.
+                                            current_level = 10000;
+                                            nongen_level = 10000;
+                                            global_level = 10001;
+                                            saved_level = [] };
+                         let _expr = Typecore.type_expression env expr in
+                         ()
+                       with exn ->
+                         Location.report_exception Format.err_formatter exn
                        end;
-                       print_fp (Dbgprim.next fp)
-                   | None -> ()
-                 in
-                 print_fp fp
-             end;
-             ignore x)
-            ();
-          f y
-        in
-        k print_int 42
+                       let env =
+                         Envaux.env_from_summary
+                           ev.Instruct.ev_typenv
+                           ev.Instruct.ev_typsubst
+                         in
+                         let summaries = unfold_summaries (Env.summary env) in
+                         print_env := Some { env; ev; fp };
+                         Format.printf "%a\n%!"
+                           (Printer.list dump_typed_env_summary) summaries;
+                         print_env := None
+                   end;
+                   print_fp (Dbgprim.next fp)
+               | None -> ()
+             in
+             print_fp fp
+         end;
+         ignore (g ());
+         ignore x)
+        ();
+      f y
+    and g () = "POWER"
+    in
+    k print_int 42
+

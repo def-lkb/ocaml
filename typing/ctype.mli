@@ -290,3 +290,7 @@ val maybe_pointer_type : Env.t -> type_expr -> bool
 val package_subtype :
     (Env.t -> Path.t -> Longident.t list -> type_expr list ->
       Path.t -> Longident.t list -> type_expr list -> bool) ref
+
+val rigid_range_before : int ref
+val rigid_range_after : int ref
+

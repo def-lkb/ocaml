@@ -1169,6 +1169,7 @@ let check_recmodule_inclusion env bindings =
          mb_expr = modl';
          mb_attributes = attrs;
          mb_loc = loc;
+         mb_time = Ident.current_time();
         }
       in
       List.map check_inclusion bindings
@@ -1487,6 +1488,7 @@ and type_structure ?(toplevel = false) funct_body anchor env sstr scope =
         let newenv = Env.enter_module_declaration id md env in
         Tstr_module {mb_id=id; mb_name=name; mb_expr=modl;
                      mb_attributes=attrs;  mb_loc=pmb_loc;
+                     mb_time = Ident.current_time();
                     },
         [Sig_module(id,
                     {md_type = modl.mod_type;

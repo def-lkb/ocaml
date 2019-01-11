@@ -64,6 +64,7 @@ and expression =
     exp_type: type_expr;
     exp_env: Env.t;
     exp_attributes: attribute list;
+    exp_time: int;
    }
 
 and exp_extra =
@@ -243,6 +244,7 @@ and module_binding =
      mb_expr: module_expr;
      mb_attributes: attribute list;
      mb_loc: Location.t;
+     mb_time: int;
     }
 
 and value_binding =

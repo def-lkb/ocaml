@@ -310,7 +310,8 @@ let type_option ty =
   newty (Tconstr(Predef.path_option,[ty], ref Mnil))
 
 let mkexp exp_desc exp_type exp_loc exp_env =
-  { exp_desc; exp_type; exp_loc; exp_env; exp_extra = []; exp_attributes = [] }
+  { exp_desc; exp_type; exp_loc; exp_env; exp_extra = []; exp_attributes = [];
+    exp_time = Ident.current_time () }
 
 let option_none ty loc =
   let lid = Longident.Lident "None"
@@ -2681,7 +2682,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
           exp_loc = loc; exp_extra = [];
           exp_type = instance env desc.val_type;
           exp_attributes = sexp.pexp_attributes;
-          exp_env = env }
+          exp_env = env;
+          exp_time = Ident.current_time ();
+        }
       end
   | Pexp_constant(Pconst_string (str, _) as cst) -> (
     let cst = constant_or_raise env loc cst in
@@ -2708,7 +2711,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
         exp_loc = loc; exp_extra = [];
         exp_type = instance_def Predef.type_string;
         exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
+        exp_env = env;
+        exp_time = Ident.current_time ();
+      }
   )
   | Pexp_constant cst ->
       let cst = constant_or_raise env loc cst in
@@ -2717,7 +2722,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
         exp_loc = loc; exp_extra = [];
         exp_type = type_constant cst;
         exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
+        exp_env = env;
+        exp_time = Ident.current_time ();
+      }
   | Pexp_let(Nonrecursive,
              [{pvb_pat=spat; pvb_expr=sval; pvb_attributes=[]}], sbody)
     when contains_gadt env spat ->
@@ -2746,7 +2753,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
         exp_loc = loc; exp_extra = [];
         exp_type = body.exp_type;
         exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
+        exp_env = env;
+        exp_time = Ident.current_time ();
+      }
   | Pexp_fun (l, Some default, spat, sbody) ->
       assert(is_optional l); (* default allowed only with optional argument *)
       let open Ast_helper in
@@ -2818,7 +2827,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
         exp_loc = loc; exp_extra = [];
         exp_type = ty_res;
         exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
+        exp_env = env;
+        exp_time = Ident.current_time ();
+      }
   | Pexp_match(sarg, caselist) ->
       begin_def ();
       let arg = type_exp env sarg in
@@ -2847,7 +2858,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
         exp_loc = loc; exp_extra = [];
         exp_type = instance env ty_expected;
         exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
+        exp_env = env;
+        exp_time = Ident.current_time ();
+      }
   | Pexp_try(sbody, caselist) ->
       let body = type_expect env sbody ty_expected in
       let cases, _ =
@@ -2857,7 +2870,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
         exp_loc = loc; exp_extra = [];
         exp_type = body.exp_type;
         exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
+        exp_env = env;
+        exp_time = Ident.current_time ();
+      }
   | Pexp_tuple sexpl ->
       assert (List.length sexpl >= 2);
       let subtypes = List.map (fun _ -> newgenvar ()) sexpl in
@@ -2872,7 +2887,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
         (* Keep sharing *)
         exp_type = newty (Ttuple (List.map (fun e -> e.exp_type) expl));
         exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
+        exp_env = env;
+        exp_time = Ident.current_time ();
+      }
   | Pexp_construct(lid, sarg) ->
       type_construct env loc lid sarg ty_expected sexp.pexp_attributes
   | Pexp_variant(l, sarg) ->
@@ -2890,7 +2907,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
                    exp_loc = loc; exp_extra = [];
                    exp_type = ty_expected0;
                    exp_attributes = sexp.pexp_attributes;
-                   exp_env = env }
+                   exp_env = env;
+                   exp_time = Ident.current_time ();
+                 }
           | _ -> raise Not_found
           end
       | _ -> raise Not_found
@@ -2907,7 +2926,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
                                     row_fixed = false;
                                     row_name = None});
           exp_attributes = sexp.pexp_attributes;
-          exp_env = env }
+          exp_env = env;
+          exp_time = Ident.current_time ();
+        }
       end
   | Pexp_record(lid_sexp_list, opt_sexp) ->
       assert (lid_sexp_list <> []);
@@ -3044,7 +3065,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
         exp_loc = loc; exp_extra = [];
         exp_type = instance env ty_expected;
         exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
+        exp_env = env;
+        exp_time = Ident.current_time ();
+      }
   | Pexp_field(srecord, lid) ->
       let (record, label, _) = type_label_access env srecord lid in
       let (_, ty_arg, ty_res) = instance_label false label in
@@ -3054,7 +3077,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
         exp_loc = loc; exp_extra = [];
         exp_type = ty_arg;
         exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
+        exp_env = env;
+        exp_time = Ident.current_time ();
+      }
   | Pexp_setfield(srecord, lid, snewval) ->
       let (record, label, opath) = type_label_access env srecord lid in
       let ty_record = if opath = None then newvar () else record.exp_type in
@@ -3070,7 +3095,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
         exp_loc = loc; exp_extra = [];
         exp_type = instance_def Predef.type_unit;
         exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
+        exp_env = env;
+        exp_time = Ident.current_time ();
+      }
   | Pexp_array(sargl) ->
       let ty = newgenvar() in
       let to_unify = Predef.type_array ty in
@@ -3081,7 +3108,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
         exp_loc = loc; exp_extra = [];
         exp_type = instance env ty_expected;
         exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
+        exp_env = env;
+        exp_time = Ident.current_time ();
+      }
   | Pexp_ifthenelse(scond, sifso, sifnot) ->
       let cond = type_expect env scond Predef.type_bool in
       begin match sifnot with
@@ -3092,7 +3121,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
             exp_loc = loc; exp_extra = [];
             exp_type = ifso.exp_type;
             exp_attributes = sexp.pexp_attributes;
-            exp_env = env }
+            exp_env = env;
+        exp_time = Ident.current_time ();
+          }
       | Some sifnot ->
           let ifso = type_expect env sifso ty_expected in
           let ifnot = type_expect env sifnot ty_expected in
@@ -3103,7 +3134,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
             exp_loc = loc; exp_extra = [];
             exp_type = ifso.exp_type;
             exp_attributes = sexp.pexp_attributes;
-            exp_env = env }
+            exp_env = env;
+        exp_time = Ident.current_time ();
+          }
       end
   | Pexp_sequence(sexp1, sexp2) ->
       let exp1 = type_statement env sexp1 in
@@ -3113,7 +3146,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
         exp_loc = loc; exp_extra = [];
         exp_type = exp2.exp_type;
         exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
+        exp_env = env;
+        exp_time = Ident.current_time ();
+      }
   | Pexp_while(scond, sbody) ->
       let cond = type_expect env scond Predef.type_bool in
       let body = type_statement env sbody in
@@ -3122,7 +3157,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
         exp_loc = loc; exp_extra = [];
         exp_type = instance_def Predef.type_unit;
         exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
+        exp_env = env;
+        exp_time = Ident.current_time ();
+      }
   | Pexp_for(param, slow, shigh, dir, sbody) ->
       let low = type_expect env slow Predef.type_int in
       let high = type_expect env shigh Predef.type_int in
@@ -3143,7 +3180,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
         exp_loc = loc; exp_extra = [];
         exp_type = instance_def Predef.type_unit;
         exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
+        exp_env = env;
+        exp_time = Ident.current_time ();
+      }
   | Pexp_constraint (sarg, sty) ->
       let separate = true in (* always separate, 1% slowdown for lablgtk *)
       if separate then begin_def ();
@@ -3165,6 +3204,7 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
         exp_env = env;
         exp_extra =
           (Texp_constraint cty, loc, sexp.pexp_attributes) :: arg.exp_extra;
+        exp_time = Ident.current_time ();
       }
   | Pexp_coerce(sarg, sty, sty') ->
       let separate = true in (* always separate, 1% slowdown for lablgtk *)
@@ -3256,6 +3296,7 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
         exp_env = env;
         exp_extra = (Texp_coerce (cty, cty'), loc, sexp.pexp_attributes) ::
                        arg.exp_extra;
+        exp_time = Ident.current_time ();
       }
   | Pexp_send (e, {txt=met}) ->
       if !Clflags.principal then begin_def ();
@@ -3305,20 +3346,26 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
                                 exp_loc = loc; exp_extra = [];
                                 exp_type = method_type;
                                 exp_attributes = []; (* check *)
-                                exp_env = env},
+                                exp_env = env;
+                                exp_time = Ident.current_time ();
+                               },
                           [ Nolabel,
                             Some {exp_desc = Texp_ident(path, lid, desc);
                                   exp_loc = obj.exp_loc; exp_extra = [];
                                   exp_type = desc.val_type;
                                   exp_attributes = []; (* check *)
-                                  exp_env = env}
+                                  exp_env = env;
+                                  exp_time = Ident.current_time ();
+                                 }
                           ])
                   in
                   (Tmeth_name met, Some (re {exp_desc = exp;
                                              exp_loc = loc; exp_extra = [];
                                              exp_type = typ;
                                              exp_attributes = []; (* check *)
-                                             exp_env = env}), typ)
+                                             exp_env = env;
+                                             exp_time = Ident.current_time ();
+                                            }), typ)
               |  _ ->
                   assert false
               end
@@ -3353,7 +3400,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
           exp_loc = loc; exp_extra = [];
           exp_type = typ;
           exp_attributes = sexp.pexp_attributes;
-          exp_env = env }
+          exp_env = env;
+          exp_time = Ident.current_time ();
+        }
       with Unify _ ->
         let valid_methods =
           match !obj_meths with
@@ -3382,7 +3431,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
               exp_loc = loc; exp_extra = [];
               exp_type = instance_def ty;
               exp_attributes = sexp.pexp_attributes;
-              exp_env = env }
+              exp_env = env;
+              exp_time = Ident.current_time ();
+            }
         end
   | Pexp_setinstvar (lab, snewval) ->
       begin try
@@ -3399,7 +3450,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
               exp_loc = loc; exp_extra = [];
               exp_type = instance_def Predef.type_unit;
               exp_attributes = sexp.pexp_attributes;
-              exp_env = env }
+              exp_env = env;
+              exp_time = Ident.current_time ();
+            }
         | Val_ivar _ ->
             raise(Error(loc, env, Instance_variable_not_mutable(true,lab.txt)))
         | _ ->
@@ -3450,7 +3503,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
             exp_loc = loc; exp_extra = [];
             exp_type = self_ty;
             exp_attributes = sexp.pexp_attributes;
-            exp_env = env }
+            exp_env = env;
+            exp_time = Ident.current_time ();
+          }
       | _ ->
           assert false
       end
@@ -3485,7 +3540,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
         exp_loc = loc; exp_extra = [];
         exp_type = ty;
         exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
+        exp_env = env;
+        exp_time = Ident.current_time ();
+      }
   | Pexp_letexception(cd, sbody) ->
       let (cd, newenv) = Typedecl.transl_exception env cd in
       let body = type_expect newenv sbody ty_expected in
@@ -3494,7 +3551,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
         exp_loc = loc; exp_extra = [];
         exp_type = body.exp_type;
         exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
+        exp_env = env;
+        exp_time = Ident.current_time ();
+      }
 
   | Pexp_assert (e) ->
       let cond = type_expect env e Predef.type_bool in
@@ -3511,6 +3570,7 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
         exp_type;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env;
+        exp_time = Ident.current_time ();
       }
   | Pexp_lazy e ->
       let ty = newgenvar () in
@@ -3523,6 +3583,7 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
         exp_type = instance env ty_expected;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env;
+        exp_time = Ident.current_time ();
       }
   | Pexp_object s ->
       let desc, sign, meths = !type_object env loc s in
@@ -3532,6 +3593,7 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
         exp_type = sign.csig_self;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env;
+        exp_time = Ident.current_time ();
       }
   | Pexp_poly(sbody, sty) ->
       if !Clflags.principal then begin_def ();
@@ -3645,7 +3707,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
         exp_loc = loc; exp_extra = [];
         exp_type = newty (Tpackage (p, nl, tl'));
         exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
+        exp_env = env;
+        exp_time = Ident.current_time ();
+      }
   | Pexp_open (ovf, lid, e) ->
       let (path, newenv) = !type_open ovf env sexp.pexp_loc lid in
       let exp = type_expect newenv e ty_expected in
@@ -3672,7 +3736,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
             exp_loc = loc; exp_extra = [];
             exp_type = instance_def Predef.type_extension_constructor;
             exp_attributes = sexp.pexp_attributes;
-            exp_env = env }
+            exp_env = env;
+            exp_time = Ident.current_time ();
+          }
       | _ ->
           raise (Error (loc, env, Invalid_extension_constructor_payload))
       end
@@ -3684,7 +3750,9 @@ and type_expect_ ?in_function ?(recarg=Rejected) env sexp ty_expected =
            exp_loc = loc; exp_extra = [];
            exp_type = instance env ty_expected;
            exp_attributes = sexp.pexp_attributes;
-           exp_env = env }
+           exp_env = env;
+           exp_time = Ident.current_time ();
+         }
 
 and type_function ?in_function loc attrs env ty_expected l caselist =
   let (loc_fun, ty_fun) =
@@ -3734,7 +3802,9 @@ and type_function ?in_function loc attrs env ty_expected l caselist =
     exp_loc = loc; exp_extra = [];
     exp_type = instance env (newgenty (Tarrow(l, ty_arg, ty_res, Cok)));
     exp_attributes = attrs;
-    exp_env = env }
+    exp_env = env;
+    exp_time = Ident.current_time ();
+  }
 
 
 and type_label_access env srecord lid =
@@ -4113,6 +4183,7 @@ and type_argument ?recarg env sarg ty_expected' ty_expected =
          pat_attributes = [];
          pat_loc = Location.none; pat_env = env},
         {exp_type = ty; exp_loc = Location.none; exp_env = env;
+         exp_time = Ident.current_time ();
          exp_extra = []; exp_attributes = [];
          exp_desc =
          Texp_ident(Path.Pident id, mknoloc (Longident.Lident name),
@@ -4388,7 +4459,9 @@ and type_construct env loc lid sarg ty_expected attrs =
       exp_loc = loc; exp_extra = [];
       exp_type = ty_res;
       exp_attributes = attrs;
-      exp_env = env } in
+      exp_env = env;
+      exp_time = Ident.current_time ();
+    } in
   if separate then begin
     end_def ();
     generalize_structure ty_res;
