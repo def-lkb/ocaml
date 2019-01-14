@@ -203,6 +203,8 @@ let classify_lazy_argument : Typedtree.expression ->
     | _ ->
        `Other
 
+let cstr_cache = Hashtbl.create 7
+
 let approx env ty =
   match scrape env ty with
   | Tvar _ | Tfield _ | Tnil | Tlink _ | Tarrow _ | Ttuple _ | Tobject _
@@ -215,14 +217,20 @@ let approx env ty =
   | Tconstr (p, _, _) ->
       begin match Env.find_type_descrs p env with
       | (cstr :: _ as cstrs), _ when cstr.Types.cstr_consts > 0 ->
-        let names = Array.make cstr.Types.cstr_consts "" in
-        List.iter (fun cstr ->
-            match cstr.Types.cstr_tag with
-            | Types.Cstr_constant i ->
-                names.(i) <- cstr.Types.cstr_name
-            | _ -> ()
-          ) cstrs;
-        Taglib.Constants names
+        begin match Hashtbl.find cstr_cache cstrs with
+        | result -> result
+        | exception Not_found ->
+            let names = Array.make cstr.Types.cstr_consts "" in
+            List.iter (fun cstr ->
+                match cstr.Types.cstr_tag with
+                | Types.Cstr_constant i ->
+                    names.(i) <- cstr.Types.cstr_name
+                | _ -> ()
+              ) cstrs;
+            let result = Taglib.Constants names in
+            Hashtbl.add cstr_cache cstrs result;
+            result
+        end
       | _ -> Taglib.Any
       end
   | Tvariant _ ->
