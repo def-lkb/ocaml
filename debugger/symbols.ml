@@ -102,33 +102,35 @@ let read_symbols' bytecode_file =
   close_in_noerr ic;
   !eventlists, !dirs, tagl
 
+let print_array f members =
+  ("[|" ^ String.concat ";" (List.map f (Array.to_list members)) ^ "|]")
+
+let print_approx = function
+  | Taglib.Any -> "Any"
+  | Taglib.Char -> "Char"
+  | Taglib.Int -> "Int"
+  | Taglib.Polymorphic_variants -> "Polymorphic_variants"
+  | Taglib.Constants strings ->
+      "Constants " ^ print_array (Printf.sprintf "%S") strings
+
 let prerr_tag =
-  let print_fields fields =
-    let fields = Array.to_list fields in
-    let fields = List.map (Printf.sprintf "%S") fields in
-    ("[|" ^ String.concat ";" fields ^ "|]")
-  in
+  let print_field (f, apx) =
+    Printf.sprintf "(%s, %S)" (print_approx apx) f in
   function
   | Taglib.Unknown ->
-      Printf.eprintf "\tUnknown\n"
-  | Taglib.Tuple ->
-      Printf.eprintf "\tTuple\n"
-  | Taglib.Array ->
-      Printf.eprintf "\tArray\n"
-  | Taglib.Record fields ->
-      Printf.eprintf "\tRecord %s\n" (print_fields fields)
-  | Taglib.Float_record fields ->
-      Printf.eprintf "\tFloat_record (%s\n" (print_fields fields)
-  | Taglib.Variant_tuple t ->
-      Printf.eprintf "\tVariant_tuple { tag = %d; name = %S; size = %d }\n"
-        t.tag t.name t.size
-  | Taglib.Variant_record t ->
-      Printf.eprintf "\tVariant_tuple { tag = %d; name = %S; fields = %s }\n"
-        t.tag t.name (print_fields t.fields)
+      Printf.printf "\tUnknown\n"
+  | Taglib.Array apx ->
+      Printf.printf "\tArray %s\n" (print_approx apx)
+  | Taglib.Tuple {name; tag; fields} ->
+      Printf.printf "\tTuple {name = %s; tag = %d; fields = %s}\n"
+        name tag (print_array print_approx fields)
+  | Taglib.Record {name; tag; fields} ->
+      Printf.printf "\tRecord {name = %s; tag = %d; fields = %s}\n"
+        name tag (print_array print_field fields)
   | Taglib.Polymorphic_variant ->
-      Printf.eprintf "\tPolymorphic_variant\n"
+      Printf.printf "\tPolymorphic_variant\n"
   | Taglib.Polymorphic_variant_constant name ->
-      Printf.eprintf "\tPolymorphic_variant_constant %S\n" name
+      Printf.printf "\tPolymorphic_variant_constant %S\n" name
 
 let read_symbols bytecode_file =
   let all_events, all_dirs, tagl = read_symbols' bytecode_file in

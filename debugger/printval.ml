@@ -112,37 +112,31 @@ let opaque_printer _kind obj =
         | String str ->
           Oval_string (str, 70, Ostr_string)
         | Float f -> Oval_float f
-        | Int n | Int_or_constant (n, []) -> Oval_int n
+        | Int_or_constant (n, []) -> Oval_int n
+        | Char n -> Oval_char n
         | Int_or_constant (n, name :: _) ->
           Oval_stuff (Printf.sprintf "%d or `%s" n name)
-        | Tuple fields ->
-          Oval_tuple (list_fields (print (depth - 1)) fields)
+        | Constant names ->
+          Oval_stuff (String.concat " or " names)
         | Array fields ->
           Oval_array (list_fields (print (depth - 1)) fields)
-        | Float_array fields ->
-          Oval_array (list_fields (fun f -> Oval_float f) fields)
-        | Record fields ->
-          let pf (k,v) = (Oide_ident k, print (depth - 1) v) in
-          Oval_record (list_fields pf fields)
-        | Float_record fields ->
-          let pf (k,v) = (Oide_ident k, Oval_float v) in
-          Oval_record (list_fields pf fields)
-        | Variant_tuple (name, fields) ->
+        | Tuple {name; fields} ->
           let tuple = list_fields (print (depth - 1)) fields in
           Oval_constr (Oide_ident name, tuple)
-        | Variant_record (name, fields) ->
+        | Record {name; fields} ->
           let pf (k,v) = (Oide_ident k, print (depth - 1) v) in
           let args = Oval_record (list_fields pf fields) in
           Oval_constr (Oide_ident name, [args])
         | Polymorphic_variant (name, tuple) ->
-          Oval_variant (name, Some (print (depth - 1) tuple))
+            let args = Tagprinter.Introspect.no_approx tuple in
+            Oval_variant (name, Some (print (depth - 1) args))
         | Closure  -> Oval_stuff "<closure>"
         | Lazy     -> Oval_stuff "<lazy>"
         | Abstract -> Oval_stuff "<abstract>"
         | Custom   -> Oval_stuff "<custom>"
         | Unknown  -> Oval_stuff "<unknown>"
       in
-      Some (print !max_printer_depth obj)
+      Some (print !max_printer_depth (Tagprinter.Introspect.no_approx obj))
 
 let print_exception ppf obj =
   let t = Printer.outval_of_untyped_exception ~opaque_printer obj in

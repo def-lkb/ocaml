@@ -405,6 +405,9 @@ let glb_array_type t1 t2 =
   | Pintarray, Pintarray -> Pintarray
   | Pfloatarray, Pfloatarray -> Pfloatarray
 
+let approx_exp_list el =
+  Array.of_list (List.map (fun e -> Typeopt.approx e.exp_env e.exp_type) el)
+
 (* Specialize a primitive from available type information,
    raise Not_found if primitive is unknown  *)
 
@@ -829,7 +832,7 @@ and transl_exp0 e =
                Matching.for_trywith (Lvar id) (transl_cases_try pat_expr_list))
   | Texp_tuple el ->
       let ll, shape = transl_list_with_shape el in
-      let tagl = Taglib.make_tuple () in
+      let tagl = Taglib.make_tuple 0 "" (approx_exp_list el) in
       begin try
         Lconst(Const_block(0, List.map extract_constant ll, tagl))
       with Not_constant ->
@@ -847,7 +850,7 @@ and transl_exp0 e =
       | Cstr_unboxed ->
           (match ll with [v] -> v | _ -> assert false)
       | Cstr_block n ->
-          let tagl = Taglib.make_variant n cstr.cstr_name (List.length ll) in
+          let tagl = Taglib.make_tuple n cstr.cstr_name (approx_exp_list args) in
           begin try
             Lconst(Const_block(n, List.map extract_constant ll, tagl))
           with Not_constant ->
@@ -906,6 +909,13 @@ and transl_exp0 e =
   | Texp_array expr_list ->
       let kind = array_kind e in
       let ll = transl_list expr_list in
+      let tagl =
+        let approx = match expr_list with
+          | [] -> Taglib.Any
+          | x :: _ -> Typeopt.approx x.exp_env x.exp_type
+        in
+        Taglib.make_array approx
+      in
       begin try
         (* For native code the decision as to which compilation strategy to
            use is made later.  This enables the Flambda passes to lift certain
@@ -930,15 +940,14 @@ and transl_exp0 e =
                When not [Pfloatarray], the exception propagates to the handler
                below. *)
             let imm_array =
-              Lprim (Pmakearray (kind, Immutable, Taglib.make_array ()),
-                     ll, e.exp_loc)
+              Lprim (Pmakearray (kind, Immutable, tagl), ll, e.exp_loc)
             in
             Lprim (Pduparray (kind, Mutable), [imm_array], e.exp_loc)
         | cl ->
             let imm_array =
               match kind with
               | Paddrarray | Pintarray ->
-                  Lconst(Const_block(0, cl, Taglib.make_array ()))
+                  Lconst(Const_block(0, cl, tagl))
               | Pfloatarray ->
                   Lconst(Const_float_array(List.map extract_float cl))
               | Pgenarray ->
@@ -947,7 +956,7 @@ and transl_exp0 e =
             Lprim (Pduparray (kind, Mutable), [imm_array], e.exp_loc)
         end
       with Not_constant ->
-        Lprim(Pmakearray (kind, Mutable, Taglib.make_array ()), ll, e.exp_loc)
+        Lprim(Pmakearray (kind, Mutable, tagl), ll, e.exp_loc)
       end
   | Texp_ifthenelse(cond, ifso, Some ifnot) ->
       Lifthenelse(transl_exp cond,
@@ -1259,19 +1268,22 @@ and transl_setinstvar loc self var expr =
 and transl_record loc env fields repres opt_init_expr =
   let size = Array.length fields in
   let tagdesc =
-    let fields = Array.map (fun (desc,_) -> desc.Types.lbl_name) fields in
+    let fields = Array.map (fun (desc,expr) ->
+        let approx = match expr with
+          | Typedtree.Kept texpr -> Typeopt.approx env texpr
+          | Typedtree.Overridden (_, expr) ->
+              Typeopt.approx expr.exp_env expr.exp_type
+        in
+        (desc.Types.lbl_name, approx)) fields
+    in
     match repres with
-    | Record_regular -> Taglib.make_record fields
+    | Record_regular -> Taglib.make_record 0 "" fields
     | Record_inlined tag ->
-        Taglib.make_variant_record
-          tag !current_constructor_name fields
+        Taglib.make_record tag !current_constructor_name fields
     | Record_extension ->
-        Taglib.make_variant_record
-          Obj.object_tag !current_constructor_name fields
-    | Record_float ->
-        Taglib.make_float_record fields
-    | Record_unboxed _ ->
-        Taglib.default
+        Taglib.make_record Obj.object_tag !current_constructor_name fields
+    | Record_float -> Taglib.make_record Obj.double_array_tag "" fields
+    | Record_unboxed _ -> Taglib.default
   in
   (* Determine if there are "enough" fields (only relevant if this is a
      functional-style record update *)

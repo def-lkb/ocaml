@@ -118,14 +118,18 @@ module Ephemeron = struct
 end
 
 module Tag_descriptor = struct
+  type approx =
+    | Any
+    | Char
+    | Int
+    | Constants of string array
+    | Polymorphic_variants
+
   type t =
     | Unknown
-    | Tuple
-    | Array
-    | Record of string array
-    | Float_record of string array
-    | Variant_tuple  of { tag: int; name: string; size: int }
-    | Variant_record of { tag: int; name: string; fields: string array }
+    | Array  of approx
+    | Tuple  of { name: string; tag: int; fields: approx array }
+    | Record of { name: string; tag: int; fields: (string * approx) array }
     | Polymorphic_variant
     | Polymorphic_variant_constant of string
 
@@ -161,13 +165,10 @@ module Tag_descriptor = struct
 
   let hash = function
     | Unknown -> 0
-    | Tuple -> 1
-    | Array -> 2
-    | Record fields -> hash_array 3 fields
-    | Float_record fields -> hash_array 4 fields
-    | Variant_tuple { tag; name; size } ->
-        hash_combine (hash_combine (hash_combine 5 tag) name) size
-    | Variant_record { tag; name; fields } ->
+    | Array approx -> hash_combine 2 approx
+    | Tuple { name; tag; fields } ->
+        hash_combine (hash_combine (hash_combine 5 tag) name) fields
+    | Record { name; tag; fields } ->
         hash_array (hash_combine (hash_combine 6 tag) name) fields
     | Polymorphic_variant -> 7
     | Polymorphic_variant_constant _ -> 0

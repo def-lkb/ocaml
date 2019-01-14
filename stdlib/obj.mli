@@ -156,14 +156,18 @@ module Ephemeron: sig
 end
 
 module Tag_descriptor : sig
+  type approx =
+    | Any
+    | Char
+    | Int
+    | Constants of string array
+    | Polymorphic_variants
+
   type t =
     | Unknown
-    | Tuple
-    | Array
-    | Record of string array
-    | Float_record of string array
-    | Variant_tuple  of { tag: int; name: string; size: int }
-    | Variant_record of { tag: int; name: string; fields: string array }
+    | Array of approx
+    | Tuple  of { name: string; tag: int; fields: approx array }
+    | Record of { name: string; tag: int; fields: (string * approx) array }
     | Polymorphic_variant
     | Polymorphic_variant_constant of string
 

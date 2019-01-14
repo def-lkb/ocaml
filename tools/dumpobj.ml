@@ -516,29 +516,31 @@ let read_primitive_table ic len =
   let p = really_input_string ic len in
   String.split_on_char '\000' p |> List.filter ((<>) "") |> Array.of_list
 
+let print_array f members =
+  ("[|" ^ String.concat ";" (List.map f (Array.to_list members)) ^ "|]")
+
+let print_approx = function
+  | Taglib.Any -> "Any"
+  | Taglib.Char -> "Char"
+  | Taglib.Int -> "Int"
+  | Taglib.Polymorphic_variants -> "Polymorphic_variants"
+  | Taglib.Constants strings ->
+      "Constants " ^ print_array (sprintf "%S") strings
+
 let print_tag =
-  let print_fields fields =
-    let fields = Array.to_list fields in
-    let fields = List.map (Printf.sprintf "%S") fields in
-    ("[|" ^ String.concat ";" fields ^ "|]")
-  in
+  let print_field (f, apx) =
+    Printf.sprintf "(%s, %S)" (print_approx apx) f in
   function
   | Taglib.Unknown ->
       printf "\tUnknown\n"
-  | Taglib.Tuple ->
-      printf "\tTuple\n"
-  | Taglib.Array ->
-      printf "\tArray\n"
-  | Taglib.Record fields ->
-      printf "\tRecord %s\n" (print_fields fields)
-  | Taglib.Float_record fields ->
-      printf "\tFloat_record (%s\n" (print_fields fields)
-  | Taglib.Variant_tuple t ->
-      printf "\tVariant_tuple { tag = %d; name = %S; size = %d }\n"
-        t.tag t.name t.size
-  | Taglib.Variant_record t ->
-      printf "\tVariant_tuple { tag = %d; name = %S; fields = %s }\n"
-        t.tag t.name (print_fields t.fields)
+  | Taglib.Array apx ->
+      printf "\tArray %s\n" (print_approx apx)
+  | Taglib.Tuple {name; tag; fields} ->
+      printf "\tTuple {name = %s; tag = %d; fields = %s}\n"
+        name tag (print_array print_approx fields)
+  | Taglib.Record {name; tag; fields} ->
+      printf "\tRecord {name = %s; tag = %d; fields = %s}\n"
+        name tag (print_array print_field fields)
   | Taglib.Polymorphic_variant ->
       printf "\tPolymorphic_variant\n"
   | Taglib.Polymorphic_variant_constant name ->

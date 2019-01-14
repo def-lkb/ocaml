@@ -1,11 +1,15 @@
+type approx = Obj.Tag_descriptor.approx =
+  | Any
+  | Char
+  | Int
+  | Constants of string array
+  | Polymorphic_variants
+
 type t = Obj.Tag_descriptor.t =
   | Unknown
-  | Tuple
-  | Array
-  | Record of string array
-  | Float_record of string array
-  | Variant_tuple  of { tag: int; name: string; size: int }
-  | Variant_record of { tag: int; name: string; fields: string array }
+  | Array of approx
+  | Tuple  of { name: string; tag: int; fields: approx array }
+  | Record of { name: string; tag: int; fields: (string * approx) array }
   | Polymorphic_variant
   | Polymorphic_variant_constant of string
 
@@ -18,21 +22,14 @@ let library = compiler_tags ()
 
 let register t = library := t :: !library; t
 
-let make_tuple () = register Tuple
+let make_array approx =
+  register (Array approx)
 
-let make_array () = register Array
+let make_tuple tag name fields =
+  register (Tuple {name; tag; fields})
 
-let make_record fields =
-  register (Record fields)
-
-let make_float_record fields =
-  register (Float_record fields)
-
-let make_variant tag name size =
-  register (Variant_tuple {tag; name; size})
-
-let make_variant_record tag name fields =
-  register (Variant_record {tag; name; fields})
+let make_record tag name fields =
+  register (Record {name; tag; fields})
 
 let register_polymorphic_variant name =
   ignore (register (Polymorphic_variant_constant name) : t)

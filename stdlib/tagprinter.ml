@@ -46,42 +46,38 @@ end
 module Introspect = struct
   type 'a fields = int * (int -> 'a)
 
+  type approx = Obj.Tag_descriptor.approx
+
   type dynval =
     | String of string
     (* [String "foo"] = "foo" *)
-    | Int of int
-    (* [Int 42] = 42    *)
     | Float of float
     (* [Float 12.12] = 12.12 *)
+    | Char of char
+    (* [Char 'c'] = 'x' *)
     | Int_or_constant of int * string list
     (* [Int_or_constant (1, ["`Bla"])] = 1 or `Bla *)
-    | Tuple of Obj.t fields
+    | Constant of string list
+    (* [Constant ["`Bla"]] = `Bla *)
+    | Array of (approx * Obj.t) fields
+    (* [Array f] = [|f0, f1, f2, ...|] *)
+    | Tuple of { name: string; fields: (approx * Obj.t) fields }
     (* [Tuple f] = (f0, f1, f2, ...) *)
-    | Array of Obj.t fields
-    (* [Array f] = [|f0, f1, f2, ...|] *)
-    | Float_array of float fields
-    (* [Array f] = [|f0, f1, f2, ...|] *)
-    | Record of (string * Obj.t) fields
+    | Record of { name: string; fields: (string * (approx * Obj.t)) fields }
     (* [Record f] = { fst f0 : snd f0; fst f1 : snd f1; ... } *)
-    | Float_record of (string * float) fields
-    (* [Float_record f] = { fst f0 : snd f0; fst f1 : snd f1; ... } *)
-    | Variant_tuple  of string * Obj.t fields
-    | Variant_record of string * (string * Obj.t) fields
     | Polymorphic_variant of string * Obj.t
     | Closure | Lazy | Abstract | Custom | Unknown
 
-  let double_to_wo_size = match Sys.word_size with
-    | 64 -> 1
-    | _  -> 2
+  let double_to_wo_shift = match Sys.word_size with
+    | 64 -> 0
+    | _  -> 1
 
-  let fields_of_array arr =
-    (Array.length arr, Array.get arr)
-
-  let fields_of_float_array (arr : float array) =
-    (Array.length arr, Array.get arr)
-
-  let fields_of_block obj =
-    (Obj.size obj, Obj.field obj)
+  let fields_of_block f obj =
+    if Obj.tag obj = Obj.double_array_tag then
+      (Obj.size obj lsr double_to_wo_shift,
+       fun i -> f i (Obj.repr (Obj.double_field obj i)))
+    else
+      (Obj.size obj, fun i -> f i (Obj.field obj i))
 
   let map_fields f (size, get) =
     (size, fun i -> f i (get i))
@@ -92,39 +88,42 @@ module Introspect = struct
     else
       let osize = Obj.size obj in
       let select = function
-        | Obj.Tag_descriptor.Tuple -> true
-        | Obj.Tag_descriptor.Array -> true
+        | Obj.Tag_descriptor.Array _ -> true
         | Obj.Tag_descriptor.Polymorphic_variant -> osize = 2
-        | Obj.Tag_descriptor.Record fields ->
-            otag = 0 && osize = Array.length fields
-        | Obj.Tag_descriptor.Float_record fields ->
-            otag = Obj.double_array_tag &&
-            osize = Array.length fields * double_to_wo_size
-        | Obj.Tag_descriptor.Variant_tuple t ->
-            otag = t.tag && osize = t.size
-        | Obj.Tag_descriptor.Variant_record t ->
+        | Obj.Tag_descriptor.Tuple t ->
             otag = t.tag && osize = Array.length t.fields
+        | Obj.Tag_descriptor.Record t ->
+            otag = t.tag &&
+            let len = Array.length t.fields in
+            let len =
+              if otag = Obj.double_array_tag
+              then len lsl double_to_wo_shift else len
+            in
+            osize = len
         | Obj.Tag_descriptor.Polymorphic_variant_constant _ -> false
         | Obj.Tag_descriptor.Unknown -> false
       in
       List.find_opt select (Index.lookup_by_profinfo t obj)
 
+  let no_approx' (_ : int) (obj : Obj.t) = (Obj.Tag_descriptor.Any, obj)
+
   let dynval obj =
     let obj = Obj.repr obj in
     if Obj.is_int obj then
-      Int (Obj.obj obj)
+      Int_or_constant (Obj.obj obj, [])
     else
       let tag = Obj.tag obj in
       if tag <= Obj.last_non_constant_constructor_tag then (
         if tag = 0
-        then Tuple (fields_of_block obj)
-        else Variant_tuple ("Tag#" ^ string_of_int tag, fields_of_block obj)
+        then Tuple { name = ""; fields = fields_of_block no_approx' obj }
+        else Tuple { name = "Tag#" ^ string_of_int tag;
+                     fields = fields_of_block no_approx' obj }
       ) else if tag = Obj.string_tag then
         String (Obj.obj obj)
       else if tag = Obj.double_tag then
         Float (Obj.obj obj)
       else if tag = Obj.double_array_tag then
-        Float_array (Obj.obj obj)
+        Array (fields_of_block no_approx' obj)
       else if tag = Obj.closure_tag then
         Closure
       else if tag = Obj.lazy_tag then
@@ -136,30 +135,40 @@ module Introspect = struct
       else
         Unknown
 
-  let tagged_dynval t obj =
+  let no_approx (obj : Obj.t) = (Obj.Tag_descriptor.Any, obj)
+
+  let tagged_dynval t (approx, obj) =
     if Obj.is_int obj then
       let i = (Obj.obj obj : int) in
-      match Index.lookup_variant t i with
-      | [] -> Int i
-      | names -> Int_or_constant (i, names)
+      match approx with
+       | Obj.Tag_descriptor.Any ->
+           Int_or_constant (i, Index.lookup_variant t i)
+       | Obj.Tag_descriptor.Int ->
+           Int_or_constant (i, [])
+       | Obj.Tag_descriptor.Char ->
+           (try Char (Char.chr i) with _ -> Int_or_constant (i, []))
+       | Obj.Tag_descriptor.Constants names ->
+           if i >= 0 && i < Array.length names
+           then Constant [names.(i)]
+           else Int_or_constant (i, [])
+       | Obj.Tag_descriptor.Polymorphic_variants ->
+           begin match Index.lookup_variant t i with
+           | [] -> Int_or_constant (i, [])
+           | names -> Constant names
+           end
     else
       match find_tag t obj with
-      | Some (Obj.Tag_descriptor.Tuple) ->
-          Tuple (Obj.size obj, Obj.field obj)
-      | Some (Obj.Tag_descriptor.Array) ->
-          Array (Obj.size obj, Obj.field obj)
-      | Some (Obj.Tag_descriptor.Record fields) ->
-          Record (map_fields (fun i field -> fields.(i), field)
-                    (fields_of_block obj))
-      | Some (Obj.Tag_descriptor.Float_record fields) ->
-          Float_record (map_fields (fun i field -> fields.(i), field)
-                          (fields_of_float_array (Obj.obj obj)))
-      | Some (Obj.Tag_descriptor.Variant_tuple t) ->
-          Variant_tuple (t.name, fields_of_block obj)
-      | Some (Obj.Tag_descriptor.Variant_record t) ->
-          let f i field = (t.fields.(i), field) in
-          let fields = map_fields f (fields_of_block (Obj.obj obj)) in
-          Variant_record (t.name, fields)
+      | Some (Obj.Tag_descriptor.Array approx ) ->
+          Array (fields_of_block (fun _ obj -> approx, obj) obj)
+      | Some (Obj.Tag_descriptor.Record {name; fields}) ->
+          let get_field i obj =
+            let fname, fapprox = fields.(i) in
+            (fname, (fapprox, obj))
+          in
+          Record { name; fields = fields_of_block get_field obj }
+      | Some (Obj.Tag_descriptor.Tuple {name; fields}) ->
+          let get_field i obj = (fields.(i), obj) in
+          Tuple {name; fields = fields_of_block get_field obj}
       | Some (Obj.Tag_descriptor.Polymorphic_variant) ->
           let name = (Obj.obj (Obj.field obj 0) : int) in
           let payload = Obj.field obj 1 in

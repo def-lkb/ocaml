@@ -202,3 +202,28 @@ let classify_lazy_argument : Typedtree.expression ->
        `Identifier `Other
     | _ ->
        `Other
+
+let approx env ty =
+  match scrape env ty with
+  | Tvar _ | Tfield _ | Tnil | Tlink _ | Tarrow _ | Ttuple _ | Tobject _
+  | Tsubst _ | Tpackage _ | Tunivar _ | Tpoly _ ->
+      Taglib.Any
+  | Tconstr (p, _, _) when Path.same p Predef.path_int ->
+      Taglib.Int
+  | Tconstr (p, _, _) when Path.same p Predef.path_char ->
+      Taglib.Char
+  | Tconstr (p, _, _) ->
+      begin match Env.find_type_descrs p env with
+      | (cstr :: _ as cstrs), _ when cstr.Types.cstr_consts > 0 ->
+        let names = Array.make cstr.Types.cstr_consts "" in
+        List.iter (fun cstr ->
+            match cstr.Types.cstr_tag with
+            | Types.Cstr_constant i ->
+                names.(i) <- cstr.Types.cstr_name
+            | _ -> ()
+          ) cstrs;
+        Taglib.Constants names
+      | _ -> Taglib.Any
+      end
+  | Tvariant _ ->
+      Taglib.Polymorphic_variants

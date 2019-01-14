@@ -35,3 +35,5 @@ val classify_lazy_argument : Typedtree.expression ->
                              | `Float
                              | `Identifier of [`Forward_value | `Other]
                              | `Other]
+
+val approx : Env.t -> Types.type_expr -> Taglib.approx
