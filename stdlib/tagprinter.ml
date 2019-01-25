@@ -1,15 +1,15 @@
-type descriptor = Obj.Tag_descriptor.t
-
-let profinfo_mask = (1 lsl Obj.profinfo_bits ()) - 1
-let index x = profinfo_mask land (Obj.Tag_descriptor.hash x)
-
 module Index = struct
+  type descriptor = Obj.Tag_descriptor.t
+
+  let profinfo_mask = (1 lsl Obj.profinfo_bits ()) - 1
+  let descriptor_index x = profinfo_mask land (Obj.Tag_descriptor.hash x)
+
   type t = {
     descriptors : (int, descriptor list) Hashtbl.t;
     variants : (int, string list) Hashtbl.t;
   }
 
-  let create () : t = {
+  let make () : t = {
     descriptors = Hashtbl.create 17;
     variants = Hashtbl.create 17;
   }
@@ -22,7 +22,7 @@ module Index = struct
         | names -> Hashtbl.replace t.variants i (name :: names)
         end
     | tag ->
-        let i = index tag in
+        let i = descriptor_index tag in
         begin match Hashtbl.find t.descriptors i with
         | exception Not_found -> Hashtbl.add t.descriptors i [tag]
         | tags -> Hashtbl.replace t.descriptors i (tag :: tags)
@@ -36,17 +36,52 @@ module Index = struct
     with Not_found -> []
 
   let lookup_by_profinfo t o =
-    lookup t (Obj.get_profinfo (Obj.repr o))
+    lookup t (Obj.get_profinfo o)
 
   let lookup_variant (t : t) i =
     try Hashtbl.find t.variants i
     with Not_found -> []
+
+  let self_index = lazy (make ())
+  let self_descriptors = ref []
+
+  let self_index () =
+    let lazy index = self_index in
+    let new_descriptors = Obj.Tag_descriptor.read_self_descriptors () in
+    let last_descriptors = !self_descriptors in
+    if new_descriptors <> last_descriptors then (
+      self_descriptors := new_descriptors;
+      let rec update_descriptors = function
+        | descriptors when descriptors == last_descriptors -> ()
+        | [] -> ()
+        | x :: xs ->
+          register index x;
+          update_descriptors xs
+      in
+      update_descriptors new_descriptors
+    );
+    index
 end
 
 module Introspect = struct
   type 'a fields = int * (int -> 'a)
+  let field_count (count, _ : _ fields) = count
+  let field_get (_, getter : _ fields) i = getter i
 
-  type approx = Obj.Tag_descriptor.approx
+  type approx = Obj.Tag_descriptor.approx =
+    | Any
+    | Char
+    | Int
+    | Constants of string array
+    | Polymorphic_variants
+
+  type dynobj = approx * Obj.t
+  let get_approx (approx, _ : dynobj) = approx
+  let get_obj (_, obj : dynobj) = obj
+
+  let no_approx (obj : Obj.t) : dynobj = (Obj.Tag_descriptor.Any, obj)
+  let lift ?(approx=Obj.Tag_descriptor.Any) (obj : Obj.t) : dynobj =
+    (approx, obj)
 
   type dynval =
     | String of string
@@ -59,13 +94,13 @@ module Introspect = struct
     (* [Int_or_constant (1, ["`Bla"])] = 1 or `Bla *)
     | Constant of string list
     (* [Constant ["`Bla"]] = `Bla *)
-    | Array of (approx * Obj.t) fields
+    | Array of dynobj fields
     (* [Array f] = [|f0, f1, f2, ...|] *)
-    | Tuple of { name: string; fields: (approx * Obj.t) fields }
+    | Tuple of { name: string; fields: dynobj fields }
     (* [Tuple f] = (f0, f1, f2, ...) *)
-    | Record of { name: string; fields: (string * (approx * Obj.t)) fields }
+    | Record of { name: string; fields: (string * dynobj) fields }
     (* [Record f] = { fst f0 : snd f0; fst f1 : snd f1; ... } *)
-    | Polymorphic_variant of string * Obj.t
+    | Polymorphic_variant of string * dynobj
     | Closure | Lazy | Abstract | Custom | Unknown
 
   let double_to_wo_shift = match Sys.word_size with
@@ -78,9 +113,6 @@ module Introspect = struct
        fun i -> f i (Obj.repr (Obj.double_field obj i)))
     else
       (Obj.size obj, fun i -> f i (Obj.field obj i))
-
-  let map_fields f (size, get) =
-    (size, fun i -> f i (get i))
 
   let find_tag t obj =
     let otag = Obj.tag obj in
@@ -107,7 +139,7 @@ module Introspect = struct
 
   let no_approx' (_ : int) (obj : Obj.t) = (Obj.Tag_descriptor.Any, obj)
 
-  let dynval obj =
+  let raw_dynval obj =
     let obj = Obj.repr obj in
     if Obj.is_int obj then
       Int_or_constant (Obj.obj obj, [])
@@ -135,27 +167,25 @@ module Introspect = struct
       else
         Unknown
 
-  let no_approx (obj : Obj.t) = (Obj.Tag_descriptor.Any, obj)
-
-  let tagged_dynval t (approx, obj) =
+  let dynval t (approx, obj) =
     if Obj.is_int obj then
       let i = (Obj.obj obj : int) in
       match approx with
-       | Obj.Tag_descriptor.Any ->
-           Int_or_constant (i, Index.lookup_variant t i)
-       | Obj.Tag_descriptor.Int ->
-           Int_or_constant (i, [])
-       | Obj.Tag_descriptor.Char ->
-           (try Char (Char.chr i) with _ -> Int_or_constant (i, []))
-       | Obj.Tag_descriptor.Constants names ->
-           if i >= 0 && i < Array.length names
-           then Constant [names.(i)]
-           else Int_or_constant (i, [])
-       | Obj.Tag_descriptor.Polymorphic_variants ->
-           begin match Index.lookup_variant t i with
-           | [] -> Int_or_constant (i, [])
-           | names -> Constant names
-           end
+      | Obj.Tag_descriptor.Any ->
+          Int_or_constant (i, Index.lookup_variant t i)
+      | Obj.Tag_descriptor.Int ->
+          Int_or_constant (i, [])
+      | Obj.Tag_descriptor.Char ->
+          (try Char (Char.chr i) with _ -> Int_or_constant (i, []))
+      | Obj.Tag_descriptor.Constants names ->
+          if i >= 0 && i < Array.length names
+          then Constant [names.(i)]
+          else Int_or_constant (i, [])
+      | Obj.Tag_descriptor.Polymorphic_variants ->
+          begin match Index.lookup_variant t i with
+          | [] -> Int_or_constant (i, [])
+          | names -> Constant names
+          end
     else
       match find_tag t obj with
       | Some (Obj.Tag_descriptor.Array approx ) ->
@@ -173,104 +203,12 @@ module Introspect = struct
           let name = (Obj.obj (Obj.field obj 0) : int) in
           let payload = Obj.field obj 1 in
           begin match Index.lookup_variant t name with
-          | [] -> Polymorphic_variant (string_of_int name, payload)
-          | name :: _ -> Polymorphic_variant (name, payload)
+          | [] -> Polymorphic_variant (string_of_int name, no_approx payload)
+          | name :: _ -> Polymorphic_variant (name, no_approx payload)
           end
       | Some (Obj.Tag_descriptor.Unknown)
       | Some (Obj.Tag_descriptor.Polymorphic_variant_constant _)
-      | None -> dynval obj
+      | None -> raw_dynval obj
 
-  (*type outcome =
-    | Ostring of string
-    | Ofloat of float
-    | Oint of int
-    | Oarray of outcome list
-    | Oconstr of string * outcome list
-    | Orecord of (string * outcome) list
-    | Oellipsis
-    | Oother of string
-
-  let rec format_outcome ppf = function
-    | Ostring x -> Format.fprintf ppf "%S" x
-    | Ofloat x -> Format.fprintf ppf "%f" x
-    | Oint x -> Format.fprintf ppf "%d" x
-    | Oarray xs ->
-        let format_elements ppf xs =
-          List.iter (Format.fprintf ppf "%a;" format_outcome) xs
-        in
-        Format.fprintf ppf "@[<hov>[|%a|]@]" format_elements xs
-    | Oconstr (name, []) ->
-        Format.fprintf ppf "%s" name
-    | Oconstr (name, xs) ->
-        let format_elements ppf xs =
-          List.iter (Format.fprintf ppf "%a;" format_outcome) xs
-        in
-        Format.fprintf ppf "%s (@[<hov>%a@])" name format_elements xs
-    | Orecord xs ->
-        let format_element ppf (k,v) =
-          Format.fprintf ppf "%s: %a;" k format_outcome v
-        in
-        let format_elements ppf xs =
-          List.iter (format_element ppf) xs
-        in
-        Format.fprintf ppf "{@[<hov>%a@]}" format_elements xs
-    | Oellipsis ->
-        Format.fprintf ppf "..."
-    | Oother str ->
-        Format.fprintf ppf "%s" str
-
-  let rec var_dump_outcome depth width obj =
-    let fmt_fields f (size, field) =
-      let list =
-        ref (if size > width then [Oellipsis] else [])
-      in
-      for i = min width size - 1 downto 0 do
-        list := f (field i) :: !list
-      done;
-      !list
-    in
-    match dynval obj with
-    | String str ->
-        Ostring str
-    | Float flt ->
-        Ofloat flt
-    | Int i ->
-        Oint i
-    | Array a ->
-        Oarray
-          (fmt_fields (var_dump_outcome (depth - 1) width) )
-    | Float_array a ->
-        Oarray
-          (fmt_fields (fun flt -> Ofloat flt) (fields_of_array a))
-    | Block (tag, fields) ->
-        Oconstr (
-          "Block." ^ string_of_int tag,
-          fmt_fields (var_dump_outcome (depth - 1) width) fields
-        )
-    | Constructor (name, fields) ->
-        Oconstr (
-          name,
-          fmt_fields (var_dump_outcome (depth - 1) width)
-            (fields_of_array fields)
-        )
-    | Record (name, fields) ->
-        let dump_field (name, v) =
-          (name, var_dump_outcome (depth - 1) width v)
-        in
-        Oconstr (
-          name,
-          [Orecord (Array.to_list (Array.map dump_field fields))]
-        )
-    | Closure  -> Oother "<closure>"
-    | Lazy     -> Oother "<lazy>"
-    | Abstract -> Oother "<abstract>"
-    | Custom   -> Oother "<custom>"
-    | Unknown  -> Oother "<unknown>"
-
-  let var_dump_outcome ?(depth=5) ?(width=80) v =
-    var_dump_outcome depth width (Obj.repr v)
-
-  let var_dump v =
-    format_outcome Format.std_formatter (var_dump_outcome v);
-    Format.pp_print_flush Format.std_formatter ()*)
+  let self_dynval dynobj = dynval (Index.self_index ()) dynobj
 end

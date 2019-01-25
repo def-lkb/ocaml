@@ -86,7 +86,7 @@ let max_printer_depth = ref 20
 let max_printer_steps = ref 300
 
 let descriptors = lazy (
-  let index = Tagprinter.Index.create () in
+  let index = Tagprinter.Index.make () in
   Tagprinter.Index.register_list index (Debugcom.remote_tag_descriptors ());
   index
 )
@@ -98,10 +98,11 @@ let opaque_printer _kind obj =
   | exception Debugcom.Marshalling_error ->
       Some (Outcometree.Oval_stuff "<cannot fetch remote object>")
   | obj ->
+      let open Tagprinter.Introspect in
       let list_fields f fields =
         let acc = ref [] in
-        for i = fst fields - 1 downto 0 do
-          acc := f (snd fields i) :: !acc
+        for i = field_count fields - 1 downto 0 do
+          acc := f (field_get fields i) :: !acc
         done;
         !acc
       in
@@ -109,14 +110,11 @@ let opaque_printer _kind obj =
       let rec print depth obj =
         if depth <= 0 then
           Outcometree.Oval_ellipsis
-        else if H.mem table (snd obj) then
+        else if H.mem table (get_obj obj) then
           Outcometree.Oval_stuff "<cycle>"
         else
-          let open Tagprinter.Introspect in
           let open Outcometree in
-          match
-            Tagprinter.Introspect.tagged_dynval (Lazy.force descriptors) obj
-          with
+          match dynval (Lazy.force descriptors) obj with
           | String str ->
               Oval_string (str, 70, Ostr_string)
           | Float f -> Oval_float f
@@ -127,28 +125,27 @@ let opaque_printer _kind obj =
           | Constant names ->
               Oval_stuff (String.concat " or " names)
           | Array fields ->
-              H.add table (snd obj) ();
+              H.add table (get_obj obj) ();
               Oval_array (list_fields (print (depth - 1)) fields)
           | Tuple {name; fields} ->
-              H.add table (snd obj) ();
+              H.add table (get_obj obj) ();
               let tuple = list_fields (print (depth - 1)) fields in
               Oval_constr (Oide_ident name, tuple)
           | Record {name; fields} ->
-              H.add table (snd obj) ();
+              H.add table (get_obj obj) ();
               let pf (k,v) = (Oide_ident k, print (depth - 1) v) in
               let args = Oval_record (list_fields pf fields) in
               Oval_constr (Oide_ident name, [args])
           | Polymorphic_variant (name, tuple) ->
-              H.add table (snd obj) ();
-              let args = Tagprinter.Introspect.no_approx tuple in
-              Oval_variant (name, Some (print (depth - 1) args))
+              H.add table (get_obj obj) ();
+              Oval_variant (name, Some (print (depth - 1) tuple))
           | Closure  -> Oval_stuff "<closure>"
           | Lazy     -> Oval_stuff "<lazy>"
           | Abstract -> Oval_stuff "<abstract>"
           | Custom   -> Oval_stuff "<custom>"
           | Unknown  -> Oval_stuff "<unknown>"
       in
-      Some (print !max_printer_depth (Tagprinter.Introspect.no_approx obj))
+      Some (print !max_printer_depth (Tagprinter.Introspect.lift obj))
 
 let print_exception ppf obj =
   let t = Printer.outval_of_untyped_exception ~opaque_printer obj in
