@@ -195,6 +195,7 @@ let print_config oc =
   p_bool "flat_float_array" flat_float_array;
   p_bool "afl_instrument" afl_instrument;
   p_bool "windows_unicode" windows_unicode;
+  p_bool "tag_library" true;
 
   (* print the magic number *)
   p "exec_magic_number" exec_magic_number;
