@@ -190,7 +190,7 @@ module Introspect = struct
       | Obj.Tag_descriptor.Polymorphic_variants ->
           begin match Index.lookup_variant t i with
           | [] -> Int_or_constant (i, [])
-          | names -> Constant names
+          | names -> Constant (List.map ((^)"`") names)
           end
     else
       match find_tag t obj with
