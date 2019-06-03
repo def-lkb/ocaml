@@ -139,8 +139,7 @@ module Introspect = struct
 
   let no_approx' (_ : int) (obj : Obj.t) = (Obj.Tag_descriptor.Any, obj)
 
-  let raw_dynval obj =
-    let obj = Obj.repr obj in
+  let raw_dynval (obj : Obj.t) =
     if Obj.is_int obj then
       Int_or_constant (Obj.obj obj, [])
     else

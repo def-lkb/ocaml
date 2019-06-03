@@ -71,7 +71,7 @@ module Introspect : sig
     | Unknown
 
   (* Introspect an object, without using an index *)
-  val raw_dynval : dynobj -> dynval
+  val raw_dynval : Obj.t -> dynval
 
   (* Introspect an object using a user-provided index *)
   val dynval : Index.t -> dynobj -> dynval
