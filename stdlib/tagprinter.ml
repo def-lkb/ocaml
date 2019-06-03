@@ -42,24 +42,31 @@ module Index = struct
     try Hashtbl.find t.variants i
     with Not_found -> []
 
-  let self_index = lazy (make ())
   let self_descriptors = ref []
-
-  let self_index () =
-    let lazy index = self_index in
-    let new_descriptors = Obj.Tag_descriptor.read_self_descriptors () in
+  let update_descriptors index descriptors =
     let last_descriptors = !self_descriptors in
-    if new_descriptors <> last_descriptors then (
-      self_descriptors := new_descriptors;
-      let rec update_descriptors = function
+    if descriptors <> last_descriptors then (
+      self_descriptors := descriptors;
+      let rec aux = function
         | descriptors when descriptors == last_descriptors -> ()
         | [] -> ()
         | x :: xs ->
-          register index x;
-          update_descriptors xs
+            register index x;
+            aux xs
       in
-      update_descriptors new_descriptors
-    );
+      aux descriptors
+    )
+
+  let self_index = lazy (
+    let descriptors = Obj.Tag_descriptor.read_self_descriptors () in
+    let result = make () in
+    update_descriptors result descriptors;
+    result
+  )
+
+  let self_index () =
+    let lazy index = self_index in
+    update_descriptors index !(Obj.Tag_descriptor.compiler_tags ());
     index
 end
 

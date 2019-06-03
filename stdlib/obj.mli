@@ -177,4 +177,7 @@ module Tag_descriptor : sig
 
   external read_self_descriptors : unit -> t list =
     "caml_read_tag_section"
+
+  external compiler_tags : unit -> t list ref =
+    "caml_compiler_tags"
 end
