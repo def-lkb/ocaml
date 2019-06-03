@@ -206,32 +206,35 @@ let classify_lazy_argument : Typedtree.expression ->
 let cstr_cache = Hashtbl.create 7
 
 let approx env ty =
-  match scrape env ty with
-  | Tvar _ | Tfield _ | Tnil | Tlink _ | Tarrow _ | Ttuple _ | Tobject _
-  | Tsubst _ | Tpackage _ | Tunivar _ | Tpoly _ ->
-      Taglib.Any
-  | Tconstr (p, _, _) when Path.same p Predef.path_int ->
-      Taglib.Int
-  | Tconstr (p, _, _) when Path.same p Predef.path_char ->
-      Taglib.Char
-  | Tconstr (p, _, _) ->
-      begin match Env.find_type_descrs p env with
-      | (cstr :: _ as cstrs), _ when cstr.Types.cstr_consts > 0 ->
-        begin match Hashtbl.find cstr_cache cstrs with
-        | result -> result
-        | exception Not_found ->
-            let names = Array.make cstr.Types.cstr_consts "" in
-            List.iter (fun cstr ->
-                match cstr.Types.cstr_tag with
-                | Types.Cstr_constant i ->
-                    names.(i) <- cstr.Types.cstr_name
-                | _ -> ()
-              ) cstrs;
-            let result = Taglib.Constants names in
-            Hashtbl.add cstr_cache cstrs result;
-            result
+  try
+    match scrape env ty with
+    | Tvar _ | Tfield _ | Tnil | Tlink _ | Tarrow _ | Ttuple _ | Tobject _
+    | Tsubst _ | Tpackage _ | Tunivar _ | Tpoly _ ->
+        Taglib.Any
+    | Tconstr (p, _, _) when Path.same p Predef.path_int ->
+        Taglib.Int
+    | Tconstr (p, _, _) when Path.same p Predef.path_char ->
+        Taglib.Char
+    | Tconstr (p, _, _) ->
+        begin match Env.find_type_descrs p env with
+        | (cstr :: _ as cstrs), _ when cstr.Types.cstr_consts > 0 ->
+          begin match Hashtbl.find cstr_cache cstrs with
+          | result -> result
+          | exception Not_found ->
+              let names = Array.make cstr.Types.cstr_consts "" in
+              List.iter (fun cstr ->
+                  match cstr.Types.cstr_tag with
+                  | Types.Cstr_constant i ->
+                      names.(i) <- cstr.Types.cstr_name
+                  | _ -> ()
+                ) cstrs;
+              let result = Taglib.Constants names in
+              Hashtbl.add cstr_cache cstrs result;
+              result
+          end
+        | _ -> Taglib.Any
         end
-      | _ -> Taglib.Any
-      end
-  | Tvariant _ ->
-      Taglib.Polymorphic_variants
+    | Tvariant _ ->
+        Taglib.Polymorphic_variants
+  with Not_found ->
+    Taglib.Any
